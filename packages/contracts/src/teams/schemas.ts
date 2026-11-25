@@ -7,6 +7,24 @@ export type TeamStatus = z.infer<typeof teamStatusSchema>;
 export const teamRoleSchema = z.enum(["captain", "member"]);
 export type TeamRole = z.infer<typeof teamRoleSchema>;
 
+export const teamInvitationStatusSchema = z.enum([
+    "pending",
+    "accepted",
+    "declined",
+    "revoked",
+    "expired",
+]);
+export type TeamInvitationStatus = z.infer<typeof teamInvitationStatusSchema>;
+
+export const teamInvitationSchema = z.object({
+    id: idSchema,
+    email: emailSchema,
+    status: teamInvitationStatusSchema,
+    expiresAt: isoDateTimeSchema,
+    createdAt: isoDateTimeSchema,
+});
+export type TeamInvitation = z.infer<typeof teamInvitationSchema>;
+
 export const teamSchema = z.object({
     id: idSchema,
     organizationId: idSchema,
@@ -32,15 +50,7 @@ export const teamDetailSchema = teamSchema.extend({
             joinedAt: isoDateTimeSchema,
         }),
     ),
-    invitations: z.array(
-        z.object({
-            id: idSchema,
-            email: emailSchema,
-            status: z.enum(["pending", "accepted", "declined", "revoked", "expired"]),
-            expiresAt: isoDateTimeSchema,
-            createdAt: isoDateTimeSchema,
-        }),
-    ),
+    invitations: z.array(teamInvitationSchema),
 });
 export type TeamDetail = z.infer<typeof teamDetailSchema>;
 
@@ -77,6 +87,20 @@ export const updateTeamMemberRoleRequestSchema = z
     })
     .strict();
 export type UpdateTeamMemberRoleRequest = z.infer<typeof updateTeamMemberRoleRequestSchema>;
+
+export const transferTeamCaptainRequestSchema = z
+    .object({
+        userId: idSchema,
+    })
+    .strict();
+export type TransferTeamCaptainRequest = z.infer<typeof transferTeamCaptainRequestSchema>;
+
+export const acceptTeamInvitationRequestSchema = z
+    .object({
+        token: z.string().min(32).max(256),
+    })
+    .strict();
+export type AcceptTeamInvitationRequest = z.infer<typeof acceptTeamInvitationRequestSchema>;
 
 export const teamInvitationAcceptanceSchema = z.object({
     teamId: idSchema,

@@ -5,7 +5,13 @@
         "rootDir": "./src",
         "declaration": true,
         "declarationMap": true,
-        "sourceMap": true
+        "sourceMap": true,
+        "lib": [
+            "ES2023",
+            "DOM"
+        ]
     },
-    "include": ["src/**/*.ts"]
+    "include": [
+        "src/**/*.ts"
+    ]
 }

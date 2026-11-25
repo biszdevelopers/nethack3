@@ -7,9 +7,7 @@ export const grantGlobalAdministratorRequestSchema = z
         reason: z.string().trim().min(5).max(500),
     })
     .strict();
-export type GrantGlobalAdministratorRequest = z.infer<
-    typeof grantGlobalAdministratorRequestSchema
->;
+export type GrantGlobalAdministratorRequest = z.infer<typeof grantGlobalAdministratorRequestSchema>;
 
 export const revokeGlobalAdministratorRequestSchema = z
     .object({
@@ -56,5 +54,10 @@ export const auditQuerySchema = z.object({
     entityType: z.string().max(80).optional(),
     actorUserId: z.uuid().optional(),
 });
+
+export const administrationAuditQuerySchema = auditQuerySchema.extend({
+    organizationId: z.uuid(),
+});
+export type AdministrationAuditQuery = z.infer<typeof administrationAuditQuerySchema>;
 
 export { reportSummarySchema };

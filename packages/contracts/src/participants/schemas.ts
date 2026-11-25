@@ -64,3 +64,16 @@ export const participantSummarySchema = z.object({
     registeredAt: isoDateTimeSchema,
 });
 export type ParticipantSummary = z.infer<typeof participantSummarySchema>;
+
+export const myParticipationSchema = z.object({
+    organizationId: idSchema,
+    editionId: idSchema,
+    editionName: z.string(),
+    editionSlug: z.string(),
+    organizationName: z.string(),
+    status: registrationStatusSchema,
+    divisionId: idSchema.nullable(),
+    teamId: idSchema.nullable(),
+    registeredAt: isoDateTimeSchema,
+});
+export type MyParticipation = z.infer<typeof myParticipationSchema>;

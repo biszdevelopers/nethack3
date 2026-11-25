@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { httpUrlSchema, idSchema, isoDateTimeSchema, markdownSchema } from "../common/schemas.js";
+import {
+    emailSchema,
+    httpUrlSchema,
+    idSchema,
+    isoDateTimeSchema,
+    markdownSchema,
+} from "../common/schemas.js";
 
 export const projectStatusSchema = z.enum(["draft", "published", "archived"]);
 export type ProjectStatus = z.infer<typeof projectStatusSchema>;
@@ -23,6 +29,20 @@ export const projectSchema = z.object({
     updatedAt: isoDateTimeSchema,
 });
 export type Project = z.infer<typeof projectSchema>;
+
+export const projectMemberSchema = z.object({
+    userId: idSchema,
+    displayName: z.string(),
+    role: z.enum(["owner", "member"]),
+});
+export type ProjectMember = z.infer<typeof projectMemberSchema>;
+
+export const addProjectMemberRequestSchema = z
+    .object({
+        email: emailSchema,
+    })
+    .strict();
+export type AddProjectMemberRequest = z.infer<typeof addProjectMemberRequestSchema>;
 
 export const projectDetailSchema = projectSchema.extend({
     teamName: z.string().nullable(),

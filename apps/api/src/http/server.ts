@@ -24,6 +24,7 @@ import { FastifyLoggerAdapter } from "../infrastructure/logging/fastify-logger.j
 import { createErrorHandler } from "./error-handler.js";
 import { AuthGuard } from "./guards.js";
 import type { NethackServer } from "./types.js";
+import { beginRequestSpan, endRequestSpan } from "../observability/tracing.js";
 
 export interface BaseServer {
     readonly app: NethackServer;
@@ -186,6 +187,11 @@ export async function configureServer(app: NethackServer, services: ServerServic
     app.addHook("onRequest", async (request) => {
         request.authContext = null;
         request.startedAt = Date.now();
+        beginRequestSpan(request, request.method, request.url.split("?")[0] ?? request.url);
+    });
+
+    app.addHook("onResponse", async (request, reply) => {
+        endRequestSpan(request, request.method, reply.statusCode, request.routeOptions.url);
     });
 
     app.addHook("preHandler", async (request) => {

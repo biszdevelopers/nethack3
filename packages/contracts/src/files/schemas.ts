@@ -1,6 +1,15 @@
 import { z } from "zod";
 import { idSchema, isoDateTimeSchema } from "../common/schemas.js";
 
+export const fileStatusSchema = z.enum([
+    "quarantined",
+    "scanning",
+    "approved",
+    "rejected",
+    "deleted",
+]);
+export type FileStatus = z.infer<typeof fileStatusSchema>;
+
 export const storedFileSchema = z.object({
     id: idSchema,
     organizationId: idSchema.nullable(),
@@ -8,7 +17,7 @@ export const storedFileSchema = z.object({
     contentType: z.string(),
     byteSize: z.number().int().nonnegative(),
     checksumSha256: z.string(),
-    status: z.enum(["quarantined", "scanning", "approved", "rejected", "deleted"]),
+    status: fileStatusSchema,
     createdAt: isoDateTimeSchema,
 });
 export type StoredFile = z.infer<typeof storedFileSchema>;

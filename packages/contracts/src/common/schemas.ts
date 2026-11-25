@@ -31,7 +31,13 @@ export const timeZoneSchema = z
         }
     }, "Unknown time zone.");
 
-export const httpUrlSchema = z.url().max(2048);
+export const httpUrlSchema = z
+    .url()
+    .max(2048)
+    .refine((value) => {
+        const protocol = new URL(value).protocol;
+        return protocol === "http:" || protocol === "https:";
+    }, "Use an http or https URL.");
 
 export const cursorSchema = z.string().max(512);
 export const limitSchema = z.coerce.number().int().min(1).max(100).default(20);

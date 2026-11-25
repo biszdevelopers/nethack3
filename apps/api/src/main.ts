@@ -1,11 +1,13 @@
 import { loadLocalEnvironment } from "./bootstrap.js";
 import { loadConfiguration } from "./core/configuration.js";
 import { NethackRuntime } from "./core/runtime.js";
+import { startTracing, stopTracing } from "./observability/tracing.js";
 
 loadLocalEnvironment();
 
 const config = loadConfiguration();
 const runtime = new NethackRuntime({ config });
+await startTracing(config, runtime.logger);
 
 let shuttingDown = false;
 
@@ -22,6 +24,7 @@ async function shutdown(signal: string): Promise<void> {
     force.unref();
     try {
         await runtime.close();
+        await stopTracing();
         clearTimeout(force);
         process.exit(0);
     } catch (error) {

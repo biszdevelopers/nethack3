@@ -15,6 +15,9 @@ import {
 import type { SessionService } from "./session-service.js";
 import type { RequestMetadata } from "./types.js";
 import { AccountLinkRequiredError, type UserService } from "./user-service.js";
+import { normalizeReturnTo } from "./return-to.js";
+
+export { normalizeReturnTo } from "./return-to.js";
 
 export type LoginFailureReason =
     | "login_cancelled"
@@ -199,25 +202,6 @@ export class LoginService {
             expiresAt: this.clock.now(),
         };
     }
-}
-
-export function normalizeReturnTo(returnTo: string | null, workspaceOrigin: string): string {
-    if (returnTo === null || returnTo.trim() === "") {
-        return "/";
-    }
-    const value = returnTo.trim();
-    if (value.startsWith("/") && !value.startsWith("//") && !value.includes("\\")) {
-        return value.slice(0, 2048);
-    }
-    try {
-        const url = new URL(value);
-        if (url.origin === workspaceOrigin) {
-            return `${url.pathname}${url.search}${url.hash}`.slice(0, 2048) || "/";
-        }
-    } catch {
-        // Fall through to the safe default.
-    }
-    return "/";
 }
 
 function toWorkspaceUrl(path: string, workspaceOrigin: string): string {

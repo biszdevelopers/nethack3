@@ -16,7 +16,9 @@
         "db:migrate": "bun src/migrate.ts",
         "db:migrate:node": "node dist/migrate.js",
         "db:seed": "bun src/seed.ts",
-        "test": "vitest run"
+        "test": "vitest run",
+        "test:integration": "vitest run",
+        "test:auth": "vitest run tests/auth"
     },
     "dependencies": {
         "@fastify/cookie": "11.1.5",

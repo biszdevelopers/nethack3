@@ -29,3 +29,19 @@ export const createAnnouncementRequestSchema = z
     })
     .strict();
 export type CreateAnnouncementRequest = z.infer<typeof createAnnouncementRequestSchema>;
+
+export const updateAnnouncementRequestSchema = z
+    .object({
+        title: z.string().trim().min(2).max(160).optional(),
+        bodyMarkdown: markdownSchema.optional(),
+        visibility: announcementVisibilitySchema.optional(),
+    })
+    .strict()
+    .refine(
+        (value) =>
+            value.title !== undefined ||
+            value.bodyMarkdown !== undefined ||
+            value.visibility !== undefined,
+        "Provide at least one field to update.",
+    );
+export type UpdateAnnouncementRequest = z.infer<typeof updateAnnouncementRequestSchema>;

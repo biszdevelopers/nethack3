@@ -44,6 +44,15 @@ export const createRubricRequestSchema = z
     .strict();
 export type CreateRubricRequest = z.infer<typeof createRubricRequestSchema>;
 
+export const judgeAssignmentStatusSchema = z.enum([
+    "assigned",
+    "in_progress",
+    "submitted",
+    "conflict_declared",
+    "revoked",
+]);
+export type JudgeAssignmentStatus = z.infer<typeof judgeAssignmentStatusSchema>;
+
 export const judgeAssignmentSchema = z.object({
     id: idSchema,
     organizationId: idSchema,
@@ -53,7 +62,7 @@ export const judgeAssignmentSchema = z.object({
     judgeUserId: idSchema,
     judgeDisplayName: z.string(),
     projectTitle: z.string(),
-    status: z.enum(["assigned", "in_progress", "submitted", "conflict_declared", "revoked"]),
+    status: judgeAssignmentStatusSchema,
     conflictNote: z.string().nullable(),
     assignmentNote: z.string(),
     dueAt: isoDateTimeSchema.nullable(),
@@ -107,3 +116,24 @@ export const evaluationSchema = z.object({
     updatedAt: isoDateTimeSchema,
 });
 export type Evaluation = z.infer<typeof evaluationSchema>;
+
+export const assignmentSubmissionSummarySchema = z.object({
+    id: idSchema,
+    projectId: idSchema,
+    projectTitle: z.string(),
+    teamId: idSchema.nullable(),
+});
+export type AssignmentSubmissionSummary = z.infer<typeof assignmentSubmissionSummarySchema>;
+
+export const assignmentDetailSchema = z.object({
+    assignment: judgeAssignmentSchema,
+    criteria: z.array(criterionSchema),
+    submission: assignmentSubmissionSummarySchema,
+    evaluation: evaluationSchema.nullable(),
+});
+export type AssignmentDetail = z.infer<typeof assignmentDetailSchema>;
+
+export const assignmentHistorySchema = z.object({
+    evaluation: evaluationSchema.nullable(),
+});
+export type AssignmentHistory = z.infer<typeof assignmentHistorySchema>;
