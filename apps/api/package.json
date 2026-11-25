@@ -1,0 +1,49 @@
+{
+    "name": "api",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "bun --watch src/main.ts",
+        "dev:node": "node --disable-warning=ExperimentalWarning --experimental-strip-types --watch src/main.ts",
+        "build": "tsc -p tsconfig.build.json",
+        "typecheck": "tsc -p tsconfig.json --noEmit",
+        "start:node": "node dist/main.js",
+        "start:bun": "bun dist/main.js",
+        "worker:node": "node dist/worker-main.js",
+        "worker:bun": "bun dist/worker-main.js",
+        "db:generate": "drizzle-kit generate",
+        "db:migrate": "bun src/migrate.ts",
+        "db:migrate:node": "node dist/migrate.js",
+        "db:seed": "bun src/seed.ts",
+        "test": "vitest run"
+    },
+    "dependencies": {
+        "@fastify/cookie": "11.1.5",
+        "@fastify/cors": "11.4.3",
+        "@fastify/helmet": "13.2.0",
+        "@fastify/multipart": "10.1.9",
+        "@fastify/rate-limit": "11.3.0",
+        "@fastify/swagger": "9.9.5",
+        "@fastify/swagger-ui": "6.1.5",
+        "@nethack/contracts": "workspace:*",
+        "@opentelemetry/api": "1.10.0",
+        "@opentelemetry/exporter-trace-otlp-http": "0.301.2",
+        "@opentelemetry/sdk-node": "0.301.2",
+        "drizzle-orm": "0.45.4",
+        "fastify": "5.12.8",
+        "fastify-type-provider-zod": "7.0.0",
+        "jose": "6.2.18",
+        "nodemailer": "10.6.1",
+        "openid-client": "6.9.1",
+        "pg": "8.23.1",
+        "zod": "4.6.7"
+    },
+    "devDependencies": {
+        "@types/node": "26.6.10",
+        "@types/nodemailer": "8.0.2",
+        "@types/pg": "8.23.1",
+        "drizzle-kit": "0.31.11",
+        "typescript": "6.0.3"
+    }
+}

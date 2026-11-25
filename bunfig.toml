@@ -1,0 +1,9 @@
+[install]
+exact = true
+frozenLockfile = false
+
+[run]
+bun = true
+
+[test]
+root = "."

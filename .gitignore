@@ -159,5 +159,16 @@ vite.config.ts.timestamp-*
 .nx/cache
 .nx/workspace-data
 .nx/migrate-runs
-FULL_PLAN.md
-SETUP_GUIDE.md
+
+# Test and build artifacts
+playwright-report/
+blob-report/
+test-results/
+*.tsbuildinfo
+
+# Local project data, storage, and secrets
+.data/
+storage/
+.env
+.env.*
+!.env.example

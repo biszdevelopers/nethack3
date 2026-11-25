@@ -1,0 +1,35 @@
+{
+    "name": "workspace",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc -p tsconfig.build.json && vite build",
+        "typecheck": "tsc -p tsconfig.json --noEmit",
+        "preview": "vite preview",
+        "test": "vitest run"
+    },
+    "dependencies": {
+        "@hookform/resolvers": "7.0.9",
+        "@nethack/api-client": "workspace:*",
+        "@nethack/contracts": "workspace:*",
+        "@nethack/ui": "workspace:*",
+        "@tanstack/react-query": "5.108.4",
+        "date-fns": "4.4.0",
+        "react": "19.3.1",
+        "react-dom": "19.3.1",
+        "react-hook-form": "7.92.0",
+        "react-router": "8.5.3",
+        "zod": "4.6.7"
+    },
+    "devDependencies": {
+        "@tailwindcss/vite": "4.3.5",
+        "@types/react": "19.3.2",
+        "@types/react-dom": "19.3.0",
+        "@vitejs/plugin-react": "6.3.0",
+        "tailwindcss": "4.3.5",
+        "typescript": "6.0.3",
+        "vite": "8.3.8"
+    }
+}

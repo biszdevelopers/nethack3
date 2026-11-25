@@ -1,0 +1,54 @@
+{
+    "$schema": "./node_modules/oxlint/configuration_schema.json",
+    "plugins": ["typescript", "react", "jsx-a11y", "import", "promise", "unicorn", "oxc"],
+    "env": {
+        "browser": true,
+        "node": true,
+        "es2024": true
+    },
+    "categories": {
+        "correctness": "error",
+        "suspicious": "warn",
+        "perf": "warn"
+    },
+    "rules": {
+        "no-unused-vars": "off",
+        "typescript/no-unused-vars": [
+            "error",
+            {
+                "argsIgnorePattern": "^_",
+                "varsIgnorePattern": "^_"
+            }
+        ],
+        "typescript/no-explicit-any": "error",
+        "typescript/no-non-null-assertion": "error",
+        "typescript/consistent-type-imports": "error",
+        "react/jsx-key": "error",
+        "react/no-array-index-key": "warn",
+        "react-hooks/rules-of-hooks": "error",
+        "react-hooks/exhaustive-deps": "warn",
+        "jsx-a11y/alt-text": "error",
+        "jsx-a11y/aria-props": "error",
+        "jsx-a11y/aria-role": "error",
+        "jsx-a11y/label-has-associated-control": "error",
+        "jsx-a11y/anchor-is-valid": "error",
+        "jsx-a11y/click-events-have-key-events": "warn",
+        "import/no-cycle": "error",
+        "import/no-duplicates": "error",
+        "no-console": ["warn", { "allow": ["warn", "error"] }],
+        "eqeqeq": "error",
+        "no-var": "error",
+        "prefer-const": "error"
+    },
+    "ignorePatterns": [
+        "node_modules",
+        "dist",
+        ".next",
+        "coverage",
+        "playwright-report",
+        "test-results",
+        ".data",
+        "storage",
+        "drizzle/meta"
+    ]
+}
