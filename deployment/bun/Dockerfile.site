@@ -1,0 +1,61 @@
+# syntax=docker/dockerfile:1
+
+FROM oven/bun:1.3.14-alpine AS build
+USER root
+WORKDIR /app
+
+COPY package.json bun.lock bunfig.toml tsconfig.base.json ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/site/package.json apps/site/package.json
+COPY apps/workspace/package.json apps/workspace/package.json
+COPY packages/contracts/package.json packages/contracts/package.json
+COPY packages/ui/package.json packages/ui/package.json
+COPY packages/api-client/package.json packages/api-client/package.json
+RUN bun install --frozen-lockfile
+
+COPY apps/site/src apps/site/src
+COPY apps/site/next.config.ts apps/site/next.config.ts
+COPY apps/site/next-env.d.ts apps/site/next-env.d.ts
+COPY apps/site/tsconfig.json apps/site/tsconfig.json
+COPY apps/site/postcss.config.mjs apps/site/postcss.config.mjs
+COPY packages/contracts/src packages/contracts/src
+COPY packages/contracts/tsconfig.json packages/contracts/tsconfig.json
+COPY packages/contracts/tsconfig.build.json packages/contracts/tsconfig.build.json
+COPY packages/ui/src packages/ui/src
+COPY packages/ui/styles.css packages/ui/styles.css
+COPY packages/ui/tsconfig.json packages/ui/tsconfig.json
+COPY packages/ui/tsconfig.build.json packages/ui/tsconfig.build.json
+
+RUN mkdir -p apps/site/public
+
+ARG PUBLIC_API_ORIGIN=https://api.nethack.example
+ARG WORKSPACE_ORIGIN=https://app.nethack.example
+ENV PUBLIC_API_ORIGIN=${PUBLIC_API_ORIGIN} \
+    WORKSPACE_ORIGIN=${WORKSPACE_ORIGIN} \
+    NEXT_TELEMETRY_DISABLED=1
+
+RUN bun run --cwd packages/contracts build \
+    && bun run --cwd packages/ui build \
+    && bun run --cwd apps/site build
+
+FROM oven/bun:1.3.14-alpine AS runtime
+
+ENV NODE_ENV=production \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0 \
+    NEXT_TELEMETRY_DISABLED=1
+
+WORKDIR /app
+RUN chown -R bun:bun /app
+
+COPY --from=build --chown=bun:bun /app/apps/site/.next/standalone ./
+COPY --from=build --chown=bun:bun /app/apps/site/.next/static ./apps/site/.next/static
+COPY --from=build --chown=bun:bun /app/apps/site/public ./apps/site/public
+
+USER bun
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD bun -e "fetch('http://127.0.0.1:' + (process.env.PORT || '3000') + '/').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+
+CMD ["bun", "apps/site/server.js"]

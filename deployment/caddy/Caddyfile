@@ -1,0 +1,73 @@
+{
+	email ops@nethack.example
+}
+
+# Shared response policy for every public host. CSP is added per host: the
+# Next.js site generates its own per-request nonce policy and must not receive
+# a second, conflicting policy here.
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Referrer-Policy "no-referrer"
+		X-Frame-Options "DENY"
+		X-Content-Type-Options "nosniff"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		-Server
+	}
+}
+
+www.nethack.example {
+	import security_headers
+	request_body {
+		max_size 2MB
+	}
+	reverse_proxy site:3000
+}
+
+app.nethack.example {
+	import security_headers
+	request_body {
+		max_size 1MB
+	}
+	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.nethack.example https://assets.nethack.example; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+	root * /srv/workspace
+	try_files {path} /index.html
+	file_server
+}
+
+api.nethack.example {
+	import security_headers
+	request_body {
+		max_size 32MB
+	}
+	reverse_proxy api:3002
+}
+
+# Public asset responses are derived from API routes. Cookies must not enter or
+# leave this host. Content-Disposition is passed through unchanged so downloads
+# keep their filenames.
+assets.nethack.example {
+	import security_headers
+	header X-Content-Type-Options "nosniff"
+	request_body {
+		max_size 1MB
+	}
+	request_header -Cookie
+	reverse_proxy api:3002 {
+		header_down -Set-Cookie
+	}
+}
+
+# Local testing: map the example hosts in /etc/hosts to 127.0.0.1 and use the
+# compose port mapping 8080:80 instead of 80:80.
+#
+# http://localhost:8080 {
+# 	handle /api/* {
+# 		reverse_proxy api:3002
+# 	}
+# 	handle {
+# 		root * /srv/workspace
+# 		try_files {path} /index.html
+# 		file_server
+# 	}
+# }

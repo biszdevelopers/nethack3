@@ -1,0 +1,214 @@
+name: nethack-node
+
+x-logging: &default-logging
+    driver: json-file
+    options:
+        max-size: "10m"
+        max-file: "3"
+
+x-api-service: &api-service
+    image: nethack/api:node
+    build:
+        context: ../..
+        dockerfile: deployment/node/Dockerfile.api
+    env_file:
+        - ../.env.production
+    networks:
+        - frontend
+        - backend
+    security_opt:
+        - no-new-privileges:true
+    logging: *default-logging
+    restart: unless-stopped
+
+services:
+    postgres:
+        image: postgres:18-alpine
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: ${POSTGRES_DB:-nethack}
+            POSTGRES_USER: ${POSTGRES_USER:-nethack}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deployment/.env.production}
+        volumes:
+            # PostgreSQL 18 images keep PGDATA under /var/lib/postgresql/18/docker.
+            - postgres-data:/var/lib/postgresql
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 20s
+        networks:
+            - backend
+        security_opt:
+            - no-new-privileges:true
+        deploy:
+            resources:
+                limits:
+                    cpus: "1.0"
+                    memory: 1G
+        logging: *default-logging
+
+    api:
+        <<: *api-service
+        command: ["node", "apps/api/dist/main.js"]
+        environment:
+            HOST: 0.0.0.0
+            PORT: "3002"
+            STORAGE_ROOT: /data/storage
+            TRUST_PROXY: "true"
+            # Owner credentials are only injected into the one-shot migrate service.
+            DATABASE_MIGRATION_URL: ""
+            POSTGRES_PASSWORD: ""
+        volumes:
+            - storage-data:/data/storage
+        depends_on:
+            postgres:
+                condition: service_healthy
+        read_only: true
+        tmpfs:
+            - /tmp
+        deploy:
+            resources:
+                limits:
+                    cpus: "1.5"
+                    memory: 768M
+
+    worker:
+        <<: *api-service
+        command: ["node", "apps/api/dist/worker-main.js"]
+        environment:
+            HOST: 0.0.0.0
+            STORAGE_ROOT: /data/storage
+            TRUST_PROXY: "true"
+            # Owner credentials are only injected into the one-shot migrate service.
+            DATABASE_MIGRATION_URL: ""
+            POSTGRES_PASSWORD: ""
+        volumes:
+            - storage-data:/data/storage
+        depends_on:
+            postgres:
+                condition: service_healthy
+        read_only: true
+        tmpfs:
+            - /tmp
+        healthcheck:
+            test: ["CMD", "node", "-e", "process.kill(1, 0)"]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+        deploy:
+            resources:
+                limits:
+                    cpus: "1.0"
+                    memory: 512M
+
+    # One-shot job, excluded from `up` by its profile. Run explicitly:
+    #   docker compose --env-file deployment/.env.production -f deployment/node/compose.yaml \
+    #     --profile migrate run --rm migrate
+    migrate:
+        <<: *api-service
+        profiles: ["migrate"]
+        restart: "no"
+        command: ["node", "apps/api/dist/migrate.js"]
+        environment:
+            MIGRATIONS_DIR: /app/database/migrations
+            DATABASE_MIGRATION_URL: ${DATABASE_MIGRATION_URL:?set DATABASE_MIGRATION_URL in deployment/.env.production}
+        depends_on:
+            postgres:
+                condition: service_healthy
+        read_only: true
+        tmpfs:
+            - /tmp
+        deploy:
+            resources:
+                limits:
+                    cpus: "1.0"
+                    memory: 512M
+
+    site:
+        image: nethack/site:node
+        build:
+            context: ../..
+            dockerfile: deployment/node/Dockerfile.site
+            args:
+                PUBLIC_API_ORIGIN: ${PUBLIC_API_ORIGIN:-https://api.nethack.example}
+                WORKSPACE_ORIGIN: ${WORKSPACE_ORIGIN:-https://app.nethack.example}
+        restart: unless-stopped
+        environment:
+            NODE_ENV: production
+            PORT: "3000"
+            HOSTNAME: 0.0.0.0
+            PUBLIC_API_ORIGIN: ${PUBLIC_API_ORIGIN:-https://api.nethack.example}
+            WORKSPACE_ORIGIN: ${WORKSPACE_ORIGIN:-https://app.nethack.example}
+        depends_on:
+            api:
+                condition: service_started
+        networks:
+            - frontend
+        read_only: true
+        tmpfs:
+            - /tmp
+            - /app/apps/site/.next/cache
+        security_opt:
+            - no-new-privileges:true
+        deploy:
+            resources:
+                limits:
+                    cpus: "1.0"
+                    memory: 512M
+        logging: *default-logging
+
+    caddy:
+        image: nethack/caddy:2.10.2
+        build:
+            context: ../..
+            dockerfile: deployment/caddy/Dockerfile
+            args:
+                VITE_API_ORIGIN: ${VITE_API_ORIGIN:-https://api.nethack.example}
+        restart: unless-stopped
+        ports:
+            - "80:80"
+            - "443:443"
+            # Local testing without root-owned ports: use "8080:80" instead.
+        volumes:
+            - caddy-data:/data
+            - caddy-config:/config
+        depends_on:
+            api:
+                condition: service_started
+            site:
+                condition: service_started
+        networks:
+            - frontend
+        read_only: true
+        tmpfs:
+            - /tmp
+        cap_drop:
+            - ALL
+        cap_add:
+            - NET_BIND_SERVICE
+        security_opt:
+            - no-new-privileges:true
+        healthcheck:
+            test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+            interval: 30s
+            timeout: 5s
+            retries: 3
+        deploy:
+            resources:
+                limits:
+                    cpus: "0.5"
+                    memory: 256M
+        logging: *default-logging
+
+networks:
+    frontend:
+    backend:
+        internal: true
+
+volumes:
+    postgres-data:
+    storage-data:
+    caddy-data:
+    caddy-config:
