@@ -160,3 +160,4 @@ vite.config.ts.timestamp-*
 .nx/workspace-data
 .nx/migrate-runs
 FULL_PLAN.md
+SETUP_GUIDE.md
