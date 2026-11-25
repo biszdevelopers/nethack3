@@ -20,6 +20,8 @@
         "jsdom": "31.0.1",
         "oxfmt": "0.80.0",
         "oxlint": "1.95.0",
+        "react": "19.3.1",
+        "react-dom": "19.3.1",
         "typescript": "6.0.3",
         "vitest": "5.1.1",
       },
@@ -62,9 +64,11 @@
       "dependencies": {
         "@nethack/contracts": "workspace:*",
         "@nethack/ui": "workspace:*",
+        "lucide-react": "1.80.0",
         "next": "16.4.6",
         "react": "19.3.1",
         "react-dom": "19.3.1",
+        "zod": "4.6.7",
       },
       "devDependencies": {
         "@tailwindcss/postcss": "4.3.5",
@@ -85,6 +89,7 @@
         "@nethack/ui": "workspace:*",
         "@tanstack/react-query": "5.108.4",
         "date-fns": "4.4.0",
+        "lucide-react": "1.80.0",
         "react": "19.3.1",
         "react-dom": "19.3.1",
         "react-hook-form": "7.92.0",
@@ -106,6 +111,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@nethack/contracts": "workspace:*",
+        "zod": "4.6.7",
       },
       "devDependencies": {
         "typescript": "6.0.3",

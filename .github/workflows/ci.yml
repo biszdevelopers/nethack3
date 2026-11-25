@@ -1,0 +1,153 @@
+name: ci
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+env:
+    DATABASE_URL: postgres://nethack_app:nethack_app_password@127.0.0.1:5432/nethack_test
+    DATABASE_MIGRATION_URL: postgres://nethack:nethack_dev_password@127.0.0.1:5432/nethack_test
+    SESSION_ENCRYPTION_KEYS: ZlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlo=
+    BASIS_AUTH_ALLOW_INSECURE_HTTP: "true"
+    WORKSPACE_ORIGIN: http://localhost:5173
+    SITE_ORIGIN: http://localhost:3000
+    API_ORIGIN: http://localhost:3002
+
+jobs:
+    quality:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: 1.3.14
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+            - run: bun install --frozen-lockfile
+            - run: bun run format:check
+            - run: bun run lint
+            - run: bun run typecheck
+            - run: bun run test
+
+    integration:
+        runs-on: ubuntu-latest
+        services:
+            postgres:
+                image: postgres:18
+                env:
+                    POSTGRES_PASSWORD: nethack_dev_password
+                    POSTGRES_USER: nethack
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd "pg_isready -U nethack"
+                    --health-interval 5s
+                    --health-timeout 5s
+                    --health-retries 20
+        steps:
+            - uses: actions/checkout@v4
+            - uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: 1.3.14
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+            - run: bun install --frozen-lockfile
+            - name: Create database and runtime role
+              env:
+                  PGPASSWORD: nethack_dev_password
+              run: |
+                  psql -h 127.0.0.1 -U nethack -d postgres -c "create database nethack_test;"
+                  psql -h 127.0.0.1 -U nethack -d postgres -c "create role nethack_app login password 'nethack_app_password' nosuperuser nobypassrls nocreatedb nocreaterole;"
+                  psql -h 127.0.0.1 -U nethack -d postgres -c "grant connect on database nethack_test to nethack_app;"
+            - run: bun run --cwd apps/api db:migrate
+            - run: bun run test:integration
+
+    runtime-node:
+        runs-on: ubuntu-latest
+        needs: [quality]
+        services:
+            postgres:
+                image: postgres:18
+                env:
+                    POSTGRES_PASSWORD: nethack_dev_password
+                    POSTGRES_USER: nethack
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd "pg_isready -U nethack"
+                    --health-interval 5s
+                    --health-timeout 5s
+                    --health-retries 20
+        steps:
+            - uses: actions/checkout@v4
+            - uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: 1.3.14
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+            - run: bun install --frozen-lockfile
+            - name: Create database and runtime role
+              env:
+                  PGPASSWORD: nethack_dev_password
+              run: |
+                  psql -h 127.0.0.1 -U nethack -d postgres -c "create database nethack_test;"
+                  psql -h 127.0.0.1 -U nethack -d postgres -c "create role nethack_app login password 'nethack_app_password' nosuperuser nobypassrls nocreatedb nocreaterole;"
+                  psql -h 127.0.0.1 -U nethack -d postgres -c "grant connect on database nethack_test to nethack_app;"
+            - run: bun run --cwd apps/api db:migrate
+            - run: bun run build
+            - run: bun run verify:runtime
+
+    runtime-bun:
+        runs-on: ubuntu-latest
+        needs: [quality]
+        services:
+            postgres:
+                image: postgres:18
+                env:
+                    POSTGRES_PASSWORD: nethack_dev_password
+                    POSTGRES_USER: nethack
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd "pg_isready -U nethack"
+                    --health-interval 5s
+                    --health-timeout 5s
+                    --health-retries 20
+        steps:
+            - uses: actions/checkout@v4
+            - uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: 1.3.14
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+            - run: bun install --frozen-lockfile
+            - name: Create database and runtime role
+              env:
+                  PGPASSWORD: nethack_dev_password
+              run: |
+                  psql -h 127.0.0.1 -U nethack -d postgres -c "create database nethack_test;"
+                  psql -h 127.0.0.1 -U nethack -d postgres -c "create role nethack_app login password 'nethack_app_password' nosuperuser nobypassrls nocreatedb nocreaterole;"
+                  psql -h 127.0.0.1 -U nethack -d postgres -c "grant connect on database nethack_test to nethack_app;"
+            - run: bun run --cwd apps/api db:migrate
+            - run: bun run build
+            - run: bun run verify:runtime
+
+    security:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: 1.3.14
+            - run: bun install --frozen-lockfile
+            - run: bun run test:security
+            - run: bun audit
