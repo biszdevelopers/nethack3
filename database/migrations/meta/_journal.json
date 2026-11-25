@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1795608859972,
+      "tag": "0000_handy_katie_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795608860787,
+      "tag": "0001_rls-policies",
+      "breakpoints": true
+    }
+  ]
+}
