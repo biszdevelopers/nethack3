@@ -1,0 +1,184 @@
+import { z } from "zod";
+import {
+    idSchema,
+    isoDateTimeSchema,
+    markdownSchema,
+    slugSchema,
+    timeZoneSchema,
+} from "../common/schemas.js";
+
+export const competitionEditionStatusSchema = z.enum([
+    "draft",
+    "published",
+    "registration_open",
+    "registration_closed",
+    "active",
+    "judging",
+    "voting",
+    "completed",
+    "archived",
+]);
+export type CompetitionEditionStatus = z.infer<typeof competitionEditionStatusSchema>;
+
+export const milestoneKindSchema = z.enum([
+    "registration",
+    "submission",
+    "judging",
+    "voting",
+    "ceremony",
+    "other",
+]);
+export type MilestoneKind = z.infer<typeof milestoneKindSchema>;
+
+export const competitionSeriesSchema = z.object({
+    id: idSchema,
+    organizationId: idSchema,
+    name: z.string(),
+    slug: z.string(),
+    description: z.string(),
+    createdAt: isoDateTimeSchema,
+    updatedAt: isoDateTimeSchema,
+});
+export type CompetitionSeries = z.infer<typeof competitionSeriesSchema>;
+
+export const divisionSchema = z.object({
+    id: idSchema,
+    organizationId: idSchema,
+    editionId: idSchema,
+    name: z.string(),
+    slug: z.string(),
+    description: z.string(),
+    minTeamSize: z.number().int().min(1).nullable(),
+    maxTeamSize: z.number().int().min(1).nullable(),
+    createdAt: isoDateTimeSchema,
+});
+export type Division = z.infer<typeof divisionSchema>;
+
+export const milestoneSchema = z.object({
+    id: idSchema,
+    organizationId: idSchema,
+    editionId: idSchema,
+    title: z.string(),
+    description: z.string(),
+    kind: milestoneKindSchema,
+    occursAt: isoDateTimeSchema,
+    createdAt: isoDateTimeSchema,
+});
+export type Milestone = z.infer<typeof milestoneSchema>;
+
+export const competitionEditionSchema = z.object({
+    id: idSchema,
+    organizationId: idSchema,
+    seriesId: idSchema,
+    name: z.string(),
+    slug: z.string(),
+    description: z.string(),
+    status: competitionEditionStatusSchema,
+    timezone: z.string(),
+    registrationOpensAt: isoDateTimeSchema.nullable(),
+    registrationClosesAt: isoDateTimeSchema.nullable(),
+    startsAt: isoDateTimeSchema.nullable(),
+    endsAt: isoDateTimeSchema.nullable(),
+    teamMinSize: z.number().int().min(1),
+    teamMaxSize: z.number().int().min(1),
+    maxParticipants: z.number().int().min(1).nullable(),
+    rulesMarkdown: z.string(),
+    publishedAt: isoDateTimeSchema.nullable(),
+    createdAt: isoDateTimeSchema,
+    updatedAt: isoDateTimeSchema,
+});
+export type CompetitionEdition = z.infer<typeof competitionEditionSchema>;
+
+export const competitionEditionDetailSchema = competitionEditionSchema.extend({
+    seriesName: z.string(),
+    organizationName: z.string(),
+    organizationSlug: z.string(),
+    divisions: z.array(divisionSchema),
+    milestones: z.array(milestoneSchema),
+    registrationCount: z.number().int().nonnegative(),
+    teamCount: z.number().int().nonnegative(),
+    submissionCount: z.number().int().nonnegative(),
+});
+export type CompetitionEditionDetail = z.infer<typeof competitionEditionDetailSchema>;
+
+export const createSeriesRequestSchema = z
+    .object({
+        name: z.string().trim().min(2).max(120),
+        slug: slugSchema,
+        description: z.string().max(2000).default(""),
+    })
+    .strict();
+export type CreateSeriesRequest = z.infer<typeof createSeriesRequestSchema>;
+
+export const createEditionRequestSchema = z
+    .object({
+        name: z.string().trim().min(2).max(160),
+        slug: slugSchema,
+        description: z.string().max(5000).default(""),
+        timezone: timeZoneSchema,
+        registrationOpensAt: isoDateTimeSchema.nullable().default(null),
+        registrationClosesAt: isoDateTimeSchema.nullable().default(null),
+        startsAt: isoDateTimeSchema.nullable().default(null),
+        endsAt: isoDateTimeSchema.nullable().default(null),
+        teamMinSize: z.number().int().min(1).max(50).default(1),
+        teamMaxSize: z.number().int().min(1).max(50).default(4),
+        maxParticipants: z.number().int().min(1).max(100000).nullable().default(null),
+        rulesMarkdown: markdownSchema.default(""),
+    })
+    .strict()
+    .refine((value) => value.teamMinSize <= value.teamMaxSize, {
+        message: "Minimum team size cannot exceed maximum team size.",
+        path: ["teamMinSize"],
+    })
+    .refine(
+        (value) =>
+            !value.registrationOpensAt ||
+            !value.registrationClosesAt ||
+            new Date(value.registrationOpensAt) <= new Date(value.registrationClosesAt),
+        { message: "Registration must close after it opens.", path: ["registrationClosesAt"] },
+    )
+    .refine(
+        (value) =>
+            !value.startsAt || !value.endsAt || new Date(value.startsAt) <= new Date(value.endsAt),
+        { message: "The end must not precede the start.", path: ["endsAt"] },
+    );
+export type CreateEditionRequest = z.infer<typeof createEditionRequestSchema>;
+
+export const updateEditionRequestSchema = z
+    .object({
+        name: z.string().trim().min(2).max(160).optional(),
+        description: z.string().max(5000).optional(),
+        status: competitionEditionStatusSchema.optional(),
+        timezone: timeZoneSchema.optional(),
+        registrationOpensAt: isoDateTimeSchema.nullable().optional(),
+        registrationClosesAt: isoDateTimeSchema.nullable().optional(),
+        startsAt: isoDateTimeSchema.nullable().optional(),
+        endsAt: isoDateTimeSchema.nullable().optional(),
+        teamMinSize: z.number().int().min(1).max(50).optional(),
+        teamMaxSize: z.number().int().min(1).max(50).optional(),
+        maxParticipants: z.number().int().min(1).max(100000).nullable().optional(),
+        rulesMarkdown: markdownSchema.optional(),
+    })
+    .strict();
+export type UpdateEditionRequest = z.infer<typeof updateEditionRequestSchema>;
+
+export const createDivisionRequestSchema = z
+    .object({
+        name: z.string().trim().min(2).max(120),
+        slug: slugSchema,
+        description: z.string().max(2000).default(""),
+        minTeamSize: z.number().int().min(1).max(50).nullable().default(null),
+        maxTeamSize: z.number().int().min(1).max(50).nullable().default(null),
+    })
+    .strict();
+export type CreateDivisionRequest = z.infer<typeof createDivisionRequestSchema>;
+
+export const createMilestoneRequestSchema = z
+    .object({
+        title: z.string().trim().min(2).max(160),
+        description: z.string().max(2000).default(""),
+        kind: milestoneKindSchema.default("other"),
+        occursAt: isoDateTimeSchema,
+    })
+    .strict();
+export type CreateMilestoneRequest = z.infer<typeof createMilestoneRequestSchema>;
