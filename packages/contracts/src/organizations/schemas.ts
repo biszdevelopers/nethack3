@@ -68,3 +68,36 @@ export const organizationInvitationSchema = z.object({
     createdAt: isoDateTimeSchema,
 });
 export type OrganizationInvitation = z.infer<typeof organizationInvitationSchema>;
+
+export const addOrganizationMemberResultSchema = z.object({
+    kind: z.enum(["membership", "invitation"]),
+    membership: z
+        .object({
+            organizationId: idSchema,
+            userId: idSchema,
+            role: organizationRoleSchema,
+            status: membershipStatusSchema,
+            displayName: z.string(),
+            email: emailSchema.nullable(),
+            createdAt: isoDateTimeSchema,
+        })
+        .nullable(),
+    invitation: organizationInvitationSchema.nullable(),
+});
+export type AddOrganizationMemberResult = z.infer<typeof addOrganizationMemberResultSchema>;
+
+export const acceptOrganizationInvitationResultSchema = z.object({
+    organization: z.object({
+        id: idSchema,
+        name: z.string(),
+        slug: z.string(),
+        description: z.string(),
+        websiteUrl: httpUrlSchema.nullable(),
+        createdAt: isoDateTimeSchema,
+        updatedAt: isoDateTimeSchema,
+    }),
+    role: organizationRoleSchema,
+});
+export type AcceptOrganizationInvitationResult = z.infer<
+    typeof acceptOrganizationInvitationResultSchema
+>;

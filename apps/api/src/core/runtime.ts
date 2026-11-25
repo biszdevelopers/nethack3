@@ -8,6 +8,7 @@ import { SessionService } from "../authentication/session-service.js";
 import { TokenService } from "../authentication/token-service.js";
 import { UserService } from "../authentication/user-service.js";
 import { SmtpMailer, LoggingMailer, type Mailer } from "../infrastructure/email/mailer.js";
+import { AuditLogger } from "../infrastructure/audit/audit-logger.js";
 import { JobQueue } from "../infrastructure/jobs/job-queue.js";
 import { LocalFileStorage } from "../infrastructure/storage/file-storage.js";
 import { CapabilityRegistry } from "./capability-registry.js";
@@ -40,6 +41,7 @@ export class NethackRuntime {
     readonly jobs: JobQueue;
     readonly mailer: Mailer;
     readonly auth: AuthenticationServices;
+    readonly audit: AuditLogger;
     readonly services: Services;
     readonly registry: CapabilityRegistry;
     readonly logger: import("./logger.js").Logger;
@@ -61,6 +63,7 @@ export class NethackRuntime {
             this.config.smtpUrl === null
                 ? new LoggingMailer(this.loggerAdapter)
                 : new SmtpMailer(this.config.smtpUrl, this.config.emailFrom);
+        this.audit = new AuditLogger(this.config);
 
         const client = new BasisAuthClient(
             this.config.basisAuth,
@@ -126,6 +129,7 @@ export class NethackRuntime {
             storage: this.storage,
             mailer: this.mailer,
             auth: this.auth,
+            audit: this.audit,
         };
         this.registry = new CapabilityRegistry(capabilities, this.services);
     }

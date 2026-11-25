@@ -8,6 +8,7 @@ import type { Mailer } from "../infrastructure/email/mailer.js";
 import type { FileStorage } from "../infrastructure/storage/file-storage.js";
 import type { JobQueue } from "../infrastructure/jobs/job-queue.js";
 import type { AuthenticationServices } from "../authentication/services.js";
+import type { AuditLogger } from "../infrastructure/audit/audit-logger.js";
 import type { OutboxPublisher } from "./outbox.js";
 
 export interface Services {
@@ -20,6 +21,7 @@ export interface Services {
     readonly storage: FileStorage;
     readonly mailer: Mailer;
     readonly auth: AuthenticationServices;
+    readonly audit: AuditLogger;
 }
 
 export interface ContractAccess {

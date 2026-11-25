@@ -41,13 +41,6 @@ export const teamDetailSchema = teamSchema.extend({
             createdAt: isoDateTimeSchema,
         }),
     ),
-    project: z
-        .object({
-            id: idSchema,
-            title: z.string(),
-            status: z.enum(["draft", "published", "archived"]),
-        })
-        .nullable(),
 });
 export type TeamDetail = z.infer<typeof teamDetailSchema>;
 

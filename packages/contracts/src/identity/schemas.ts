@@ -18,4 +18,25 @@ export const loginFailureCodeSchema = z.enum([
 ]);
 export type LoginFailureCode = z.infer<typeof loginFailureCodeSchema>;
 
+export const updateProfileRequestSchema = z
+    .object({
+        displayName: z.string().trim().min(1).max(80).optional(),
+        locale: z
+            .string()
+            .min(2)
+            .max(16)
+            .regex(/^[a-z]{2}(?:-[A-Za-z]{2,8})?$/)
+            .optional(),
+    })
+    .strict()
+    .refine((value) => value.displayName !== undefined || value.locale !== undefined, {
+        message: "Provide a display name or a locale.",
+    });
+export type UpdateProfileRequest = z.infer<typeof updateProfileRequestSchema>;
+
+export const csrfTokenSchema = z.object({
+    csrfToken: z.string(),
+});
+export type CsrfToken = z.infer<typeof csrfTokenSchema>;
+
 export { sessionSchema };

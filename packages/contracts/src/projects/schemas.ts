@@ -33,14 +33,6 @@ export const projectDetailSchema = projectSchema.extend({
             role: z.enum(["owner", "member"]),
         }),
     ),
-    files: z.array(
-        z.object({
-            id: idSchema,
-            fileName: z.string(),
-            contentType: z.string(),
-            byteSize: z.number().int().nonnegative(),
-        }),
-    ),
     submissions: z.array(
         z.object({
             id: idSchema,
