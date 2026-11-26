@@ -1,4 +1,11 @@
-import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import {
+    createCipheriv,
+    createDecipheriv,
+    createHash,
+    createHmac,
+    randomBytes,
+    timingSafeEqual,
+} from "node:crypto";
 import type { SessionEncryptionKey } from "../core/configuration.js";
 import { InternalError, InvalidTokenError } from "../core/errors.js";
 
@@ -17,7 +24,9 @@ export function hmacHex(key: Buffer, value: string): string {
 }
 
 export function deriveCsrfToken(sessionToken: string, key: Buffer): string {
-    return createHmac("sha256", key).update(`nethack-csrf:${sessionToken}`, "utf8").digest("base64url");
+    return createHmac("sha256", key)
+        .update(`nethack-csrf:${sessionToken}`, "utf8")
+        .digest("base64url");
 }
 
 export function hashesEqual(left: string, right: string): boolean {
@@ -53,12 +62,14 @@ export function encryptSecret(
     };
 }
 
-export function decryptSecret(
-    ciphertext: string,
-    keys: readonly SessionEncryptionKey[],
-): string {
+export function decryptSecret(ciphertext: string, keys: readonly SessionEncryptionKey[]): string {
     const [versionPart, ivPart, tagPart, dataPart] = ciphertext.split(".");
-    if (versionPart === undefined || ivPart === undefined || tagPart === undefined || dataPart === undefined) {
+    if (
+        versionPart === undefined ||
+        ivPart === undefined ||
+        tagPart === undefined ||
+        dataPart === undefined
+    ) {
         throw new InternalError("Stored secret has an invalid format.");
     }
     const version = Number.parseInt(versionPart.replace(/^v/, ""), 10);
@@ -70,7 +81,10 @@ export function decryptSecret(
         const decipher = createDecipheriv("aes-256-gcm", key.key, Buffer.from(ivPart, "base64url"));
         decipher.setAAD(AAD);
         decipher.setAuthTag(Buffer.from(tagPart, "base64url"));
-        return Buffer.concat([decipher.update(Buffer.from(dataPart, "base64url")), decipher.final()]).toString("utf8");
+        return Buffer.concat([
+            decipher.update(Buffer.from(dataPart, "base64url")),
+            decipher.final(),
+        ]).toString("utf8");
     } catch (error) {
         throw new InternalError("A stored secret could not be decrypted.", error);
     }

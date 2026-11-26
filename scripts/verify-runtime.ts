@@ -5,7 +5,12 @@ import { join } from "node:path";
 const root = process.cwd();
 const results: { name: string; status: "passed" | "failed"; detail: string }[] = [];
 
-function run(command: string, args: string[], cwd: string, env: NodeJS.ProcessEnv = process.env): Promise<{ code: number; output: string }> {
+function run(
+    command: string,
+    args: string[],
+    cwd: string,
+    env: NodeJS.ProcessEnv = process.env,
+): Promise<{ code: number; output: string }> {
     return new Promise((resolve) => {
         const child = spawn(command, args, {
             cwd,

@@ -1,20 +1,18 @@
-import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import { forwardRef, type ComponentPropsWithoutRef } from "react";
 import * as CollapsiblePrimitive from "@radix-ui/react-collapsible";
 import { ChevronDown } from "lucide-react";
 import { cn } from "../../lib/cn.js";
 
 export const Collapsible = CollapsiblePrimitive.Root;
 
-export interface CollapsibleTriggerProps
-    extends ComponentPropsWithoutRef<typeof CollapsiblePrimitive.Trigger> {
+export interface CollapsibleTriggerProps extends ComponentPropsWithoutRef<
+    typeof CollapsiblePrimitive.Trigger
+> {
     readonly showIndicator?: boolean;
 }
 
 export const CollapsibleTrigger = forwardRef<HTMLButtonElement, CollapsibleTriggerProps>(
-    function CollapsibleTrigger(
-        { className, showIndicator = true, children, ...rest },
-        ref,
-    ) {
+    function CollapsibleTrigger({ className, showIndicator = true, children, ...rest }, ref) {
         return (
             <CollapsiblePrimitive.Trigger
                 ref={ref}

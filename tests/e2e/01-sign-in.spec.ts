@@ -1,10 +1,5 @@
 import { expect, test } from "@playwright/test";
-import {
-    API_ORIGIN,
-    AUTH_ORIGIN,
-    FIXTURE,
-    USERS,
-} from "../support/e2e/config.js";
+import { API_ORIGIN, AUTH_ORIGIN, FIXTURE, USERS } from "../support/e2e/config.js";
 import { expectOrganizationSelected, setMockUser, signIn } from "../support/e2e/app.js";
 
 test.describe("sign-in journey", () => {

@@ -1,8 +1,4 @@
-import type {
-    CompetitionEditionStatus,
-    RegistrationStatus,
-    TeamStatus,
-} from "@nethack/contracts";
+import type { CompetitionEditionStatus, RegistrationStatus, TeamStatus } from "@nethack/contracts";
 import { ConflictError, ForbiddenError } from "../../../core/errors.js";
 
 export interface EditionTeamPolicy {
@@ -107,7 +103,9 @@ export class TeamRules {
         isOrganizer: boolean,
     ): void {
         if (teamCaptainUserId !== actorUserId && !isOrganizer) {
-            throw new ForbiddenError("Only the team captain or an organizer may perform this action.");
+            throw new ForbiddenError(
+                "Only the team captain or an organizer may perform this action.",
+            );
         }
     }
 

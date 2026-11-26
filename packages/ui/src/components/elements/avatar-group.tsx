@@ -48,11 +48,7 @@ export function AvatarGroup({
     const visible = members.slice(0, visibleCount);
     const hiddenCount = members.length - visible.length;
     return (
-        <div
-            role="group"
-            aria-label={label}
-            className={cn("flex items-center", className)}
-        >
+        <div role="group" aria-label={label} className={cn("flex items-center", className)}>
             {visible.map((member, index) => (
                 <Avatar
                     key={`${index}-${member.name}`}

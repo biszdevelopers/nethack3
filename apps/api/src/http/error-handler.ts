@@ -22,7 +22,9 @@ export function createErrorHandler(logger: Logger) {
 
         if (isAppError(error)) {
             body.error.code = error.code;
-            body.error.message = error.exposeMessage ? error.message : "An unexpected error occurred.";
+            body.error.message = error.exposeMessage
+                ? error.message
+                : "An unexpected error occurred.";
             if (error.details !== undefined) {
                 body.error.details = error.details;
             }

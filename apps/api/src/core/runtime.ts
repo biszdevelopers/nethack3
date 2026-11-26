@@ -14,6 +14,7 @@ import { LocalFileStorage } from "../infrastructure/storage/file-storage.js";
 import { CapabilityRegistry } from "./capability-registry.js";
 import type { CapabilityContext, Services } from "./capability.js";
 import { SystemClock, type Clock } from "./clock.js";
+import type { Logger } from "./logger.js";
 import { capabilities } from "../capabilities/index.js";
 import type { AppConfig } from "./configuration.js";
 import { DatabaseConnection } from "../infrastructure/database/client.js";
@@ -44,8 +45,8 @@ export class NethackRuntime {
     readonly audit: AuditLogger;
     readonly services: Services;
     readonly registry: CapabilityRegistry;
-    readonly logger: import("./logger.js").Logger;
-    private readonly loggerAdapter: import("./logger.js").Logger;
+    readonly logger: Logger;
+    private readonly loggerAdapter: Logger;
     private initialized = false;
 
     constructor(options: RuntimeOptions) {

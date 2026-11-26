@@ -32,8 +32,7 @@ export const inputVariants = tv({
 });
 
 export interface InputProps
-    extends Omit<ComponentPropsWithoutRef<"input">, "size">,
-        VariantProps<typeof inputVariants> {
+    extends Omit<ComponentPropsWithoutRef<"input">, "size">, VariantProps<typeof inputVariants> {
     readonly leading?: ReactNode;
     readonly trailing?: ReactNode;
     readonly wrapperClassName?: string;

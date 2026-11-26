@@ -33,7 +33,7 @@
         "test:integration": "bun scripts/run-node.ts ./node_modules/vitest/vitest.mjs run --config apps/api/vitest.config.ts",
         "test:security": "bun scripts/run-node.ts ./node_modules/vitest/vitest.mjs run tests/security",
         "test:e2e": "bun scripts/run-node.ts ./node_modules/@playwright/test/cli.js test",
-        "test:visual": "bun scripts/run-node.ts ./node_modules/@playwright/test/cli.js test tests/visual",
+        "test:visual": "bun scripts/run-node.ts ./node_modules/@playwright/test/cli.js test tests/e2e/09-accessibility.spec.ts",
         "test:load": "bun run tests/load/run.ts",
         "check": "bun run format:check && bun run lint && bun run typecheck && bun run test",
         "db:generate": "bun --filter api run db:generate",

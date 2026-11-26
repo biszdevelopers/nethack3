@@ -57,7 +57,7 @@ describe("capability boundaries", () => {
                 if (target === undefined || target === owner) {
                     continue;
                 }
-                const allowed = /\/contracts\.js$/.test(specifier ?? "");
+                const allowed = (specifier ?? "").endsWith("/contracts.js");
                 if (!allowed) {
                     violations.push(`${relativePath} imports private ${specifier}`);
                 }

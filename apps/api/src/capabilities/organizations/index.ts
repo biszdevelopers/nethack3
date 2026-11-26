@@ -20,10 +20,7 @@ export const organizationsCapability: CapabilityDefinition = {
 
         const contract: OrganizationsContract = {
             async getSummary(organizationId) {
-                const organization = await repository.findById(
-                    context.database.db,
-                    organizationId,
-                );
+                const organization = await repository.findById(context.database.db, organizationId);
                 return organization === null
                     ? null
                     : {
@@ -51,10 +48,7 @@ export const organizationsCapability: CapabilityDefinition = {
                     return await context.database.transaction(
                         { organizationId },
                         async (session) => {
-                            const settings = await repository.settings(
-                                session.db,
-                                organizationId,
-                            );
+                            const settings = await repository.settings(session.db, organizationId);
                             return settings.publicShowcaseEnabled;
                         },
                     );

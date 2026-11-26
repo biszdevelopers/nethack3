@@ -134,7 +134,11 @@ export const milestones = pgTable(
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     },
     (table) => [
-        index("milestones_edition_time_idx").on(table.organizationId, table.editionId, table.occursAt),
+        index("milestones_edition_time_idx").on(
+            table.organizationId,
+            table.editionId,
+            table.occursAt,
+        ),
         foreignKey({
             name: "milestones_edition_fk",
             columns: [table.editionId, table.organizationId],

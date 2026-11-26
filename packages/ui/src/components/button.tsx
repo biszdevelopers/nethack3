@@ -141,7 +141,8 @@ export const buttonVariants = tv({
 });
 
 export interface ButtonProps
-    extends ComponentPropsWithoutRef<"button">,
+    extends
+        ComponentPropsWithoutRef<"button">,
         Omit<VariantProps<typeof buttonVariants>, "color" | "variant" | "size"> {
     readonly asChild?: boolean;
     readonly loading?: boolean;

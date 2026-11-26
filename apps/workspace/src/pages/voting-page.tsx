@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams } from "react-router";
 import type { Ballot, OrganizationRole, VoteResult, VotingRound } from "@nethack/contracts";
 import {
-    Alert,
     AlertDialog,
     Badge,
     Button,
@@ -264,7 +263,10 @@ export function VotingPage(): ReactNode {
 
                     <section className="flex flex-col gap-4" aria-labelledby="open-rounds-heading">
                         <div className="flex flex-col gap-1">
-                            <h2 id="open-rounds-heading" className="text-lg font-bold tracking-tight">
+                            <h2
+                                id="open-rounds-heading"
+                                className="text-lg font-bold tracking-tight"
+                            >
                                 Open rounds for you
                             </h2>
                             <p className="text-sm text-ink-muted">
@@ -303,7 +305,10 @@ export function VotingPage(): ReactNode {
                             aria-labelledby="round-management-heading"
                         >
                             <div className="flex flex-col gap-1">
-                                <h2 id="round-management-heading" className="text-lg font-bold tracking-tight">
+                                <h2
+                                    id="round-management-heading"
+                                    className="text-lg font-bold tracking-tight"
+                                >
                                     Round management
                                 </h2>
                                 <p className="text-sm text-ink-muted">
@@ -728,40 +733,42 @@ function BallotCard({
                         <RequestError error={ballot.error} onRetry={() => void ballot.refetch()} />
                     ) : ballot.data !== null && ballot.data !== undefined ? (
                         <BallotSummary ballot={ballot.data} />
+                    ) : submissions.isPending ? (
+                        <LoadingBlock rows={3} label="Loading submissions" />
+                    ) : submissions.isError ? (
+                        <RequestError
+                            error={submissions.error}
+                            onRetry={() => void submissions.refetch()}
+                        />
+                    ) : submissionItems.length === 0 ? (
+                        <EmptyState
+                            title="No submissions"
+                            description="A ballot can be cast after submissions exist in this edition."
+                        />
                     ) : (
-                        submissions.isPending ? (
-                            <LoadingBlock rows={3} label="Loading submissions" />
-                        ) : submissions.isError ? (
-                            <RequestError
-                                error={submissions.error}
-                                onRetry={() => void submissions.refetch()}
-                            />
-                        ) : submissionItems.length === 0 ? (
-                            <EmptyState
-                                title="No submissions"
-                                description="A ballot can be cast after submissions exist in this edition."
-                            />
-                        ) : (
-                            <fieldset className="flex flex-col gap-2">
-                                <legend className="text-sm font-medium text-ink">
-                                    Select up to {String(round.maxSelections)}
-                                </legend>
-                                {submissionItems.map((submission) => {
-                                    const checked = selected.includes(submission.id);
-                                    return (
-                                        <Checkbox
-                                            key={submission.id}
-                                            checked={checked}
-                                            onCheckedChange={(value) =>
-                                                toggle(submission.id, value === true)
-                                            }
-                                            disabled={!checked && atLimit}
-                                            label={submission.teamName === null ? submission.projectTitle : `${submission.projectTitle} · ${submission.teamName}`}
-                                        />
-                                    );
-                                })}
-                            </fieldset>
-                        )
+                        <fieldset className="flex flex-col gap-2">
+                            <legend className="text-sm font-medium text-ink">
+                                Select up to {String(round.maxSelections)}
+                            </legend>
+                            {submissionItems.map((submission) => {
+                                const checked = selected.includes(submission.id);
+                                return (
+                                    <Checkbox
+                                        key={submission.id}
+                                        checked={checked}
+                                        onCheckedChange={(value) =>
+                                            toggle(submission.id, value === true)
+                                        }
+                                        disabled={!checked && atLimit}
+                                        label={
+                                            submission.teamName === null
+                                                ? submission.projectTitle
+                                                : `${submission.projectTitle} · ${submission.teamName}`
+                                        }
+                                    />
+                                );
+                            })}
+                        </fieldset>
                     )}
 
                     {submitted ? null : submissionItems.length > 0 ? (

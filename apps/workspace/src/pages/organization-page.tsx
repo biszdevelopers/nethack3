@@ -70,7 +70,14 @@ import {
     type SettingsForm,
 } from "../capabilities/organizations/forms.js";
 
-const TAB_VALUES = ["members", "invitations", "announcements", "settings", "audit", "reports"] as const;
+const TAB_VALUES = [
+    "members",
+    "invitations",
+    "announcements",
+    "settings",
+    "audit",
+    "reports",
+] as const;
 type TabValue = (typeof TAB_VALUES)[number];
 const OWNER_TABS = new Set<TabValue>(["members", "invitations", "settings"]);
 

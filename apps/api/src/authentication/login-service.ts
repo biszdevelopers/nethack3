@@ -5,13 +5,7 @@ import type { Logger } from "../core/logger.js";
 import type { DatabaseConnection } from "../infrastructure/database/client.js";
 import { authTransactions } from "../infrastructure/database/schema/index.js";
 import type { BasisAuthClient } from "./basis-auth-client.js";
-import {
-    decryptSecret,
-    encryptSecret,
-    hashIp,
-    randomToken,
-    sha256Hex,
-} from "./crypto.js";
+import { decryptSecret, encryptSecret, hashIp, randomToken, sha256Hex } from "./crypto.js";
 import type { SessionService } from "./session-service.js";
 import type { RequestMetadata } from "./types.js";
 import { AccountLinkRequiredError, type UserService } from "./user-service.js";

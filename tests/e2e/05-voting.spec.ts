@@ -120,9 +120,7 @@ test.describe("voting", () => {
             const participantPage = await participantContext.newPage();
             await signIn(participantPage, USERS.participant);
             await participantPage.goto(`/voting?edition=${FIXTURE.editionId}`);
-            await expect(
-                participantPage.getByRole("heading", { name: roundName }),
-            ).toBeVisible();
+            await expect(participantPage.getByRole("heading", { name: roundName })).toBeVisible();
             await expect(
                 participantPage.getByRole("button", { name: "Cast ballot" }).first(),
             ).toBeVisible();

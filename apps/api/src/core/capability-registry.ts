@@ -79,7 +79,9 @@ export class CapabilityRegistry {
 
     async registerRoutes(app: FastifyInstance): Promise<void> {
         if (!this.initialized) {
-            throw new InternalError("Capabilities must be initialized before routes are registered.");
+            throw new InternalError(
+                "Capabilities must be initialized before routes are registered.",
+            );
         }
         const context: CapabilityContext = {
             ...this.services,

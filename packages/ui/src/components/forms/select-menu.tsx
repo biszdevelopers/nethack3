@@ -87,8 +87,7 @@ export function SelectMenu({
     );
 }
 
-export interface SelectMenuTriggerProps
-    extends ComponentPropsWithoutRef<"button"> {
+export interface SelectMenuTriggerProps extends ComponentPropsWithoutRef<"button"> {
     readonly children: ReactNode;
 }
 

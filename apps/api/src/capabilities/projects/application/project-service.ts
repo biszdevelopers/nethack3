@@ -642,4 +642,3 @@ function toPublicProject(row: PublicProjectRow, members: readonly string[]): Pub
         members: members.map((displayName) => ({ displayName })),
     };
 }
-

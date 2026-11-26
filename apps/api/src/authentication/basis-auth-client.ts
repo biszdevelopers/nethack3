@@ -112,9 +112,7 @@ export class BasisAuthClient {
                 ClientSecretBasic(this.config.clientSecret),
                 {
                     timeout: 10,
-                    ...(this.config.allowInsecureHttp
-                        ? { execute: [allowInsecureRequests] }
-                        : {}),
+                    ...(this.config.allowInsecureHttp ? { execute: [allowInsecureRequests] } : {}),
                 },
             );
             if (this.config.allowInsecureHttp) {
@@ -178,7 +176,9 @@ export class BasisAuthClient {
             });
             return toTokenResult(response);
         } catch (error) {
-            this.logger.warn("Authorization code exchange failed.", { error: describeError(error) });
+            this.logger.warn("Authorization code exchange failed.", {
+                error: describeError(error),
+            });
             throw new ExternalDependencyError("Sign-in could not be completed.", error);
         }
     }
@@ -327,7 +327,9 @@ export class BasisAuthClient {
             });
             return payload;
         } catch (error) {
-            this.logger.warn("Backchannel token validation failed.", { error: describeError(error) });
+            this.logger.warn("Backchannel token validation failed.", {
+                error: describeError(error),
+            });
             throw new InvalidTokenError();
         }
     }

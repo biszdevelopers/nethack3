@@ -1,4 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
 type Listener = () => void;
 
@@ -52,11 +52,7 @@ export function useColorMode(): {
     setColorMode: (mode: ColorMode) => void;
     toggleColorMode: () => void;
 } {
-    const value = useSyncExternalStore(
-        colorModeStore.subscribe,
-        colorModeStore.get,
-        () => "dark",
-    );
+    const value = useSyncExternalStore(colorModeStore.subscribe, colorModeStore.get, () => "dark");
     const colorMode: ColorMode = value === "light" ? "light" : "dark";
 
     useEffect(() => {
@@ -84,20 +80,26 @@ export function useLocale(): { locale: string; setLocale: (locale: string) => vo
 }
 
 export function useMediaQuery(query: string): boolean {
-    const [matches, setMatches] = useState(false);
+    const subscribe = useCallback(
+        (onChange: () => void): (() => void) => {
+            if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+                return () => {};
+            }
+            const media = window.matchMedia(query);
+            media.addEventListener("change", onChange);
+            return () => media.removeEventListener("change", onChange);
+        },
+        [query],
+    );
 
-    useEffect(() => {
-        if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-            return;
-        }
-        const media = window.matchMedia(query);
-        setMatches(media.matches);
-        const listener = (event: MediaQueryListEvent) => setMatches(event.matches);
-        media.addEventListener("change", listener);
-        return () => media.removeEventListener("change", listener);
-    }, [query]);
-
-    return matches;
+    return useSyncExternalStore(
+        subscribe,
+        () =>
+            typeof window !== "undefined" && typeof window.matchMedia === "function"
+                ? window.matchMedia(query).matches
+                : false,
+        () => false,
+    );
 }
 
 export function useIsMobile(): boolean {

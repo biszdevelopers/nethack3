@@ -45,9 +45,7 @@ export const updateOrganizationMemberRequestSchema = z
     .refine((value) => value.role !== undefined || value.status !== undefined, {
         message: "Provide a role or a status.",
     });
-export type UpdateOrganizationMemberRequest = z.infer<
-    typeof updateOrganizationMemberRequestSchema
->;
+export type UpdateOrganizationMemberRequest = z.infer<typeof updateOrganizationMemberRequestSchema>;
 
 export const acceptOrganizationInvitationRequestSchema = z
     .object({

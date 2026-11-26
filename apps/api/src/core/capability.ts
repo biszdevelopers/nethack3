@@ -1,4 +1,3 @@
-import type { FastifyInstance } from "fastify";
 import type { NethackServer } from "../http/types.js";
 import type { Clock } from "./clock.js";
 import type { AppConfig } from "./configuration.js";

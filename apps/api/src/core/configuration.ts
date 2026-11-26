@@ -1,8 +1,6 @@
 import { z } from "zod";
 
-const booleanString = z
-    .enum(["true", "false"])
-    .transform((value) => value === "true");
+const booleanString = z.enum(["true", "false"]).transform((value) => value === "true");
 
 const optionalUrl = z
     .string()
@@ -20,7 +18,9 @@ const environmentSchema = z.object({
     SITE_ORIGIN: z.url().default("http://localhost:3000"),
     ASSET_ORIGIN: z.url().default("http://localhost:3002"),
     TRUST_PROXY: booleanString.default(false),
-    LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
+    LOG_LEVEL: z
+        .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
+        .default("info"),
 
     DATABASE_URL: z
         .string()
@@ -29,7 +29,12 @@ const environmentSchema = z.object({
     DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
 
     SESSION_COOKIE_NAME: z.string().default("__Host-nethack_session"),
-    SESSION_TTL_SECONDS: z.coerce.number().int().min(60).max(60 * 60 * 24 * 30).default(60 * 60 * 24 * 7),
+    SESSION_TTL_SECONDS: z.coerce
+        .number()
+        .int()
+        .min(60)
+        .max(60 * 60 * 24 * 30)
+        .default(60 * 60 * 24 * 7),
     SESSION_CSRF_HEADER: z.string().default("x-csrf-token"),
     SESSION_ENCRYPTION_KEYS: z.string().optional(),
 
@@ -45,8 +50,18 @@ const environmentSchema = z.object({
     BASIS_AUTH_ALLOW_INSECURE_HTTP: booleanString.default(false),
 
     STORAGE_ROOT: z.string().default("./storage"),
-    MAX_UPLOAD_BYTES: z.coerce.number().int().min(1024).max(100 * 1024 * 1024).default(25 * 1024 * 1024),
-    MAX_REQUEST_BYTES: z.coerce.number().int().min(1024).max(10 * 1024 * 1024).default(1024 * 1024),
+    MAX_UPLOAD_BYTES: z.coerce
+        .number()
+        .int()
+        .min(1024)
+        .max(100 * 1024 * 1024)
+        .default(25 * 1024 * 1024),
+    MAX_REQUEST_BYTES: z.coerce
+        .number()
+        .int()
+        .min(1024)
+        .max(10 * 1024 * 1024)
+        .default(1024 * 1024),
     RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(100000).default(300),
     RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1000).default(60_000),
 
@@ -126,7 +141,10 @@ const DEVELOPMENT_KEY = Buffer.from(
     "hex",
 );
 
-function parseEncryptionKeys(raw: string | undefined, isProduction: boolean): SessionEncryptionKey[] {
+function parseEncryptionKeys(
+    raw: string | undefined,
+    isProduction: boolean,
+): SessionEncryptionKey[] {
     if (!raw || raw.trim() === "") {
         if (isProduction) {
             throw new Error("SESSION_ENCRYPTION_KEYS is required in production.");

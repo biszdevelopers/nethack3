@@ -1,6 +1,5 @@
 import { sql } from "drizzle-orm";
 import {
-    boolean,
     index,
     integer,
     jsonb,
@@ -27,7 +26,9 @@ export const users = pgTable(
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     },
     (table) => [
-        uniqueIndex("users_email_unique").on(sql`lower(${table.email})`).where(sql`${table.email} is not null`),
+        uniqueIndex("users_email_unique")
+            .on(sql`lower(${table.email})`)
+            .where(sql`${table.email} is not null`),
         index("users_status_idx").on(table.status),
     ],
 );
@@ -123,7 +124,11 @@ export const backchannelEvents = pgTable(
         processedAt: timestamp("processed_at", { withTimezone: true }).notNull().defaultNow(),
     },
     (table) => [
-        uniqueIndex("backchannel_events_idempotency_unique").on(table.eventType, table.externalId, table.payloadHash),
+        uniqueIndex("backchannel_events_idempotency_unique").on(
+            table.eventType,
+            table.externalId,
+            table.payloadHash,
+        ),
         index("backchannel_events_processed_idx").on(table.processedAt),
     ],
 );
@@ -140,7 +145,9 @@ export const globalAdministrators = pgTable("global_administrators", {
     userId: uuid("user_id")
         .primaryKey()
         .references(() => users.id, { onDelete: "cascade" }),
-    grantedByUserId: uuid("granted_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    grantedByUserId: uuid("granted_by_user_id").references(() => users.id, {
+        onDelete: "set null",
+    }),
     reason: text("reason"),
     grantedAt: timestamp("granted_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -161,7 +168,11 @@ export const idempotencyKeys = pgTable(
         expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     },
     (table) => [
-        uniqueIndex("idempotency_keys_user_route_key_unique").on(table.userId, table.route, table.key),
+        uniqueIndex("idempotency_keys_user_route_key_unique").on(
+            table.userId,
+            table.route,
+            table.key,
+        ),
         index("idempotency_keys_expires_idx").on(table.expiresAt),
     ],
 );
@@ -241,5 +252,3 @@ export const auditLogs = pgTable(
         index("audit_logs_actor_idx").on(table.actorUserId),
     ],
 );
-
-

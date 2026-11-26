@@ -68,12 +68,16 @@ export async function getCompetition(slug: string): Promise<PublicCompetitionDet
 }
 
 export async function getProjects(competition?: string): Promise<ListResponse<PublicProject>> {
-    const query = competition === undefined ? "" : `?competition=${encodeURIComponent(competition)}`;
+    const query =
+        competition === undefined ? "" : `?competition=${encodeURIComponent(competition)}`;
     return publicRequest(`/api/v1/public/projects${query}`, projectListSchema);
 }
 
 export async function getProject(slug: string): Promise<PublicProject> {
-    return publicRequest(`/api/v1/public/projects/${encodeURIComponent(slug)}`, publicProjectSchema);
+    return publicRequest(
+        `/api/v1/public/projects/${encodeURIComponent(slug)}`,
+        publicProjectSchema,
+    );
 }
 
 export async function getAnnouncements(): Promise<ListResponse<PublicAnnouncement>> {

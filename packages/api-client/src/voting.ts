@@ -94,14 +94,10 @@ export class VotingApi {
         organizationId: string,
         editionId: string,
     ): Promise<ListResponse<VotableSubmission>> {
-        return this.client.request(
-            "GET",
-            `/api/v1/competitions/${editionId}/votable-submissions`,
-            {
-                schema: votableSubmissionListSchema,
-                headers: organizationHeader(organizationId),
-            },
-        );
+        return this.client.request("GET", `/api/v1/competitions/${editionId}/votable-submissions`, {
+            schema: votableSubmissionListSchema,
+            headers: organizationHeader(organizationId),
+        });
     }
 
     async results(organizationId: string, roundId: string): Promise<VoteResult> {

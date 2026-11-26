@@ -1,13 +1,6 @@
 import { expect, test } from "@playwright/test";
-import {
-    FIXTURE,
-    USERS,
-} from "../support/e2e/config.js";
-import {
-    chooseOption,
-    newAppContext,
-    signIn,
-} from "../support/e2e/app.js";
+import { FIXTURE, USERS } from "../support/e2e/config.js";
+import { chooseOption, newAppContext, signIn } from "../support/e2e/app.js";
 import { invitationTokenForEmail } from "../support/e2e/db.js";
 
 const PIXEL_PNG = Buffer.from(
@@ -158,9 +151,7 @@ test.describe("participant workflow", () => {
 
             await page.getByLabel("Version title").fill("E2E Submission v1");
             await page.getByLabel("Summary").fill("First submitted version.");
-            await page
-                .getByLabel("Description")
-                .fill("Initial end-to-end submission description.");
+            await page.getByLabel("Description").fill("Initial end-to-end submission description.");
             await page.getByRole("checkbox", { name: "Submit this version for review" }).check();
             await page.getByRole("button", { name: "Save version" }).click();
             await expect(page.getByText("Version saved.")).toBeVisible();
@@ -177,9 +168,9 @@ test.describe("participant workflow", () => {
                 await expect(page.getByText("Registration approved", { exact: true })).toBeVisible({
                     timeout: 2_000,
                 });
-                await expect(page.getByText("Team invitation accepted", { exact: true })).toBeVisible(
-                    { timeout: 2_000 },
-                );
+                await expect(
+                    page.getByText("Team invitation accepted", { exact: true }),
+                ).toBeVisible({ timeout: 2_000 });
             }).toPass({ timeout: 30_000 });
         });
     });

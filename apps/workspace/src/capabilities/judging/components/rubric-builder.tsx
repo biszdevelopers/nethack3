@@ -144,9 +144,7 @@ export function RubricBuilder({
                             variant="outline"
                             size="sm"
                             iconLeft={<Plus className="size-3.5" aria-hidden="true" />}
-                            onClick={() =>
-                                setCriteria((current) => [...current, emptyCriterion()])
-                            }
+                            onClick={() => setCriteria((current) => [...current, emptyCriterion()])}
                         >
                             Add criterion
                         </Button>
@@ -238,9 +236,7 @@ export function RubricBuilder({
                                     disabled={criteria.length === 1}
                                     onClick={() =>
                                         setCriteria((current) =>
-                                            current.filter(
-                                                (entry) => entry.key !== criterion.key,
-                                            ),
+                                            current.filter((entry) => entry.key !== criterion.key),
                                         )
                                     }
                                 >

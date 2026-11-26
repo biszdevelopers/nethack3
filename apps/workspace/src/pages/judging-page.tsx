@@ -231,7 +231,10 @@ export function JudgingPage(): ReactNode {
             <section className="flex flex-col gap-4" aria-labelledby="my-assignments-heading">
                 <div className="flex flex-wrap items-end justify-between gap-4">
                     <div className="flex flex-col gap-1">
-                        <h2 id="my-assignments-heading" className="text-lg font-bold tracking-tight">
+                        <h2
+                            id="my-assignments-heading"
+                            className="text-lg font-bold tracking-tight"
+                        >
                             My assignments
                         </h2>
                         <p className="text-sm text-ink-muted">
@@ -315,7 +318,10 @@ export function JudgingPage(): ReactNode {
                     aria-labelledby="assignment-management-heading"
                 >
                     <div className="flex flex-col gap-1">
-                        <h2 id="assignment-management-heading" className="text-lg font-bold tracking-tight">
+                        <h2
+                            id="assignment-management-heading"
+                            className="text-lg font-bold tracking-tight"
+                        >
                             Assignment management
                         </h2>
                         <p className="text-sm text-ink-muted">

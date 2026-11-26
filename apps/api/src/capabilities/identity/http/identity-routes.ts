@@ -44,10 +44,7 @@ export async function registerIdentityRoutes(
                 request.query.returnTo ?? null,
                 context.config.origins.workspace,
             );
-            const result = await context.auth.login.start(
-                returnTo,
-                guard.requestMetadata(request),
-            );
+            const result = await context.auth.login.start(returnTo, guard.requestMetadata(request));
             return reply.redirect(result.authorizationUrl, 302);
         },
     );
@@ -138,14 +135,10 @@ export async function registerIdentityRoutes(
         },
     );
 
-    app.get(
-        "/api/v1/me",
-        { schema: { response: { 200: userSchema } } },
-        async (request) => {
-            const auth = await guard.require(request);
-            return toUserDto(auth.user);
-        },
-    );
+    app.get("/api/v1/me", { schema: { response: { 200: userSchema } } }, async (request) => {
+        const auth = await guard.require(request);
+        return toUserDto(auth.user);
+    });
 
     app.patch(
         "/api/v1/me",

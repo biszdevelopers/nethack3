@@ -8,9 +8,7 @@ import type { UserRow } from "./types.js";
 
 export class AccountLinkRequiredError extends Error {
     constructor() {
-        super(
-            "An account with this email already exists and is linked to a different identity.",
-        );
+        super("An account with this email already exists and is linked to a different identity.");
         this.name = "AccountLinkRequiredError";
     }
 }
@@ -83,9 +81,12 @@ export class UserService {
                     .where(sql`lower(${users.email}) = ${claims.email}`)
                     .limit(1);
                 if (emailMatch.length > 0) {
-                    this.logger.warn("Login rejected because the email belongs to another identity.", {
-                        issuer,
-                    });
+                    this.logger.warn(
+                        "Login rejected because the email belongs to another identity.",
+                        {
+                            issuer,
+                        },
+                    );
                     throw new AccountLinkRequiredError();
                 }
             }
@@ -163,6 +164,11 @@ function sanitizeDisplayName(claims: IdTokenClaims): string {
             source = local;
         }
     }
-    const cleaned = source.replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 80);
+    const cleaned = Array.from(source, (character) =>
+        character.charCodeAt(0) < 0x20 || character.charCodeAt(0) === 0x7f ? "" : character,
+    )
+        .join("")
+        .trim()
+        .slice(0, 80);
     return cleaned.length > 0 ? cleaned : "Participant";
 }

@@ -1,19 +1,20 @@
 import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import { cn } from "../lib/cn.js";
 
-export const Table = forwardRef<HTMLTableElement, ComponentPropsWithoutRef<"table">>(
-    function Table({ className, ...rest }, ref) {
-        return (
-            <div className="w-full overflow-x-auto">
-                <table
-                    ref={ref}
-                    className={cn("w-full caption-bottom border-collapse text-sm", className)}
-                    {...rest}
-                />
-            </div>
-        );
-    },
-);
+export const Table = forwardRef<HTMLTableElement, ComponentPropsWithoutRef<"table">>(function Table(
+    { className, ...rest },
+    ref,
+) {
+    return (
+        <div className="w-full overflow-x-auto">
+            <table
+                ref={ref}
+                className={cn("w-full caption-bottom border-collapse text-sm", className)}
+                {...rest}
+            />
+        </div>
+    );
+});
 
 export function TableHeader({ className, ...rest }: ComponentPropsWithoutRef<"thead">): ReactNode {
     return <thead className={cn("border-b border-line", className)} {...rest} />;
@@ -25,10 +26,7 @@ export function TableBody({ className, ...rest }: ComponentPropsWithoutRef<"tbod
 
 export function TableFooter({ className, ...rest }: ComponentPropsWithoutRef<"tfoot">): ReactNode {
     return (
-        <tfoot
-            className={cn("border-t border-line bg-raised font-medium", className)}
-            {...rest}
-        />
+        <tfoot className={cn("border-t border-line bg-raised font-medium", className)} {...rest} />
     );
 }
 

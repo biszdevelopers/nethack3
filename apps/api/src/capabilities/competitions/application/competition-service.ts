@@ -20,7 +20,11 @@ import type {
 import type { AuthContext } from "../../../authentication/types.js";
 import type { Clock } from "../../../core/clock.js";
 import { domainEvents } from "../../../core/domain-event.js";
-import { ConflictError, isUniqueViolationError as isUniqueViolation, NotFoundError } from "../../../core/errors.js";
+import {
+    ConflictError,
+    isUniqueViolationError as isUniqueViolation,
+    NotFoundError,
+} from "../../../core/errors.js";
 import type { OutboxPublisher } from "../../../core/outbox.js";
 import type { AuditLogger } from "../../../infrastructure/audit/audit-logger.js";
 import type {

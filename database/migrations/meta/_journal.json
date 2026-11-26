@@ -1,41 +1,41 @@
 {
-  "version": "7",
-  "dialect": "postgresql",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "7",
-      "when": 1795608859972,
-      "tag": "0000_handy_katie_power",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1795608860787,
-      "tag": "0001_rls-policies",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1795613049215,
-      "tag": "0002_tighten-settings-rls",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1795619084291,
-      "tag": "0003_evaluation-history",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1795698322720,
-      "tag": "0004_majestic_silhouette",
-      "breakpoints": true
-    }
-  ]
+    "version": "7",
+    "dialect": "postgresql",
+    "entries": [
+        {
+            "idx": 0,
+            "version": "7",
+            "when": 1795608859972,
+            "tag": "0000_handy_katie_power",
+            "breakpoints": true
+        },
+        {
+            "idx": 1,
+            "version": "7",
+            "when": 1795608860787,
+            "tag": "0001_rls-policies",
+            "breakpoints": true
+        },
+        {
+            "idx": 2,
+            "version": "7",
+            "when": 1795613049215,
+            "tag": "0002_tighten-settings-rls",
+            "breakpoints": true
+        },
+        {
+            "idx": 3,
+            "version": "7",
+            "when": 1795619084291,
+            "tag": "0003_evaluation-history",
+            "breakpoints": true
+        },
+        {
+            "idx": 4,
+            "version": "7",
+            "when": 1795698322720,
+            "tag": "0004_majestic_silhouette",
+            "breakpoints": true
+        }
+    ]
 }

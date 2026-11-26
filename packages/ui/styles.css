@@ -17,7 +17,7 @@
     --color-line-strong: #404040;
     --color-ink: #fafafa;
     --color-ink-muted: #a3a3a3;
-    --color-ink-subtle: #737373;
+    --color-ink-subtle: #8c8c8c;
     --color-primary: #00dc82;
     --color-primary-hover: #2ee59a;
     --color-primary-soft: #062d1d;
@@ -77,7 +77,9 @@
         font-family: var(--font-sans);
         font-size: 1rem;
         line-height: 1.7;
-        font-feature-settings: "liga" 1, "calt" 1;
+        font-feature-settings:
+            "liga" 1,
+            "calt" 1;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
     }
@@ -293,7 +295,6 @@
         overflow: hidden;
     }
 }
-
 
 @keyframes ui-fade-in {
     from {

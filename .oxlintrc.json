@@ -24,6 +24,7 @@
         "typescript/no-non-null-assertion": "error",
         "typescript/consistent-type-imports": "error",
         "react/jsx-key": "error",
+        "react/react-in-jsx-scope": "off",
         "react/no-array-index-key": "warn",
         "react-hooks/rules-of-hooks": "error",
         "react-hooks/exhaustive-deps": "warn",
@@ -33,6 +34,11 @@
         "jsx-a11y/label-has-associated-control": "error",
         "jsx-a11y/anchor-is-valid": "error",
         "jsx-a11y/click-events-have-key-events": "warn",
+        "jsx-a11y/prefer-tag-over-role": "off",
+        "jsx-a11y/no-noninteractive-element-to-interactive-role": [
+            "error",
+            { "ul": ["listbox", "tree"], "li": ["option", "treeitem"] }
+        ],
         "import/no-cycle": "error",
         "import/no-duplicates": "error",
         "no-console": ["warn", { "allow": ["warn", "error"] }],

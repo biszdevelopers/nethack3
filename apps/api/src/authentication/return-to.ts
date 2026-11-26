@@ -25,4 +25,3 @@ export function normalizeReturnTo(returnTo: string | null, workspaceOrigin: stri
     }
     return "/";
 }
-

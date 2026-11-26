@@ -27,7 +27,6 @@ import {
 } from "@nethack/ui/static";
 import {
     AnimatedDisclosure,
-    CountUp,
     Magnetic,
     Parallax,
     Reveal,
@@ -103,10 +102,7 @@ export default async function HomePage(): Promise<ReactNode> {
     return (
         <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-20 overflow-x-clip px-4 py-10 sm:px-6 md:py-16 lg:px-8">
             <section className="relative flex max-w-4xl flex-col gap-6">
-                <Parallax
-                    strength={28}
-                    className="pointer-events-none absolute -top-24 left-1/4"
-                >
+                <Parallax strength={28} className="pointer-events-none absolute -top-24 left-1/4">
                     <div
                         aria-hidden="true"
                         className="size-[28rem] rounded-full bg-primary/10 blur-[120px]"
@@ -151,9 +147,14 @@ export default async function HomePage(): Promise<ReactNode> {
                 </Reveal>
 
                 {unavailable ? (
-                    <Alert variant="soft" tone="warning" title="Directory unavailable" icon={<Compass className="size-4" />}>
-                        The public directory could not be reached. Competition and project data
-                        will appear when the API is available.
+                    <Alert
+                        variant="soft"
+                        tone="warning"
+                        title="Directory unavailable"
+                        icon={<Compass className="size-4" />}
+                    >
+                        The public directory could not be reached. Competition and project data will
+                        appear when the API is available.
                     </Alert>
                 ) : openCompetition !== undefined ? (
                     <Reveal delay={0.24}>
@@ -161,7 +162,10 @@ export default async function HomePage(): Promise<ReactNode> {
                             href={`/competitions/${openCompetition.slug}`}
                             className="group flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/[0.07] p-4 transition-colors hover:border-primary/50 hover:bg-primary/10"
                         >
-                            <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" />
+                            <CheckCircle2
+                                className="mt-0.5 size-5 shrink-0 text-primary"
+                                aria-hidden="true"
+                            />
                             <span className="flex flex-col gap-0.5">
                                 <span className="text-sm font-medium text-primary">
                                     {openCompetition.status === "registration_open"
@@ -170,14 +174,25 @@ export default async function HomePage(): Promise<ReactNode> {
                                 </span>
                                 <span className="text-sm text-ink-muted">
                                     {openCompetition.name} · {openCompetition.organizationName} ·{" "}
-                                    {formatDate(openCompetition.registrationClosesAt ?? openCompetition.startsAt)}
+                                    {formatDate(
+                                        openCompetition.registrationClosesAt ??
+                                            openCompetition.startsAt,
+                                    )}
                                 </span>
                             </span>
-                            <ArrowUpRight className="ml-auto mt-0.5 size-4 text-primary transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" aria-hidden="true" />
+                            <ArrowUpRight
+                                className="ml-auto mt-0.5 size-4 text-primary transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+                                aria-hidden="true"
+                            />
                         </Link>
                     </Reveal>
                 ) : (
-                    <Alert variant="soft" tone="neutral" title="No competitions published yet" icon={<Trophy className="size-4" />}>
+                    <Alert
+                        variant="soft"
+                        tone="neutral"
+                        title="No competitions published yet"
+                        icon={<Trophy className="size-4" />}
+                    >
                         When an organizer publishes an edition, it appears here with its schedule,
                         rules, and registration window.
                     </Alert>
@@ -187,7 +202,10 @@ export default async function HomePage(): Promise<ReactNode> {
             <section className="flex flex-col gap-5" aria-labelledby="competitions-heading">
                 <Reveal className="flex flex-wrap items-end justify-between gap-3">
                     <div className="flex flex-col gap-1">
-                        <h2 id="competitions-heading" className="text-2xl font-bold tracking-tight glow-sm sm:text-3xl">
+                        <h2
+                            id="competitions-heading"
+                            className="text-2xl font-bold tracking-tight glow-sm sm:text-3xl"
+                        >
                             Competitions
                         </h2>
                         <p className="text-sm text-ink-muted">
@@ -222,7 +240,9 @@ export default async function HomePage(): Promise<ReactNode> {
                                                 {statusLabel(competition.status)}
                                             </Badge>
                                         </div>
-                                        <CardTitle className="text-lg">{competition.name}</CardTitle>
+                                        <CardTitle className="text-lg">
+                                            {competition.name}
+                                        </CardTitle>
                                     </CardHeader>
                                     <CardContent className="flex flex-col gap-4">
                                         <p className="line-clamp-3 text-sm text-ink-muted">
@@ -232,7 +252,8 @@ export default async function HomePage(): Promise<ReactNode> {
                                             <div className="flex flex-col gap-0.5">
                                                 <dt className="text-ink-subtle">Team size</dt>
                                                 <dd className="text-ink">
-                                                    {competition.teamMinSize}–{competition.teamMaxSize}
+                                                    {competition.teamMinSize}–
+                                                    {competition.teamMaxSize}
                                                 </dd>
                                             </div>
                                             <div className="flex flex-col gap-0.5">
@@ -293,7 +314,10 @@ export default async function HomePage(): Promise<ReactNode> {
 
             <section className="flex flex-col gap-5" aria-labelledby="features-heading">
                 <Reveal className="flex flex-col gap-1">
-                    <h2 id="features-heading" className="text-2xl font-bold tracking-tight glow-sm sm:text-3xl">
+                    <h2
+                        id="features-heading"
+                        className="text-2xl font-bold tracking-tight glow-sm sm:text-3xl"
+                    >
                         Built for the whole competition
                     </h2>
                     <p className="text-sm text-ink-muted">
@@ -321,7 +345,10 @@ export default async function HomePage(): Promise<ReactNode> {
             <section className="flex flex-col gap-5" aria-labelledby="projects-heading">
                 <Reveal className="flex flex-wrap items-end justify-between gap-3">
                     <div className="flex flex-col gap-1">
-                        <h2 id="projects-heading" className="text-2xl font-bold tracking-tight glow-sm sm:text-3xl">
+                        <h2
+                            id="projects-heading"
+                            className="text-2xl font-bold tracking-tight glow-sm sm:text-3xl"
+                        >
                             Project showcase
                         </h2>
                         <p className="text-sm text-ink-muted">

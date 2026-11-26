@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { LightMyRequestResponse } from "fastify";
-import { startHarness, type TestHarness } from "../support/app-harness.js";
-import type { TestSession } from "../support/app-harness.js";
+import { startHarness, type TestHarness, type TestSession } from "../support/app-harness.js";
 import { queryAsOwner, uniqueEmail } from "../support/test-database.js";
 import {
     addMember,
@@ -103,7 +102,11 @@ describe("role escalation and least privilege", () => {
             await request(fixture.participant, {
                 method: "POST",
                 url: `/api/v1/organizations/${fixture.organizationId}/competitions`,
-                payload: { name: "Participant Series", slug: "participant-series", description: "" },
+                payload: {
+                    name: "Participant Series",
+                    slug: "participant-series",
+                    description: "",
+                },
             }),
         ]);
         responses.push([

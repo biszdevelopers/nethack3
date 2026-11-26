@@ -93,12 +93,7 @@ export async function registerTeamRoutes(
         async (request) => {
             const auth = await guard.require(request);
             const access = await guard.requireOrganization(request, auth);
-            return service.detail(
-                auth,
-                access.organizationId,
-                request.params.teamId,
-                access.role,
-            );
+            return service.detail(auth, access.organizationId, request.params.teamId, access.role);
         },
     );
 
@@ -159,12 +154,7 @@ export async function registerTeamRoutes(
         async (request) => {
             const auth = await guard.require(request);
             const organizationId = organizationContext(request);
-            return service.acceptInvitation(
-                auth,
-                organizationId,
-                request.body.token,
-                request.ip,
-            );
+            return service.acceptInvitation(auth, organizationId, request.body.token, request.ip);
         },
     );
 
@@ -215,12 +205,7 @@ export async function registerTeamRoutes(
         async (request, reply) => {
             const auth = await guard.require(request);
             const access = await guard.requireOrganization(request, auth);
-            await service.leave(
-                auth,
-                access.organizationId,
-                request.params.teamId,
-                request.ip,
-            );
+            await service.leave(auth, access.organizationId, request.params.teamId, request.ip);
             return reply.status(204).send();
         },
     );

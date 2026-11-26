@@ -25,8 +25,9 @@ export const ContextMenuContent = forwardRef<
     );
 });
 
-export interface ContextMenuItemProps
-    extends ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Item> {
+export interface ContextMenuItemProps extends ComponentPropsWithoutRef<
+    typeof ContextMenuPrimitive.Item
+> {
     readonly icon?: ReactNode;
     readonly shortcut?: string;
 }

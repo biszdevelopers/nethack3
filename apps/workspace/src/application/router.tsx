@@ -24,25 +24,24 @@ export const router = createBrowserRouter([
                     {
                         path: "competitions",
                         lazy: async () => {
-                            const { CompetitionsPage } = await import("../pages/competitions-page.js");
+                            const { CompetitionsPage } =
+                                await import("../pages/competitions-page.js");
                             return { Component: CompetitionsPage };
                         },
                     },
                     {
                         path: "competitions/manage",
                         lazy: async () => {
-                            const { CompetitionAdminPage } = await import(
-                                "../capabilities/competitions/pages/competition-admin-page.js"
-                            );
+                            const { CompetitionAdminPage } =
+                                await import("../capabilities/competitions/pages/competition-admin-page.js");
                             return { Component: CompetitionAdminPage };
                         },
                     },
                     {
                         path: "competitions/:editionId",
                         lazy: async () => {
-                            const { CompetitionDetailPage } = await import(
-                                "../capabilities/competitions/pages/competition-detail-page.js"
-                            );
+                            const { CompetitionDetailPage } =
+                                await import("../capabilities/competitions/pages/competition-detail-page.js");
                             return { Component: CompetitionDetailPage };
                         },
                     },
@@ -56,9 +55,8 @@ export const router = createBrowserRouter([
                     {
                         path: "teams/:teamId",
                         lazy: async () => {
-                            const { TeamDetailPage } = await import(
-                                "../capabilities/teams/pages/team-detail-page.js"
-                            );
+                            const { TeamDetailPage } =
+                                await import("../capabilities/teams/pages/team-detail-page.js");
                             return { Component: TeamDetailPage };
                         },
                     },
@@ -72,25 +70,24 @@ export const router = createBrowserRouter([
                     {
                         path: "projects/:projectId",
                         lazy: async () => {
-                            const { ProjectDetailPage } = await import(
-                                "../capabilities/projects/pages/project-detail-page.js"
-                            );
+                            const { ProjectDetailPage } =
+                                await import("../capabilities/projects/pages/project-detail-page.js");
                             return { Component: ProjectDetailPage };
                         },
                     },
                     {
                         path: "submissions",
                         lazy: async () => {
-                            const { SubmissionsPage } = await import("../pages/submissions-page.js");
+                            const { SubmissionsPage } =
+                                await import("../pages/submissions-page.js");
                             return { Component: SubmissionsPage };
                         },
                     },
                     {
                         path: "submissions/:submissionId",
                         lazy: async () => {
-                            const { SubmissionDetailPage } = await import(
-                                "../capabilities/submissions/pages/submission-detail-page.js"
-                            );
+                            const { SubmissionDetailPage } =
+                                await import("../capabilities/submissions/pages/submission-detail-page.js");
                             return { Component: SubmissionDetailPage };
                         },
                     },
@@ -104,9 +101,8 @@ export const router = createBrowserRouter([
                     {
                         path: "judging/assignments/:assignmentId",
                         lazy: async () => {
-                            const { AssignmentDetailPage } = await import(
-                                "../capabilities/judging/pages/assignment-detail-page.js"
-                            );
+                            const { AssignmentDetailPage } =
+                                await import("../capabilities/judging/pages/assignment-detail-page.js");
                             return { Component: AssignmentDetailPage };
                         },
                     },
@@ -120,14 +116,16 @@ export const router = createBrowserRouter([
                     {
                         path: "organization",
                         lazy: async () => {
-                            const { OrganizationPage } = await import("../pages/organization-page.js");
+                            const { OrganizationPage } =
+                                await import("../pages/organization-page.js");
                             return { Component: OrganizationPage };
                         },
                     },
                     {
                         path: "notifications",
                         lazy: async () => {
-                            const { NotificationsPage } = await import("../pages/notifications-page.js");
+                            const { NotificationsPage } =
+                                await import("../pages/notifications-page.js");
                             return { Component: NotificationsPage };
                         },
                     },

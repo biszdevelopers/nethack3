@@ -117,8 +117,7 @@ export function databaseErrorDetails(error: unknown): DatabaseErrorDetails {
         if (typeof current !== "object" || current === null) {
             break;
         }
-        const code =
-            "code" in current && typeof current.code === "string" ? current.code : null;
+        const code = "code" in current && typeof current.code === "string" ? current.code : null;
         const constraint =
             "constraint" in current && typeof current.constraint === "string"
                 ? current.constraint

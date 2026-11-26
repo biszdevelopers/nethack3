@@ -122,10 +122,10 @@ describe("input injection and URL scheme validation", () => {
         });
         expect(create.statusCode).toBe(400);
 
-        const stored = await queryAsOwner<{ repository_url: string | null; demo_url: string | null }>(
-            "select repository_url, demo_url from projects where id = $1",
-            [fixture.projectId],
-        );
+        const stored = await queryAsOwner<{
+            repository_url: string | null;
+            demo_url: string | null;
+        }>("select repository_url, demo_url from projects where id = $1", [fixture.projectId]);
         expect(stored[0]?.repository_url).toBeNull();
         expect(stored[0]?.demo_url).toBeNull();
     });

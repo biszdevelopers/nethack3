@@ -95,7 +95,10 @@ export function SiteHeader({ workspaceOrigin }: { readonly workspaceOrigin: stri
                     />
                 </Link>
 
-                <div ref={navRef} className="hidden flex-1 items-center justify-center gap-1 lg:flex">
+                <div
+                    ref={navRef}
+                    className="hidden flex-1 items-center justify-center gap-1 lg:flex"
+                >
                     {NAVIGATION.map((item) => {
                         const Icon = item.icon;
                         const active = isActive(item.href);
@@ -131,7 +134,9 @@ export function SiteHeader({ workspaceOrigin }: { readonly workspaceOrigin: stri
                         variant="ghost"
                         size="icon"
                         onClick={toggleColorMode}
-                        aria-label={colorMode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                        aria-label={
+                            colorMode === "dark" ? "Switch to light mode" : "Switch to dark mode"
+                        }
                     >
                         {colorMode === "dark" ? (
                             <Moon className="size-4" aria-hidden="true" />

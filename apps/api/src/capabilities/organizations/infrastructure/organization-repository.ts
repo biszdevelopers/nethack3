@@ -354,7 +354,13 @@ export class OrganizationRepository {
     async auditPage(
         db: DatabaseExecutor,
         organizationId: string,
-        options: { limit: number; before: Date | null; action: string | null; entityType: string | null; actorUserId: string | null },
+        options: {
+            limit: number;
+            before: Date | null;
+            action: string | null;
+            entityType: string | null;
+            actorUserId: string | null;
+        },
     ): Promise<
         readonly {
             id: string;

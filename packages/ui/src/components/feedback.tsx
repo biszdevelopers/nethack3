@@ -22,7 +22,9 @@ export function Spinner({ className, label = "Loading" }: SpinnerProps): ReactNo
 }
 
 export function Skeleton({ className }: { readonly className?: string }): ReactNode {
-    return <div className={cn("animate-pulse rounded-md bg-raised", className)} aria-hidden="true" />;
+    return (
+        <div className={cn("animate-pulse rounded-md bg-raised", className)} aria-hidden="true" />
+    );
 }
 
 export function LoadingBlock({
@@ -36,10 +38,7 @@ export function LoadingBlock({
         <div className="flex flex-col gap-3" role="status" aria-live="polite">
             <span className="sr-only">{label}</span>
             {Array.from({ length: rows }, (_, index) => (
-                <Skeleton
-                    key={index}
-                    className={index === 0 ? "h-6 w-1/3" : "h-4 w-full"}
-                />
+                <Skeleton key={index} className={index === 0 ? "h-6 w-1/3" : "h-4 w-full"} />
             ))}
         </div>
     );

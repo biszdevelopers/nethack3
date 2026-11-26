@@ -44,7 +44,11 @@ export class IdempotencyService {
             throw new ValidationError("The idempotency key has an invalid format.");
         }
         const requestHash = sha256Hex(
-            JSON.stringify({ method: request.method, url: request.url, body: request.body ?? null }),
+            JSON.stringify({
+                method: request.method,
+                url: request.url,
+                body: request.body ?? null,
+            }),
         );
 
         const existing = await this.database.db

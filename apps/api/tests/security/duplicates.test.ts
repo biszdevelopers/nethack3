@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { LightMyRequestResponse } from "fastify";
-import { startHarness, type TestHarness, type TestSession } from "../support/app-harness.js";
+import { startHarness, type TestHarness } from "../support/app-harness.js";
 import { queryAsOwner, uniqueEmail, uniqueSlug } from "../support/test-database.js";
 import {
     addMember,

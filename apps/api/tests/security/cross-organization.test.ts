@@ -1,7 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { LightMyRequestResponse } from "fastify";
 import { startHarness, type TestHarness } from "../support/app-harness.js";
-import { buildSecurityFixture, expectStatus, type SecurityFixture } from "./support/security-fixtures.js";
+import {
+    buildSecurityFixture,
+    expectStatus,
+    type SecurityFixture,
+} from "./support/security-fixtures.js";
 
 function errorCode(response: LightMyRequestResponse): string | null {
     const body: unknown = response.json();

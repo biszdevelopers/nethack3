@@ -230,7 +230,6 @@ export function useDeclareConflict(organizationId: string | null, assignmentId: 
     });
 }
 
-
 export function useCreateRubric(organizationId: string | null, editionId: string | null) {
     const queryClient = useQueryClient();
     return useMutation({

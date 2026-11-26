@@ -2,14 +2,17 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowRight, ArrowUpRight, CalendarClock, GitBranch, Users } from "lucide-react";
 import {
-    ArrowRight,
-    ArrowUpRight,
-    CalendarClock,
-    GitBranch,
-    Users,
-} from "lucide-react";
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, EmptyState, Markdown } from "@nethack/ui/static";
+    Badge,
+    Button,
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+    EmptyState,
+    Markdown,
+} from "@nethack/ui/static";
 import { Reveal, StaggerReveal, Tilt } from "@nethack/ui/motion";
 import { PublicApiError, getCompetition } from "../../../lib/public-api";
 
@@ -129,7 +132,9 @@ export default async function CompetitionDetailPage({
                             <CalendarClock className="size-3.5 text-primary" aria-hidden="true" />
                             Registration closes
                         </span>
-                        <span className="text-sm">{formatDate(competition.registrationClosesAt)}</span>
+                        <span className="text-sm">
+                            {formatDate(competition.registrationClosesAt)}
+                        </span>
                     </CardContent>
                 </Card>
                 <Card variant="soft">
@@ -147,7 +152,9 @@ export default async function CompetitionDetailPage({
 
             <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
                 <Reveal className="flex flex-col gap-4" y={20}>
-                    <h2 id="rules" className="text-2xl font-bold tracking-tight glow-sm">Rules</h2>
+                    <h2 id="rules" className="text-2xl font-bold tracking-tight glow-sm">
+                        Rules
+                    </h2>
                     {competition.rulesMarkdown.trim().length === 0 ? (
                         <EmptyState
                             title="Rules not published"
@@ -174,7 +181,10 @@ export default async function CompetitionDetailPage({
                                 ) : (
                                     <ol className="flex flex-col gap-4">
                                         {competition.milestones.map((milestone) => (
-                                            <li key={milestone.id} className="relative border-l border-line pl-4">
+                                            <li
+                                                key={milestone.id}
+                                                className="relative border-l border-line pl-4"
+                                            >
                                                 <span
                                                     aria-hidden="true"
                                                     className="absolute -left-[5px] top-1.5 size-2.5 rounded-full border border-primary bg-app"

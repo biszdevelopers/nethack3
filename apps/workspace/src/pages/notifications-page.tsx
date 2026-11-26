@@ -58,7 +58,9 @@ export function NotificationsPage(): ReactNode {
         <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex flex-col gap-1">
-                    <h1 className="text-2xl font-extrabold tracking-tight glow-sm">Notifications</h1>
+                    <h1 className="text-2xl font-extrabold tracking-tight glow-sm">
+                        Notifications
+                    </h1>
                     <p className="text-sm text-ink-muted">
                         Decisions, invitations, assignments, and announcements.
                     </p>

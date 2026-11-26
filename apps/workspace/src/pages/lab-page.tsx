@@ -346,7 +346,10 @@ function MotionGroup(): ReactNode {
                     nethack builds competitions
                 </SplitTextReveal>
             </LabSection>
-            <LabSection title="Reveal and stagger" description="Scroll-triggered entrance for sections and grids.">
+            <LabSection
+                title="Reveal and stagger"
+                description="Scroll-triggered entrance for sections and grids."
+            >
                 <StaggerReveal className="grid gap-3 sm:grid-cols-3">
                     {["Registration", "Judging", "Results"].map((item) => (
                         <Card key={item} variant="soft">
@@ -355,7 +358,10 @@ function MotionGroup(): ReactNode {
                     ))}
                 </StaggerReveal>
             </LabSection>
-            <LabSection title="Tilt and magnetic" description="Pointer-driven depth and magnetic primary actions.">
+            <LabSection
+                title="Tilt and magnetic"
+                description="Pointer-driven depth and magnetic primary actions."
+            >
                 <div className="flex flex-wrap items-center gap-6">
                     <Tilt className="w-56">
                         <Card hoverable>
@@ -369,7 +375,10 @@ function MotionGroup(): ReactNode {
                     </Magnetic>
                 </div>
             </LabSection>
-            <LabSection title="Count-up and disclosure" description="Real numeric values and accessible animated disclosure.">
+            <LabSection
+                title="Count-up and disclosure"
+                description="Real numeric values and accessible animated disclosure."
+            >
                 <div className="flex flex-col gap-4">
                     <p className="text-sm text-ink-muted">
                         Animated value: <CountUp value={128} className="font-bold text-primary" />
@@ -382,7 +391,10 @@ function MotionGroup(): ReactNode {
                     </AnimatedDisclosure>
                 </div>
             </LabSection>
-            <LabSection title="Page transition" description="Workspace routes animate through PageTransition in the authenticated shell.">
+            <LabSection
+                title="Page transition"
+                description="Workspace routes animate through PageTransition in the authenticated shell."
+            >
                 <Reveal>
                     <Card variant="outline">
                         <CardContent className="pt-4 text-sm text-ink-muted">

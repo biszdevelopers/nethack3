@@ -52,7 +52,9 @@ export default async function AnnouncementsPage(): Promise<ReactNode> {
                         <Reveal key={announcement.id} delay={index * 0.05}>
                             <article className="rounded-lg border border-line bg-panel/60 p-6 transition-colors hover:border-line-strong">
                                 <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-ink-subtle">
-                                    <span className="text-primary">{announcement.organizationName}</span>
+                                    <span className="text-primary">
+                                        {announcement.organizationName}
+                                    </span>
                                     <span>·</span>
                                     <span>
                                         {announcement.publishedAt === null

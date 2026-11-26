@@ -23,21 +23,29 @@ test.describe("organizer workflow", () => {
         ).toBeVisible();
 
         await test.step("create a series", async () => {
-            const form = page.getByRole("button", { name: "Create series" }).locator("xpath=ancestor::form");
+            const form = page
+                .getByRole("button", { name: "Create series" })
+                .locator("xpath=ancestor::form");
             await form.getByLabel("Name").fill(seriesName);
             await form.getByLabel("Slug").fill("e2e-series");
-            await form.getByLabel("Description").fill("Series created by the E2E organizer journey.");
+            await form
+                .getByLabel("Description")
+                .fill("Series created by the E2E organizer journey.");
             await form.getByRole("button", { name: "Create series" }).click();
             await expectToast(page, "Competition series created");
         });
 
         let editionId = "";
         await test.step("create and publish an edition", async () => {
-            const form = page.getByRole("button", { name: "Create edition" }).locator("xpath=ancestor::form");
+            const form = page
+                .getByRole("button", { name: "Create edition" })
+                .locator("xpath=ancestor::form");
             await chooseOption(form.getByLabel("Series"), seriesName);
             await form.getByLabel("Edition name").fill(editionName);
             await form.getByLabel("Slug").fill("e2e-organizer-edition");
-            await form.getByLabel("Description").fill("Edition created by the E2E organizer journey.");
+            await form
+                .getByLabel("Description")
+                .fill("Edition created by the E2E organizer journey.");
             await form.getByLabel("Registration opens").fill(localDateTime(-1));
             await form.getByLabel("Registration closes").fill(localDateTime(10));
             await form.getByLabel("Starts").fill(localDateTime(14));
@@ -55,7 +63,9 @@ test.describe("organizer workflow", () => {
         });
 
         await test.step("open registration, add a division, and schedule a milestone", async () => {
-            const editForm = page.getByRole("button", { name: "Save edition" }).locator("xpath=ancestor::form");
+            const editForm = page
+                .getByRole("button", { name: "Save edition" })
+                .locator("xpath=ancestor::form");
             await chooseOption(editForm.getByLabel("Status"), "Registration open");
             await editForm.getByRole("button", { name: "Save edition" }).click();
             await expectToast(page, "Edition saved");
@@ -119,7 +129,9 @@ test.describe("organizer workflow", () => {
     test("offers submission review from the submission page", async ({ page }) => {
         await signIn(page, USERS.organizer);
         await page.goto(`/submissions/${FIXTURE.submissionId}`);
-        await expect(page.getByRole("heading", { name: FIXTURE.projectTitle, level: 1 })).toBeVisible();
+        await expect(
+            page.getByRole("heading", { name: FIXTURE.projectTitle, level: 1 }),
+        ).toBeVisible();
         await expect(page.getByRole("button", { name: /review submission/i })).toBeVisible({
             timeout: 5_000,
         });

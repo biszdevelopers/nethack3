@@ -132,7 +132,6 @@ export function useCastBallot(organizationId: string | null, editionId: string |
     });
 }
 
-
 export function useVotableSubmissions(organizationId: string | null, editionId: string | null) {
     return useQuery({
         queryKey: [...queryKeys.votingRounds(editionId ?? "none"), "votable-submissions"],

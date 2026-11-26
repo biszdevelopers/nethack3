@@ -10,8 +10,20 @@ import {
     sessions,
     users,
 } from "../infrastructure/database/schema/index.js";
-import { deriveCsrfToken, decryptSecret, encryptSecret, hashIp, randomToken, sha256Hex } from "./crypto.js";
-import type { AuthContext, RequestMetadata, SessionCreationResult, SessionMembership } from "./types.js";
+import {
+    deriveCsrfToken,
+    decryptSecret,
+    encryptSecret,
+    hashIp,
+    randomToken,
+    sha256Hex,
+} from "./crypto.js";
+import type {
+    AuthContext,
+    RequestMetadata,
+    SessionCreationResult,
+    SessionMembership,
+} from "./types.js";
 import type { TokenResult } from "./basis-auth-client.js";
 
 export interface SessionTokens {
@@ -26,12 +38,7 @@ export class SessionService {
     private readonly clock: Clock;
     private readonly logger: Logger;
 
-    constructor(
-        database: DatabaseConnection,
-        config: AppConfig,
-        clock: Clock,
-        logger: Logger,
-    ) {
+    constructor(database: DatabaseConnection, config: AppConfig, clock: Clock, logger: Logger) {
         this.database = database;
         this.config = config;
         this.clock = clock;
@@ -58,7 +65,9 @@ export class SessionService {
         const now = this.clock.now();
         const expiresAt = new Date(now.getTime() + this.config.session.ttlSeconds * 1000);
         const refreshExpiresAt =
-            tokens.refreshToken === null ? null : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+            tokens.refreshToken === null
+                ? null
+                : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
         const primaryKey = currentKey.key;
 
         const created = await this.database.db
@@ -91,7 +100,7 @@ export class SessionService {
         };
     }
 
-    async resolve(sessionToken: string, metadata: RequestMetadata): Promise<AuthContext | null> {
+    async resolve(sessionToken: string, _metadata: RequestMetadata): Promise<AuthContext | null> {
         const sessionTokenHash = sha256Hex(sessionToken);
         const now = this.clock.now();
         const rows = await this.database.db
@@ -248,7 +257,10 @@ export class SessionService {
             return null;
         }
         return {
-            accessToken: decryptSecret(row.accessTokenEncrypted, this.config.session.encryptionKeys),
+            accessToken: decryptSecret(
+                row.accessTokenEncrypted,
+                this.config.session.encryptionKeys,
+            ),
             refreshToken:
                 row.refreshTokenEncrypted === null
                     ? null

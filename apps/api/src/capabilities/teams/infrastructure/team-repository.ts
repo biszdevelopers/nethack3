@@ -170,12 +170,7 @@ export class TeamRepository {
                     eq(teamMembers.organizationId, teams.organizationId),
                 ),
             )
-            .where(
-                and(
-                    eq(teams.organizationId, organizationId),
-                    eq(teamMembers.userId, userId),
-                ),
-            )
+            .where(and(eq(teams.organizationId, organizationId), eq(teamMembers.userId, userId)))
             .orderBy(desc(teams.createdAt));
         return rows.map((row) => ({ ...row.team, memberCount: row.memberCount }));
     }
@@ -306,11 +301,7 @@ export class TeamRepository {
         return rows.length > 0;
     }
 
-    async removeMember(
-        session: DatabaseSession,
-        teamId: string,
-        userId: string,
-    ): Promise<boolean> {
+    async removeMember(session: DatabaseSession, teamId: string, userId: string): Promise<boolean> {
         const rows = await session.db
             .delete(teamMembers)
             .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)))

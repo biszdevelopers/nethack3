@@ -47,9 +47,7 @@ export function Banner({
             )}
             <div className="flex min-w-0 flex-1 flex-col gap-1">
                 {title === undefined ? null : <p className="font-medium">{title}</p>}
-                {children === undefined ? null : (
-                    <div className="text-ink-muted">{children}</div>
-                )}
+                {children === undefined ? null : <div className="text-ink-muted">{children}</div>}
             </div>
             {action === undefined ? null : <div className="shrink-0">{action}</div>}
             {onDismiss === undefined ? null : (

@@ -28,7 +28,8 @@ export const toggleVariants = tv({
 });
 
 export interface ToggleProps
-    extends ComponentPropsWithoutRef<typeof TogglePrimitive.Root>,
+    extends
+        ComponentPropsWithoutRef<typeof TogglePrimitive.Root>,
         VariantProps<typeof toggleVariants> {}
 
 export const Toggle = forwardRef<HTMLButtonElement, ToggleProps>(function Toggle(

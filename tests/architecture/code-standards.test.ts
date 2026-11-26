@@ -23,7 +23,14 @@ function walk(directory: string): string[] {
 
 function productSources(): string[] {
     const files: string[] = [];
-    for (const app of ["apps/api/src", "apps/site/src", "apps/workspace/src", "packages/contracts/src", "packages/ui/src", "packages/api-client/src"]) {
+    for (const app of [
+        "apps/api/src",
+        "apps/site/src",
+        "apps/workspace/src",
+        "packages/contracts/src",
+        "packages/ui/src",
+        "packages/api-client/src",
+    ]) {
         files.push(...walk(join(ROOT, app)));
     }
     return files.filter((file) => file.endsWith(".ts") || file.endsWith(".tsx"));
@@ -44,7 +51,7 @@ describe("code standards", () => {
             if (/:\s*any\b|\bas\s+any\b|<any>/.test(content)) {
                 violations.push(`${relative(ROOT, file)} uses any`);
             }
-            if (/[A-Za-z0-9_\)\]]!\./.test(content) || /[A-Za-z0-9_\)\]]!;/.test(content)) {
+            if (/[A-Za-z0-9_)\]]!\./.test(content) || /[A-Za-z0-9_)\]]!;/.test(content)) {
                 violations.push(`${relative(ROOT, file)} may use a non-null assertion`);
             }
         }
@@ -72,7 +79,10 @@ describe("code standards", () => {
 
     it("does not use uppercase text transforms", () => {
         const violations: string[] = [];
-        for (const file of [...productSources(), ...walk(join(ROOT, "packages/ui")).filter((path) => path.endsWith(".css"))]) {
+        for (const file of [
+            ...productSources(),
+            ...walk(join(ROOT, "packages/ui")).filter((path) => path.endsWith(".css")),
+        ]) {
             const content = readFileSync(file, "utf8");
             if (/text-transform\s*:\s*uppercase/i.test(content)) {
                 violations.push(`${relative(ROOT, file)} uses text-transform uppercase`);
@@ -86,7 +96,9 @@ describe("code standards", () => {
 
     it("uses only Noto Sans Mono for type", () => {
         const css = readFileSync(join(ROOT, "packages/ui/styles.css"), "utf8");
-        const families = [...css.matchAll(/font-family:\s*([^;]+);/g)].map((match) => match[1] ?? "");
+        const families = [...css.matchAll(/font-family:\s*([^;]+);/g)].map(
+            (match) => match[1] ?? "",
+        );
         expect(families.length).toBeGreaterThan(0);
         expect(
             families.every(

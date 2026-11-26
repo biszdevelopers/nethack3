@@ -20,11 +20,10 @@ import {
     useGsapStagger,
     Separator,
     StatusIndicator,
-} from "@nethack/ui";
-import {
+    cn,
     gsap,
-    useIsoLayoutEffect,
     useColorMode,
+    useIsoLayoutEffect,
 } from "@nethack/ui";
 import {
     Bell,
@@ -51,7 +50,6 @@ import type { OrganizationRole, Session } from "@nethack/contracts";
 import { api } from "./api.js";
 import { organizationSelectionStore } from "./organization-store.js";
 import { useActiveMembership, useSession } from "./session.js";
-import { cn } from "@nethack/ui";
 
 interface NavigationItem {
     readonly label: string;
@@ -167,7 +165,10 @@ export function AppShell(): ReactNode {
         <div className="flex min-h-dvh bg-app">
             <aside className="hidden w-64 shrink-0 border-r border-line lg:flex lg:flex-col">
                 <div className="flex h-16 items-center border-b border-line px-4">
-                    <Link to="/" className="flex items-center gap-2 text-lg font-extrabold tracking-tight">
+                    <Link
+                        to="/"
+                        className="flex items-center gap-2 text-lg font-extrabold tracking-tight"
+                    >
                         <span className="text-primary glow">nethack</span>
                         <span
                             aria-hidden="true"
@@ -220,7 +221,10 @@ export function AppShell(): ReactNode {
                             <span className="text-xs text-ink-muted">No organization selected</span>
                         ) : (
                             <span className="flex min-w-0 items-center gap-2 text-xs text-ink-muted">
-                                <Building2 className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+                                <Building2
+                                    className="size-3.5 shrink-0 text-primary"
+                                    aria-hidden="true"
+                                />
                                 <span className="truncate">{membership.organizationName}</span>
                             </span>
                         )}
@@ -234,7 +238,9 @@ export function AppShell(): ReactNode {
                         variant="ghost"
                         size="icon"
                         onClick={toggleColorMode}
-                        aria-label={colorMode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                        aria-label={
+                            colorMode === "dark" ? "Switch to light mode" : "Switch to dark mode"
+                        }
                     >
                         {colorMode === "dark" ? (
                             <Moon className="size-4" aria-hidden="true" />
@@ -247,12 +253,17 @@ export function AppShell(): ReactNode {
                             <button
                                 type="button"
                                 className="flex items-center gap-2 rounded-md p-1 transition-colors hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/25"
-                                aria-label="Account menu"
+                                aria-label={`Account menu ${initials(data.user.displayName)}`}
                             >
                                 <Avatar className="size-8">
-                                    <AvatarFallback>{initials(data.user.displayName)}</AvatarFallback>
+                                    <AvatarFallback>
+                                        {initials(data.user.displayName)}
+                                    </AvatarFallback>
                                 </Avatar>
-                                <ChevronDown className="hidden size-3.5 text-ink-subtle sm:block" aria-hidden="true" />
+                                <ChevronDown
+                                    className="hidden size-3.5 text-ink-subtle sm:block"
+                                    aria-hidden="true"
+                                />
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="min-w-56">
@@ -304,7 +315,10 @@ function SidebarContent({
     return (
         <>
             <div className="border-b border-line p-4">
-                <label htmlFor="organization-select" className="mb-1.5 block text-xs text-ink-subtle">
+                <label
+                    htmlFor="organization-select"
+                    className="mb-1.5 block text-xs text-ink-subtle"
+                >
                     Organization
                 </label>
                 <select
@@ -324,13 +338,20 @@ function SidebarContent({
                     ))}
                 </select>
             </div>
-            <nav ref={navRef} className="flex flex-1 flex-col gap-6 overflow-y-auto p-3" aria-label="Workspace">
+            <nav
+                ref={navRef}
+                className="flex flex-1 flex-col gap-6 overflow-y-auto p-3"
+                aria-label="Workspace"
+            >
                 <NavigationGroup heading="Participate" items={PRIMARY_NAVIGATION.filter(visible)} />
                 {REVIEW_NAVIGATION.some(visible) ? (
                     <NavigationGroup heading="Review" items={REVIEW_NAVIGATION.filter(visible)} />
                 ) : null}
                 {ORGANIZATION_NAVIGATION.some(visible) ? (
-                    <NavigationGroup heading="Organize" items={ORGANIZATION_NAVIGATION.filter(visible)} />
+                    <NavigationGroup
+                        heading="Organize"
+                        items={ORGANIZATION_NAVIGATION.filter(visible)}
+                    />
                 ) : null}
                 <NavigationGroup heading="Account" items={ACCOUNT_NAVIGATION.filter(visible)} />
                 {session.globalAdministrator ? (

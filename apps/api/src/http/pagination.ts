@@ -42,7 +42,10 @@ export function responsePage<T>(
     const last = visible[visible.length - 1];
     return {
         items: visible,
-        nextCursor: hasMore && last !== undefined ? encodeCursor(cursorOf(last).createdAt, cursorOf(last).id) : null,
+        nextCursor:
+            hasMore && last !== undefined
+                ? encodeCursor(cursorOf(last).createdAt, cursorOf(last).id)
+                : null,
     };
 }
 

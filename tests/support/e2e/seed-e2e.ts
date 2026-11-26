@@ -1,8 +1,4 @@
-import {
-    AUTH_ORIGIN,
-    FIXTURE,
-    USERS,
-} from "./config.js";
+import { AUTH_ORIGIN, FIXTURE, USERS } from "./config.js";
 import { ownerQuery, ownerTenantBatch } from "./db.js";
 
 const ORG = FIXTURE.organizationId;
@@ -11,7 +7,6 @@ const OPEN_DIVISION = FIXTURE.openDivisionId;
 const OTHER_ORG = FIXTURE.otherOrganizationId;
 
 const AUTHOR_ID = "f2000000-0000-4000-8000-000000000041";
-const AUTHOR_REGISTRATION_ID = "f2000000-0000-4000-8000-000000000042";
 const AUTHOR_PARTICIPANT_ID = "f2000000-0000-4000-8000-000000000043";
 const LAB_TEAM_ID = "f2000000-0000-4000-8000-000000000050";
 const LAB_TEAM_MEMBER_ID = "f2000000-0000-4000-8000-000000000051";
@@ -188,13 +183,7 @@ async function seedJudgingLab(): Promise<void> {
             text: `insert into submissions
                    (id, organization_id, edition_id, project_id, team_id, status, current_version, submitted_at)
                    values ($1, $2, $3, $4, $5, 'submitted', 1, now())`,
-            values: [
-                LAB_SUBMISSION_ID,
-                ORG,
-                FIXTURE.editionId,
-                LAB_PROJECT_ID,
-                LAB_TEAM_ID,
-            ],
+            values: [LAB_SUBMISSION_ID, ORG, FIXTURE.editionId, LAB_PROJECT_ID, LAB_TEAM_ID],
         },
         {
             text: `insert into submission_versions
@@ -202,13 +191,7 @@ async function seedJudgingLab(): Promise<void> {
                     description_markdown, repository_url, created_by_user_id)
                    values ($1, $2, $3, 1, $4, 'Lab submission version one.',
                            'Initial judging lab submission.', 'https://example.com/judging-lab', $5)`,
-            values: [
-                LAB_VERSION_ID,
-                ORG,
-                LAB_SUBMISSION_ID,
-                FIXTURE.labProjectTitle,
-                AUTHOR_ID,
-            ],
+            values: [LAB_VERSION_ID, ORG, LAB_SUBMISSION_ID, FIXTURE.labProjectTitle, AUTHOR_ID],
         },
         {
             text: `insert into judging_rubrics (id, organization_id, edition_id, name, description)

@@ -1,7 +1,15 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRight, CalendarClock, FolderGit2, Users } from "lucide-react";
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, EmptyState } from "@nethack/ui/static";
+import {
+    Badge,
+    Button,
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+    EmptyState,
+} from "@nethack/ui/static";
 import { CountUp, Reveal, StaggerReveal, Tilt } from "@nethack/ui/motion";
 import { getCompetitions } from "../../lib/public-api";
 
@@ -77,35 +85,51 @@ export default async function CompetitionsPage(): Promise<ReactNode> {
                                     <p className="line-clamp-3 text-sm text-ink-muted">
                                         {competition.description}
                                     </p>
-                                    <dl className="grid grid-cols-2 gap-3 text-xs">
+                                    <div className="grid grid-cols-2 gap-3 text-xs">
                                         <div className="flex items-start gap-2">
-                                            <Users className="mt-0.5 size-3.5 text-primary" aria-hidden="true" />
+                                            <Users
+                                                className="mt-0.5 size-3.5 text-primary"
+                                                aria-hidden="true"
+                                            />
                                             <div className="flex flex-col gap-0.5">
-                                                <dt className="text-ink-subtle">Team size</dt>
-                                                <dd className="text-ink">
-                                                    {competition.teamMinSize}–{competition.teamMaxSize}
-                                                </dd>
+                                                <span className="text-ink-subtle">Team size</span>
+                                                <span className="text-ink">
+                                                    {competition.teamMinSize}–
+                                                    {competition.teamMaxSize}
+                                                </span>
                                             </div>
                                         </div>
                                         <div className="flex items-start gap-2">
-                                            <CalendarClock className="mt-0.5 size-3.5 text-primary" aria-hidden="true" />
+                                            <CalendarClock
+                                                className="mt-0.5 size-3.5 text-primary"
+                                                aria-hidden="true"
+                                            />
                                             <div className="flex flex-col gap-0.5">
-                                                <dt className="text-ink-subtle">Registration closes</dt>
-                                                <dd className="text-ink">
+                                                <span className="text-ink-subtle">
+                                                    Registration closes
+                                                </span>
+                                                <span className="text-ink">
                                                     {formatDate(competition.registrationClosesAt)}
-                                                </dd>
+                                                </span>
                                             </div>
                                         </div>
                                         <div className="flex items-start gap-2">
-                                            <FolderGit2 className="mt-0.5 size-3.5 text-primary" aria-hidden="true" />
+                                            <FolderGit2
+                                                className="mt-0.5 size-3.5 text-primary"
+                                                aria-hidden="true"
+                                            />
                                             <div className="flex flex-col gap-0.5">
-                                                <dt className="text-ink-subtle">Published projects</dt>
-                                                <dd className="text-ink">
-                                                    <CountUp value={competition.publishedProjectCount} />
-                                                </dd>
+                                                <span className="text-ink-subtle">
+                                                    Published projects
+                                                </span>
+                                                <span className="text-ink">
+                                                    <CountUp
+                                                        value={competition.publishedProjectCount}
+                                                    />
+                                                </span>
                                             </div>
                                         </div>
-                                    </dl>
+                                    </div>
                                     <Link
                                         href={`/competitions/${competition.slug}`}
                                         className="inline-flex items-center gap-1 text-sm text-primary transition-colors hover:text-primary-hover"

@@ -24,9 +24,9 @@ test.describe("public site", () => {
         const errors = collectConsoleErrors(page);
 
         await page.goto(siteUrl("/"));
-        await expect(
-            page.getByRole("heading", { name: "Competitions", level: 2 }),
-        ).toBeVisible({ timeout: 60_000 });
+        await expect(page.getByRole("heading", { name: "Competitions", level: 2 })).toBeVisible({
+            timeout: 60_000,
+        });
         await expect(page.getByText(FIXTURE.editionName).first()).toBeVisible();
         await expect(
             page.getByRole("heading", { name: "Project showcase", level: 2 }),

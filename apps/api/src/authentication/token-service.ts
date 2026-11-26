@@ -85,7 +85,10 @@ export class TokenService {
 
             try {
                 const result = await this.authClient.refresh(refreshToken);
-                const access = encryptSecret(result.accessToken, this.config.session.encryptionKeys);
+                const access = encryptSecret(
+                    result.accessToken,
+                    this.config.session.encryptionKeys,
+                );
                 const nextRefresh =
                     result.refreshToken === null
                         ? null
@@ -106,9 +109,12 @@ export class TokenService {
                     .where(eq(sessions.id, sessionId));
             } catch (error) {
                 if (isInvalidGrant(error)) {
-                    this.logger.warn("Refresh token was rejected; the session must sign in again.", {
-                        sessionId,
-                    });
+                    this.logger.warn(
+                        "Refresh token was rejected; the session must sign in again.",
+                        {
+                            sessionId,
+                        },
+                    );
                     await session.db
                         .update(sessions)
                         .set({

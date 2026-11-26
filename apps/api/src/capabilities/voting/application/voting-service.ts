@@ -642,4 +642,3 @@ function parseNullable(value: string | null): Date | null {
 function nullableIso(value: Date | null): string | null {
     return value === null ? null : value.toISOString();
 }
-

@@ -72,6 +72,7 @@ export default defineConfig({
     reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]],
     globalSetup: "./tests/support/e2e/global-setup.ts",
     globalTeardown: "./tests/support/e2e/global-teardown.ts",
+    snapshotPathTemplate: "{testDir}/__screenshots__/{testFileName}/{arg}{ext}",
     use: {
         baseURL: WORKSPACE_ORIGIN,
         trace: "retain-on-failure",
@@ -138,4 +139,3 @@ export default defineConfig({
         },
     ],
 });
-

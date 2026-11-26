@@ -1,11 +1,11 @@
-import { expect, type Browser, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import {
-    AUTH_ORIGIN,
-    DESKTOP_VIEWPORT,
-    USERS,
-    WORKSPACE_ORIGIN,
-    type MockUser,
-} from "./config.js";
+    expect,
+    type Browser,
+    type BrowserContext,
+    type Locator,
+    type Page,
+} from "@playwright/test";
+import { AUTH_ORIGIN, DESKTOP_VIEWPORT, USERS, WORKSPACE_ORIGIN, type MockUser } from "./config.js";
 
 export async function setMockUser(user: MockUser): Promise<void> {
     const response = await fetch(`${AUTH_ORIGIN}/__test/user`, {
@@ -24,10 +24,9 @@ export async function signIn(page: Page, user: MockUser = USERS.participant): Pr
     await page.goto("/sign-in");
     await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
     await page.getByRole("link", { name: "Continue to sign in" }).click();
-    await page.waitForURL(
-        (url) => url.origin === WORKSPACE_ORIGIN && url.pathname !== "/sign-in",
-        { timeout: 45_000 },
-    );
+    await page.waitForURL((url) => url.origin === WORKSPACE_ORIGIN && url.pathname !== "/sign-in", {
+        timeout: 45_000,
+    });
     await expect(page.getByRole("heading", { name: /^Welcome, / })).toBeVisible({
         timeout: 30_000,
     });

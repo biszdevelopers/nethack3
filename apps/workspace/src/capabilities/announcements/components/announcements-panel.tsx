@@ -124,7 +124,10 @@ export function AnnouncementsPanel({
                 <CardContent>
                     <form onSubmit={onCreate} className="flex flex-col gap-4">
                         <div className="flex flex-col gap-1.5">
-                            <label htmlFor="announcement-title" className="text-sm font-medium text-ink">
+                            <label
+                                htmlFor="announcement-title"
+                                className="text-sm font-medium text-ink"
+                            >
                                 Title
                             </label>
                             <Input

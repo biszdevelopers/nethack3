@@ -27,7 +27,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
             })),
             ...projects.items.map((project) => ({
                 url: `${SITE_ORIGIN}/projects/${project.slug}`,
-                lastModified: project.publishedAt === null ? new Date() : new Date(project.publishedAt),
+                lastModified:
+                    project.publishedAt === null ? new Date() : new Date(project.publishedAt),
                 changeFrequency: "weekly" as const,
                 priority: 0.6,
             })),

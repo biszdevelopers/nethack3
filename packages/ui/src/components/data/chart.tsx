@@ -224,7 +224,7 @@ export function Chart({
                     </tr>
                 </thead>
                 <tbody>
-                    {data.map((datum, index) => (
+                    {data.map((datum) => (
                         <tr key={`table-${datum.label}`}>
                             <th scope="row">{datum.label}</th>
                             <td>{datum.value}</td>

@@ -112,11 +112,6 @@ function listPage(response: LightMyRequestResponse): ListPage {
     };
 }
 
-interface RegistrationRow {
-    readonly id: string;
-    readonly userId: string;
-}
-
 interface RubricBody {
     readonly id: string;
     readonly criteria: readonly { readonly id: string }[];
@@ -135,7 +130,10 @@ export async function createSecurityOrganization(
     harness: TestHarness,
     prefix: string,
 ): Promise<CreatedOrganizationFixture> {
-    const owner = await harness.signIn({ email: uniqueEmail(`${prefix}-owner`), name: "Org Owner" });
+    const owner = await harness.signIn({
+        email: uniqueEmail(`${prefix}-owner`),
+        name: "Org Owner",
+    });
     const organization = await harness.createOrganization(owner, {
         name: `Security ${prefix}`,
         slug: uniqueSlug(prefix),
@@ -307,7 +305,11 @@ export async function buildSecurityFixture(harness: TestHarness): Promise<Securi
     const privateDivision = await harness.authenticatedRequest(owner, {
         method: "POST",
         url: `/api/v1/competitions/${privateEditionId}/divisions`,
-        payload: { name: "Private Division", slug: uniqueSlug("private-division"), description: "" },
+        payload: {
+            name: "Private Division",
+            slug: uniqueSlug("private-division"),
+            description: "",
+        },
         headers: { "x-nethack-organization-id": organizationId },
     });
     expectStatus(privateDivision, 201, "create private division");

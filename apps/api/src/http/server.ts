@@ -73,7 +73,11 @@ export function createBaseServer(config: AppConfig): BaseServer {
     return { app, logger };
 }
 
-export async function configureServer(app: NethackServer, services: ServerServices, registry: CapabilityRegistry): Promise<void> {
+export async function configureServer(
+    app: NethackServer,
+    services: ServerServices,
+    registry: CapabilityRegistry,
+): Promise<void> {
     const { config, logger, database, auth } = services;
 
     await app.register(helmet, {
@@ -164,7 +168,11 @@ export async function configureServer(app: NethackServer, services: ServerServic
             servers: [{ url: config.origins.api, description: "Configured API origin" }],
             components: {
                 securitySchemes: {
-                    sessionCookie: { type: "apiKey", in: "cookie", name: config.session.cookieName },
+                    sessionCookie: {
+                        type: "apiKey",
+                        in: "cookie",
+                        name: config.session.cookieName,
+                    },
                     bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" },
                 },
             },

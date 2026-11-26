@@ -51,8 +51,8 @@ export function AuthErrorPage(): ReactNode {
                             {copy.detail}
                         </Alert>
                         <p className="text-xs leading-6 text-ink-subtle">
-                            Technical details are available in the browser developer console. Do
-                            not share tokens, codes, or cookies.
+                            Technical details are available in the browser developer console. Do not
+                            share tokens, codes, or cookies.
                         </p>
                         <Button asChild>
                             <Link to="/sign-in">Try signing in again</Link>

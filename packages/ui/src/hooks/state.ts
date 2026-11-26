@@ -9,7 +9,9 @@ export function useControllableState<T>(options: {
     const isControlled = options.value !== undefined;
     const value: T = options.value !== undefined ? options.value : internal;
     const onChangeRef = useRef(options.onChange);
-    onChangeRef.current = options.onChange;
+    useEffect(() => {
+        onChangeRef.current = options.onChange;
+    }, [options.onChange]);
 
     const setValue = useCallback(
         (next: T) => {
@@ -73,7 +75,9 @@ export function useShortcuts(
 ): void {
     const enabled = options.enabled ?? true;
     const handlersRef = useRef(shortcuts);
-    handlersRef.current = shortcuts;
+    useEffect(() => {
+        handlersRef.current = shortcuts;
+    }, [shortcuts]);
 
     useEffect(() => {
         if (!enabled || typeof window === "undefined") {

@@ -61,7 +61,11 @@ describe("runtime parity", () => {
             /DATABASE_URL/,
         ];
         const violations: string[] = [];
-        for (const directory of ["apps/workspace/src", "packages/ui/src", "packages/api-client/src"]) {
+        for (const directory of [
+            "apps/workspace/src",
+            "packages/ui/src",
+            "packages/api-client/src",
+        ]) {
             for (const file of textFiles(directory)) {
                 const content = readFileSync(file, "utf8");
                 for (const pattern of forbidden) {
@@ -125,8 +129,8 @@ describe("runtime parity", () => {
             dependencies?: Record<string, string>;
         };
         const dependencies = {
-            ...(rootPackage.dependencies ?? {}),
-            ...(rootPackage.devDependencies ?? {}),
+            ...rootPackage.dependencies,
+            ...rootPackage.devDependencies,
         };
         for (const forbidden of ["eslint", "prettier", "pnpm", "nx", "turbo"]) {
             expect(Object.keys(dependencies)).not.toContain(forbidden);

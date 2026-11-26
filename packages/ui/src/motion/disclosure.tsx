@@ -110,7 +110,9 @@ export function AnimatedDisclosure({
                     overflow: "hidden",
                 }}
             >
-                <div className={cn("border-t border-line px-5 py-4", contentClassName)}>{children}</div>
+                <div className={cn("border-t border-line px-5 py-4", contentClassName)}>
+                    {children}
+                </div>
             </div>
         </div>
     );

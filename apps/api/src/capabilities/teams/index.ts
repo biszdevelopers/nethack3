@@ -1,13 +1,7 @@
 import type { CapabilityDefinition } from "../../core/capability.js";
-import {
-    COMPETITIONS_CONTRACT,
-    type CompetitionsContract,
-} from "../competitions/contracts.js";
+import { COMPETITIONS_CONTRACT, type CompetitionsContract } from "../competitions/contracts.js";
 import { PARTICIPANTS_CONTRACT, type ParticipantsContract } from "../participants/contracts.js";
-import {
-    ORGANIZATIONS_CONTRACT,
-    type OrganizationsContract,
-} from "../organizations/contracts.js";
+import { ORGANIZATIONS_CONTRACT, type OrganizationsContract } from "../organizations/contracts.js";
 import { TeamService, toTeam } from "./application/team-service.js";
 import { TeamRepository } from "./infrastructure/team-repository.js";
 import { registerTeamRoutes } from "./http/team-routes.js";

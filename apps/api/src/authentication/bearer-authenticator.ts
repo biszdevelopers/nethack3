@@ -55,7 +55,10 @@ export class BearerAuthenticator {
             .where(eq(revokedAccessTokens.jti, claims.jti))
             .limit(1);
         const denial = denied[0];
-        if (denial !== undefined && claims.issuedAt >= Math.floor(denial.validAfter.getTime() / 1000)) {
+        if (
+            denial !== undefined &&
+            claims.issuedAt >= Math.floor(denial.validAfter.getTime() / 1000)
+        ) {
             return null;
         }
 

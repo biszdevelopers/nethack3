@@ -59,7 +59,8 @@ export class ApiClient {
     constructor(options: ApiClientOptions) {
         this.baseUrl = options.baseUrl.replace(/\/$/, "");
         this.fetchImpl =
-            options.fetchImpl ?? ((input: RequestInfo | URL, init?: RequestInit) => fetch(input, init));
+            options.fetchImpl ??
+            ((input: RequestInfo | URL, init?: RequestInit) => fetch(input, init));
         this.getCsrfToken = options.getCsrfToken ?? (() => null);
         this.getOrganizationId = options.getOrganizationId ?? (() => null);
         this.onUnauthorized = options.onUnauthorized ?? (() => undefined);

@@ -25,11 +25,7 @@ export function ProgressGroup({
     className,
 }: ProgressGroupProps): ReactNode {
     return (
-        <div
-            role="group"
-            aria-label={label}
-            className={cn("flex flex-col gap-3", className)}
-        >
+        <div role="group" aria-label={label} className={cn("flex flex-col gap-3", className)}>
             {items.map((item, index) => (
                 <Progress
                     key={`${index}-${item.label}`}

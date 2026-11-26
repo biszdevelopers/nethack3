@@ -85,7 +85,10 @@ export function Markdown({ source }: { readonly source: string }): ReactNode {
             return;
         }
         blocks.push(
-            <ul key={`ul-${key++}`} className="flex list-disc flex-col gap-1 pl-5 text-sm text-ink-muted">
+            <ul
+                key={`ul-${key++}`}
+                className="flex list-disc flex-col gap-1 pl-5 text-sm text-ink-muted"
+            >
                 {list.map((item, index) => (
                     <li key={`li-${index}`}>{inline(item, `li-${index}`)}</li>
                 ))}
@@ -180,7 +183,7 @@ export function Markdown({ source }: { readonly source: string }): ReactNode {
 export function plainSummary(markdown: string, maxLength = 200): string {
     const text = markdown
         .replace(/```[\s\S]*?```/g, " ")
-        .replace(/[#*_`>\[\]()]/g, " ")
+        .replace(/[#*_`>[\]()]/g, " ")
         .replace(/\s+/g, " ")
         .trim();
     return text.length > maxLength ? `${text.slice(0, maxLength - 1).trimEnd()}…` : text;

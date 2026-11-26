@@ -65,9 +65,7 @@ export function useActiveMembership() {
 
 function useOrganizationId(): string | null {
     const session = useSession();
-    const active = session.data?.memberships.filter(
-        (membership) => membership.status === "active",
-    );
+    const active = session.data?.memberships.filter((membership) => membership.status === "active");
     const stored =
         typeof window === "undefined"
             ? null

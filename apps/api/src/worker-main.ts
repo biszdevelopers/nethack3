@@ -107,10 +107,10 @@ async function maintain(): Promise<void> {
     await runtime.database.db.execute(
         sql`delete from auth_transactions where expires_at < now() - interval '1 hour'`,
     );
-    await runtime.database.db.execute(sql`delete from revoked_access_tokens where expires_at < now()`);
     await runtime.database.db.execute(
-        sql`delete from idempotency_keys where expires_at < now()`,
+        sql`delete from revoked_access_tokens where expires_at < now()`,
     );
+    await runtime.database.db.execute(sql`delete from idempotency_keys where expires_at < now()`);
     await runtime.jobs.purgeCompleted(new Date(now - 7 * 24 * 60 * 60 * 1000));
     await runtime.auth.sessions.pruneExpired(new Date(now - 30 * 24 * 60 * 60 * 1000));
 }

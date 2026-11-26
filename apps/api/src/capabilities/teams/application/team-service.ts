@@ -209,12 +209,7 @@ export class TeamService {
                 if (team === null) {
                     throw new NotFoundError("The team was not found.");
                 }
-                return this.buildDetail(
-                    session,
-                    team,
-                    auth.user.id,
-                    isOrganizer(organizationRole),
-                );
+                return this.buildDetail(session, team, auth.user.id, isOrganizer(organizationRole));
             },
         );
     }
@@ -434,92 +429,92 @@ export class TeamService {
         const now = this.clock.now();
         try {
             const acceptance = await this.database.transaction(
-            { organizationId: preview.organizationId, userId: auth.user.id },
-            async (session) => {
-                const invitation = await this.repository.lockInvitationByTokenHash(
-                    session,
-                    tokenHash,
-                );
-                if (invitation === null) {
-                    throw new NotFoundError("The team invitation was not found.");
-                }
-                this.assertInvitationUsable(invitation, auth.user.email ?? "", organizationId);
-                const team = await this.repository.findByIdForUpdate(
-                    session,
-                    invitation.organizationId,
-                    invitation.teamId,
-                );
-                if (team === null) {
-                    throw new NotFoundError("The team was not found.");
-                }
-                TeamRules.assertActiveTeam(team.status);
-                await this.repository.lockRegistration(
-                    session,
-                    invitation.organizationId,
-                    invitation.editionId,
-                    auth.user.id,
-                );
-                const existing = await this.repository.findByUserInEdition(
-                    session.db,
-                    invitation.organizationId,
-                    invitation.editionId,
-                    auth.user.id,
-                );
-                if (existing !== null) {
-                    throw new ConflictError("You already belong to a team in this edition.");
-                }
-                const memberCount = await this.repository.countMembers(
-                    session.db,
-                    invitation.teamId,
-                );
-                TeamRules.assertCapacity(memberCount, {
-                    min: 1,
-                    max: invitation.maxMembers,
-                });
-                await this.repository.insertMember(session, {
-                    organizationId: invitation.organizationId,
-                    teamId: invitation.teamId,
-                    userId: auth.user.id,
-                    role: "member",
-                });
-                await this.repository.markInvitationAccepted(
-                    session,
-                    invitation.id,
-                    auth.user.id,
-                    now,
-                );
-                await this.audit.record(session, {
-                    organizationId: invitation.organizationId,
-                    actorUserId: auth.user.id,
-                    action: "team.invitation.accepted",
-                    entityType: "team",
-                    entityId: invitation.teamId,
-                    metadata: { invitationId: invitation.id },
-                    ip,
-                });
-                await this.events.publish(session, {
-                    type: domainEvents.teamInvitationAccepted,
-                    organizationId: invitation.organizationId,
-                    aggregateType: "team",
-                    aggregateId: invitation.teamId,
-                    payload: {
+                { organizationId: preview.organizationId, userId: auth.user.id },
+                async (session) => {
+                    const invitation = await this.repository.lockInvitationByTokenHash(
+                        session,
+                        tokenHash,
+                    );
+                    if (invitation === null) {
+                        throw new NotFoundError("The team invitation was not found.");
+                    }
+                    this.assertInvitationUsable(invitation, auth.user.email ?? "", organizationId);
+                    const team = await this.repository.findByIdForUpdate(
+                        session,
+                        invitation.organizationId,
+                        invitation.teamId,
+                    );
+                    if (team === null) {
+                        throw new NotFoundError("The team was not found.");
+                    }
+                    TeamRules.assertActiveTeam(team.status);
+                    await this.repository.lockRegistration(
+                        session,
+                        invitation.organizationId,
+                        invitation.editionId,
+                        auth.user.id,
+                    );
+                    const existing = await this.repository.findByUserInEdition(
+                        session.db,
+                        invitation.organizationId,
+                        invitation.editionId,
+                        auth.user.id,
+                    );
+                    if (existing !== null) {
+                        throw new ConflictError("You already belong to a team in this edition.");
+                    }
+                    const memberCount = await this.repository.countMembers(
+                        session.db,
+                        invitation.teamId,
+                    );
+                    TeamRules.assertCapacity(memberCount, {
+                        min: 1,
+                        max: invitation.maxMembers,
+                    });
+                    await this.repository.insertMember(session, {
+                        organizationId: invitation.organizationId,
+                        teamId: invitation.teamId,
+                        userId: auth.user.id,
+                        role: "member",
+                    });
+                    await this.repository.markInvitationAccepted(
+                        session,
+                        invitation.id,
+                        auth.user.id,
+                        now,
+                    );
+                    await this.audit.record(session, {
+                        organizationId: invitation.organizationId,
+                        actorUserId: auth.user.id,
+                        action: "team.invitation.accepted",
+                        entityType: "team",
+                        entityId: invitation.teamId,
+                        metadata: { invitationId: invitation.id },
+                        ip,
+                    });
+                    await this.events.publish(session, {
+                        type: domainEvents.teamInvitationAccepted,
+                        organizationId: invitation.organizationId,
+                        aggregateType: "team",
+                        aggregateId: invitation.teamId,
+                        payload: {
+                            teamId: invitation.teamId,
+                            teamName: invitation.teamName,
+                            organizationId: invitation.organizationId,
+                            organizationName: await this.organizationName(
+                                invitation.organizationId,
+                            ),
+                            captainUserId: invitation.captainUserId,
+                        },
+                    });
+                    return {
                         teamId: invitation.teamId,
                         teamName: invitation.teamName,
+                        editionId: invitation.editionId,
                         organizationId: invitation.organizationId,
-                        organizationName: await this.organizationName(
-                            invitation.organizationId,
-                        ),
-                        captainUserId: invitation.captainUserId,
-                    },
-                });
-                return {
-                    teamId: invitation.teamId,
-                    teamName: invitation.teamName,
-                    editionId: invitation.editionId,
-                    organizationId: invitation.organizationId,
-                    acceptedAt: now.toISOString(),
-                };
-            },
+                        acceptedAt: now.toISOString(),
+                    };
+                },
             );
             // See create(): the participant FK update must run after the team
             // and invitation locks are released to avoid a self-deadlock.
@@ -553,52 +548,59 @@ export class TeamService {
         organizationRole: OrganizationRole,
         ip: string | null,
     ): Promise<void> {
-        await this.database.transaction({ organizationId, userId: auth.user.id }, async (session) => {
-            const team = await this.repository.findByIdForUpdate(session, organizationId, teamId);
-            if (team === null) {
-                throw new NotFoundError("The team was not found.");
-            }
-            const selfRemoval = targetUserId === auth.user.id;
-            if (!selfRemoval) {
-                TeamRules.assertCaptainOrOrganizer(
-                    team.captainUserId,
-                    auth.user.id,
-                    isOrganizer(organizationRole),
-                );
-            }
-            TeamRules.assertNotRemovingCaptain(team.captainUserId, targetUserId);
-            const removed = await this.repository.removeMember(session, teamId, targetUserId);
-            if (!removed) {
-                throw new NotFoundError("That person is not a member of this team.");
-            }
-            await this.participants.setParticipantTeam(
-                organizationId,
-                team.editionId,
-                targetUserId,
-                null,
-            );
-            await this.audit.record(session, {
-                organizationId,
-                actorUserId: auth.user.id,
-                action: "team.member.removed",
-                entityType: "team",
-                entityId: teamId,
-                metadata: { userId: targetUserId, self: selfRemoval },
-                ip,
-            });
-            await this.events.publish(session, {
-                type: domainEvents.teamMemberRemoved,
-                organizationId,
-                aggregateType: "team",
-                aggregateId: teamId,
-                payload: {
-                    teamId,
-                    teamName: team.name,
+        await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const team = await this.repository.findByIdForUpdate(
+                    session,
                     organizationId,
-                    removedUserId: targetUserId,
-                },
-            });
-        });
+                    teamId,
+                );
+                if (team === null) {
+                    throw new NotFoundError("The team was not found.");
+                }
+                const selfRemoval = targetUserId === auth.user.id;
+                if (!selfRemoval) {
+                    TeamRules.assertCaptainOrOrganizer(
+                        team.captainUserId,
+                        auth.user.id,
+                        isOrganizer(organizationRole),
+                    );
+                }
+                TeamRules.assertNotRemovingCaptain(team.captainUserId, targetUserId);
+                const removed = await this.repository.removeMember(session, teamId, targetUserId);
+                if (!removed) {
+                    throw new NotFoundError("That person is not a member of this team.");
+                }
+                await this.participants.setParticipantTeam(
+                    organizationId,
+                    team.editionId,
+                    targetUserId,
+                    null,
+                );
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: "team.member.removed",
+                    entityType: "team",
+                    entityId: teamId,
+                    metadata: { userId: targetUserId, self: selfRemoval },
+                    ip,
+                });
+                await this.events.publish(session, {
+                    type: domainEvents.teamMemberRemoved,
+                    organizationId,
+                    aggregateType: "team",
+                    aggregateId: teamId,
+                    payload: {
+                        teamId,
+                        teamName: team.name,
+                        organizationId,
+                        removedUserId: targetUserId,
+                    },
+                });
+            },
+        );
     }
 
     async transferCaptain(
@@ -609,51 +611,58 @@ export class TeamService {
         organizationRole: OrganizationRole,
         ip: string | null,
     ): Promise<void> {
-        await this.database.transaction({ organizationId, userId: auth.user.id }, async (session) => {
-            const team = await this.repository.findByIdForUpdate(session, organizationId, teamId);
-            if (team === null) {
-                throw new NotFoundError("The team was not found.");
-            }
-            TeamRules.assertCaptainOrOrganizer(
-                team.captainUserId,
-                auth.user.id,
-                isOrganizer(organizationRole),
-            );
-            TeamRules.assertActiveTeam(team.status);
-            if (team.captainUserId === targetUserId) {
-                return;
-            }
-            const target = await this.repository.findMember(session.db, teamId, targetUserId);
-            if (target === null) {
-                throw new NotFoundError("That person is not a member of this team.");
-            }
-            const demoted = await this.repository.updateMemberRole(
-                session,
-                teamId,
-                team.captainUserId,
-                "member",
-            );
-            if (!demoted) {
-                throw new ConflictError("The current captain is not a team member.");
-            }
-            await this.repository.updateMemberRole(session, teamId, targetUserId, "captain");
-            await this.repository.update(session, teamId, {
-                captainUserId: targetUserId,
-                updatedAt: this.clock.now(),
-            });
-            await this.audit.record(session, {
-                organizationId,
-                actorUserId: auth.user.id,
-                action: "team.captain.transferred",
-                entityType: "team",
-                entityId: teamId,
-                metadata: {
-                    previousCaptainUserId: team.captainUserId,
+        await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const team = await this.repository.findByIdForUpdate(
+                    session,
+                    organizationId,
+                    teamId,
+                );
+                if (team === null) {
+                    throw new NotFoundError("The team was not found.");
+                }
+                TeamRules.assertCaptainOrOrganizer(
+                    team.captainUserId,
+                    auth.user.id,
+                    isOrganizer(organizationRole),
+                );
+                TeamRules.assertActiveTeam(team.status);
+                if (team.captainUserId === targetUserId) {
+                    return;
+                }
+                const target = await this.repository.findMember(session.db, teamId, targetUserId);
+                if (target === null) {
+                    throw new NotFoundError("That person is not a member of this team.");
+                }
+                const demoted = await this.repository.updateMemberRole(
+                    session,
+                    teamId,
+                    team.captainUserId,
+                    "member",
+                );
+                if (!demoted) {
+                    throw new ConflictError("The current captain is not a team member.");
+                }
+                await this.repository.updateMemberRole(session, teamId, targetUserId, "captain");
+                await this.repository.update(session, teamId, {
                     captainUserId: targetUserId,
-                },
-                ip,
-            });
-        });
+                    updatedAt: this.clock.now(),
+                });
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: "team.captain.transferred",
+                    entityType: "team",
+                    entityId: teamId,
+                    metadata: {
+                        previousCaptainUserId: team.captainUserId,
+                        captainUserId: targetUserId,
+                    },
+                    ip,
+                });
+            },
+        );
     }
 
     async leave(
@@ -662,44 +671,51 @@ export class TeamService {
         teamId: string,
         ip: string | null,
     ): Promise<void> {
-        await this.database.transaction({ organizationId, userId: auth.user.id }, async (session) => {
-            const team = await this.repository.findByIdForUpdate(session, organizationId, teamId);
-            if (team === null) {
-                throw new NotFoundError("The team was not found.");
-            }
-            TeamRules.assertCanLeave(team.captainUserId, auth.user.id);
-            const removed = await this.repository.removeMember(session, teamId, auth.user.id);
-            if (!removed) {
-                throw new NotFoundError("You are not a member of this team.");
-            }
-            await this.participants.setParticipantTeam(
-                organizationId,
-                team.editionId,
-                auth.user.id,
-                null,
-            );
-            await this.audit.record(session, {
-                organizationId,
-                actorUserId: auth.user.id,
-                action: "team.member.left",
-                entityType: "team",
-                entityId: teamId,
-                metadata: { userId: auth.user.id },
-                ip,
-            });
-            await this.events.publish(session, {
-                type: domainEvents.teamMemberRemoved,
-                organizationId,
-                aggregateType: "team",
-                aggregateId: teamId,
-                payload: {
-                    teamId,
-                    teamName: team.name,
+        await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const team = await this.repository.findByIdForUpdate(
+                    session,
                     organizationId,
-                    removedUserId: auth.user.id,
-                },
-            });
-        });
+                    teamId,
+                );
+                if (team === null) {
+                    throw new NotFoundError("The team was not found.");
+                }
+                TeamRules.assertCanLeave(team.captainUserId, auth.user.id);
+                const removed = await this.repository.removeMember(session, teamId, auth.user.id);
+                if (!removed) {
+                    throw new NotFoundError("You are not a member of this team.");
+                }
+                await this.participants.setParticipantTeam(
+                    organizationId,
+                    team.editionId,
+                    auth.user.id,
+                    null,
+                );
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: "team.member.left",
+                    entityType: "team",
+                    entityId: teamId,
+                    metadata: { userId: auth.user.id },
+                    ip,
+                });
+                await this.events.publish(session, {
+                    type: domainEvents.teamMemberRemoved,
+                    organizationId,
+                    aggregateType: "team",
+                    aggregateId: teamId,
+                    payload: {
+                        teamId,
+                        teamName: team.name,
+                        organizationId,
+                        removedUserId: auth.user.id,
+                    },
+                });
+            },
+        );
     }
 
     async activity(
@@ -717,7 +733,12 @@ export class TeamService {
             if (member === null) {
                 throw new ForbiddenError("Only team members may view team activity.");
             }
-            const rows = await this.repository.auditPage(session.db, organizationId, teamId, options);
+            const rows = await this.repository.auditPage(
+                session.db,
+                organizationId,
+                teamId,
+                options,
+            );
             return rows.map((row) => ({
                 id: row.id,
                 organizationId: row.organizationId,
@@ -758,9 +779,7 @@ export class TeamService {
         const memberCount = await this.repository.countMembers(session.db, team.id);
         const canSeeMembers = organizer || viewer !== null;
         const canSeeInvitations = organizer || team.captainUserId === actorUserId;
-        const members = canSeeMembers
-            ? await this.repository.members(session.db, team.id)
-            : [];
+        const members = canSeeMembers ? await this.repository.members(session.db, team.id) : [];
         const invitations = canSeeInvitations
             ? await this.repository.listInvitations(session.db, team.id)
             : [];

@@ -1,7 +1,15 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRight, FolderGit2, GitBranch, Sparkles } from "lucide-react";
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, EmptyState } from "@nethack/ui/static";
+import {
+    Badge,
+    Button,
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+    EmptyState,
+} from "@nethack/ui/static";
 import { Reveal, StaggerReveal, Tilt } from "@nethack/ui/motion";
 import { getCompetitions, getProjects } from "../../lib/public-api";
 
@@ -23,10 +31,7 @@ export default async function ProjectsPage({
     };
     let unavailable = false;
     try {
-        [projects, competitions] = await Promise.all([
-            getProjects(competition),
-            getCompetitions(),
-        ]);
+        [projects, competitions] = await Promise.all([getProjects(competition), getCompetitions()]);
     } catch {
         unavailable = true;
     }
@@ -48,7 +53,10 @@ export default async function ProjectsPage({
             </Reveal>
 
             <Reveal>
-                <form method="get" className="flex flex-wrap items-end gap-3 rounded-lg border border-line bg-panel/60 p-4">
+                <form
+                    method="get"
+                    className="flex flex-wrap items-end gap-3 rounded-lg border border-line bg-panel/60 p-4"
+                >
                     <div className="flex min-w-56 flex-col gap-1.5">
                         <label htmlFor="competition-filter" className="text-xs text-ink-subtle">
                             Competition
@@ -95,7 +103,10 @@ export default async function ProjectsPage({
                             <Card hoverable className="h-full bg-panel/80">
                                 <CardHeader>
                                     <div className="flex items-center gap-2 text-xs text-ink-subtle">
-                                        <FolderGit2 className="size-3.5 text-primary" aria-hidden="true" />
+                                        <FolderGit2
+                                            className="size-3.5 text-primary"
+                                            aria-hidden="true"
+                                        />
                                         <span className="truncate">{project.competitionName}</span>
                                     </div>
                                     <CardTitle className="text-lg">{project.title}</CardTitle>

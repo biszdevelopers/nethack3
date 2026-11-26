@@ -1,6 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
-import { closeTestDatabase, resetTestDatabase } from "../../../apps/api/tests/support/test-database.js";
+import {
+    closeTestDatabase,
+    resetTestDatabase,
+} from "../../../apps/api/tests/support/test-database.js";
 import {
     AUTH_ORIGIN,
     OWNER_DATABASE_URL,

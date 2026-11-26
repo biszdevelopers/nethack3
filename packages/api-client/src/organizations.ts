@@ -103,11 +103,9 @@ export class OrganizationsApi {
     }
 
     async invitations(organizationId: string): Promise<ListResponse<OrganizationInvitation>> {
-        return this.client.request(
-            "GET",
-            `/api/v1/organizations/${organizationId}/invitations`,
-            { schema: invitationListSchema },
-        );
+        return this.client.request("GET", `/api/v1/organizations/${organizationId}/invitations`, {
+            schema: invitationListSchema,
+        });
     }
 
     async acceptInvitation(token: string): Promise<AcceptOrganizationInvitationResult> {

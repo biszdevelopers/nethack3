@@ -1,9 +1,11 @@
-import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import { forwardRef, type ComponentPropsWithoutRef } from "react";
 import * as ProgressPrimitive from "@radix-ui/react-progress";
 import { cn } from "../../lib/cn.js";
 
-export interface ProgressProps
-    extends Omit<ComponentPropsWithoutRef<typeof ProgressPrimitive.Root>, "value" | "max"> {
+export interface ProgressProps extends Omit<
+    ComponentPropsWithoutRef<typeof ProgressPrimitive.Root>,
+    "value" | "max"
+> {
     readonly label: string;
     readonly value?: number | null;
     readonly max?: number;
@@ -12,19 +14,10 @@ export interface ProgressProps
 }
 
 export const Progress = forwardRef<HTMLDivElement, ProgressProps>(function Progress(
-    {
-        className,
-        label,
-        value = null,
-        max = 100,
-        valueText,
-        showValue = true,
-        ...rest
-    },
+    { className, label, value = null, max = 100, valueText, showValue = true, ...rest },
     ref,
 ) {
-    const clampedValue =
-        value === null || max <= 0 ? null : Math.min(Math.max(value, 0), max);
+    const clampedValue = value === null || max <= 0 ? null : Math.min(Math.max(value, 0), max);
     const ratio = clampedValue === null ? null : clampedValue / max;
     const percent = ratio === null ? null : Math.round(ratio * 100);
     return (
@@ -50,7 +43,9 @@ export const Progress = forwardRef<HTMLDivElement, ProgressProps>(function Progr
                     data-slot="progress-indicator"
                     className={cn(
                         "h-full bg-primary transition-transform duration-150 motion-reduce:transition-none",
-                        percent === null ? "w-1/3 animate-pulse motion-reduce:animate-none" : "w-full",
+                        percent === null
+                            ? "w-1/3 animate-pulse motion-reduce:animate-none"
+                            : "w-full",
                     )}
                     style={
                         percent === null

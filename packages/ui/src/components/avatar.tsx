@@ -77,7 +77,9 @@ export function UserDisplay({
                 {imageUrl === null || imageUrl === undefined ? null : (
                     <AvatarImage src={imageUrl} alt="" loading="lazy" />
                 )}
-                <AvatarFallback aria-hidden="true">{initials.length > 0 ? initials : "?"}</AvatarFallback>
+                <AvatarFallback aria-hidden="true">
+                    {initials.length > 0 ? initials : "?"}
+                </AvatarFallback>
             </Avatar>
             <div className="flex min-w-0 flex-col">
                 <span className="truncate text-sm font-medium text-ink">{name}</span>

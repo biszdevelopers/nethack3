@@ -31,8 +31,7 @@ export const textareaVariants = tv({
 });
 
 export interface TextareaProps
-    extends ComponentPropsWithoutRef<"textarea">,
-        VariantProps<typeof textareaVariants> {}
+    extends ComponentPropsWithoutRef<"textarea">, VariantProps<typeof textareaVariants> {}
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
     { className, variant, size, ...rest },

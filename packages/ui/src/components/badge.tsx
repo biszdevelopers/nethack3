@@ -56,7 +56,8 @@ export const badgeVariants = tv({
 });
 
 export interface BadgeProps
-    extends ComponentPropsWithoutRef<"span">,
+    extends
+        ComponentPropsWithoutRef<"span">,
         Omit<VariantProps<typeof badgeVariants>, "color" | "variant" | "size"> {
     readonly variant?: "solid" | "soft" | "subtle" | "outline";
     readonly color?: "primary" | "neutral" | "critical";
@@ -84,17 +85,7 @@ function legacyTone(tone: BadgeProps["tone"]): {
 }
 
 export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(function Badge(
-    {
-        className,
-        variant,
-        color,
-        size = "md",
-        tone,
-        dot = false,
-        icon,
-        children,
-        ...rest
-    },
+    { className, variant, color, size = "md", tone, dot = false, icon, children, ...rest },
     ref,
 ) {
     const resolved = tone === undefined ? null : legacyTone(tone);

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { resolveCapabilityOrder, CapabilityGraphError } from "../../apps/api/src/core/dependency-resolver.js";
+import {
+    resolveCapabilityOrder,
+    CapabilityGraphError,
+} from "../../apps/api/src/core/dependency-resolver.js";
 
 describe("resolveCapabilityOrder", () => {
     it("returns a deterministic topological order", () => {

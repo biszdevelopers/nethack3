@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ConflictError, ForbiddenError } from "../../../core/errors.js";
-import {
-    TeamRules,
-    type EditionTeamPolicy,
-    type TeamSizeLimits,
-} from "../domain/team-rules.js";
+import { TeamRules, type EditionTeamPolicy, type TeamSizeLimits } from "../domain/team-rules.js";
 
 const openEdition: EditionTeamPolicy = {
     status: "registration_open",
@@ -22,9 +18,10 @@ describe("TeamRules.limits", () => {
     });
 
     it("lets division limits override edition limits", () => {
-        expect(
-            TeamRules.limits(openEdition, { minTeamSize: 3, maxTeamSize: 8 }),
-        ).toEqual({ min: 3, max: 8 });
+        expect(TeamRules.limits(openEdition, { minTeamSize: 3, maxTeamSize: 8 })).toEqual({
+            min: 3,
+            max: 8,
+        });
     });
 
     it("falls back per field when a division limit is absent", () => {
@@ -107,12 +104,12 @@ describe("TeamRules edition eligibility", () => {
 describe("TeamRules registration eligibility", () => {
     it("requires an approved registration", () => {
         expect(() => TeamRules.requireApprovedRegistration(null)).toThrow(ForbiddenError);
-        expect(() =>
-            TeamRules.requireApprovedRegistration({ status: "pending" }),
-        ).toThrow(ForbiddenError);
-        expect(() =>
-            TeamRules.requireApprovedRegistration({ status: "waitlisted" }),
-        ).toThrow(ForbiddenError);
+        expect(() => TeamRules.requireApprovedRegistration({ status: "pending" })).toThrow(
+            ForbiddenError,
+        );
+        expect(() => TeamRules.requireApprovedRegistration({ status: "waitlisted" })).toThrow(
+            ForbiddenError,
+        );
     });
 
     it("returns the approved registration", () => {
@@ -145,15 +142,11 @@ describe("TeamRules captain rules", () => {
     });
 
     it("refuses to remove or leave without transferring captaincy", () => {
-        expect(() =>
-            TeamRules.assertNotRemovingCaptain(captainUserId, captainUserId),
-        ).toThrow(ConflictError);
-        expect(() =>
-            TeamRules.assertNotRemovingCaptain(captainUserId, memberUserId),
-        ).not.toThrow();
-        expect(() => TeamRules.assertCanLeave(captainUserId, captainUserId)).toThrow(
+        expect(() => TeamRules.assertNotRemovingCaptain(captainUserId, captainUserId)).toThrow(
             ConflictError,
         );
+        expect(() => TeamRules.assertNotRemovingCaptain(captainUserId, memberUserId)).not.toThrow();
+        expect(() => TeamRules.assertCanLeave(captainUserId, captainUserId)).toThrow(ConflictError);
         expect(() => TeamRules.assertCanLeave(captainUserId, memberUserId)).not.toThrow();
     });
 

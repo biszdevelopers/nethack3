@@ -23,54 +23,42 @@ export const cardVariants = tv({
 });
 
 export interface CardProps
-    extends ComponentPropsWithoutRef<"div">,
-        VariantProps<typeof cardVariants> {}
+    extends ComponentPropsWithoutRef<"div">, VariantProps<typeof cardVariants> {}
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
     { className, variant, hoverable, ...rest },
     ref,
 ) {
     return (
-        <div
-            ref={ref}
-            className={cn(cardVariants({ variant, hoverable }), className)}
-            {...rest}
-        />
+        <div ref={ref} className={cn(cardVariants({ variant, hoverable }), className)} {...rest} />
     );
 });
 
-export function CardHeader({
-    className,
-    ...rest
-}: ComponentPropsWithoutRef<"div">): ReactNode {
+export function CardHeader({ className, ...rest }: ComponentPropsWithoutRef<"div">): ReactNode {
     return <div className={cn("flex flex-col gap-1.5 p-5", className)} {...rest} />;
 }
 
 export function CardTitle({
     className,
+    children,
     ...rest
 }: ComponentPropsWithoutRef<"h3">): ReactNode {
-    return <h3 className={cn("text-base font-semibold tracking-tight", className)} {...rest} />;
+    return (
+        <h3 className={cn("text-base font-semibold tracking-tight", className)} {...rest}>
+            {children}
+        </h3>
+    );
 }
 
-export function CardDescription({
-    className,
-    ...rest
-}: ComponentPropsWithoutRef<"p">): ReactNode {
+export function CardDescription({ className, ...rest }: ComponentPropsWithoutRef<"p">): ReactNode {
     return <p className={cn("text-sm text-ink-muted", className)} {...rest} />;
 }
 
-export function CardContent({
-    className,
-    ...rest
-}: ComponentPropsWithoutRef<"div">): ReactNode {
+export function CardContent({ className, ...rest }: ComponentPropsWithoutRef<"div">): ReactNode {
     return <div className={cn("px-5 pb-5", className)} {...rest} />;
 }
 
-export function CardFooter({
-    className,
-    ...rest
-}: ComponentPropsWithoutRef<"div">): ReactNode {
+export function CardFooter({ className, ...rest }: ComponentPropsWithoutRef<"div">): ReactNode {
     return (
         <div
             className={cn(

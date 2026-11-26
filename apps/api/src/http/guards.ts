@@ -6,11 +6,7 @@ import type { BearerAuthenticator } from "../authentication/bearer-authenticator
 import { extractBearerToken } from "../authentication/bearer-authenticator.js";
 import type { SessionService } from "../authentication/session-service.js";
 import type { AppConfig } from "../core/configuration.js";
-import {
-    AuthenticationError,
-    ForbiddenError,
-    ValidationError,
-} from "../core/errors.js";
+import { AuthenticationError, ForbiddenError, ValidationError } from "../core/errors.js";
 import { hashesEqual, sha256Hex } from "../authentication/crypto.js";
 
 const uuidSchema = z.uuid();
@@ -36,7 +32,10 @@ export class AuthGuard {
     requestMetadata(request: FastifyRequest): RequestMetadata {
         return {
             ip: request.ip,
-            userAgent: typeof request.headers["user-agent"] === "string" ? request.headers["user-agent"] : "",
+            userAgent:
+                typeof request.headers["user-agent"] === "string"
+                    ? request.headers["user-agent"]
+                    : "",
         };
     }
 

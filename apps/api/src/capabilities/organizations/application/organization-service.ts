@@ -14,7 +14,13 @@ import type {
 import { randomToken, sha256Hex } from "../../../authentication/crypto.js";
 import type { AuthContext } from "../../../authentication/types.js";
 import type { Clock } from "../../../core/clock.js";
-import { ConflictError, ForbiddenError, isUniqueViolationError as isUniqueViolation, NotFoundError, ValidationError } from "../../../core/errors.js";
+import {
+    ConflictError,
+    ForbiddenError,
+    isUniqueViolationError as isUniqueViolation,
+    NotFoundError,
+    ValidationError,
+} from "../../../core/errors.js";
 import { domainEvents } from "../../../core/domain-event.js";
 import type { DatabaseConnection } from "../../../infrastructure/database/client.js";
 import type { OutboxPublisher } from "../../../core/outbox.js";
@@ -56,13 +62,16 @@ export class OrganizationService {
         return rows.map(toOrganization);
     }
 
-    async create(auth: AuthContext, input: CreateOrganizationRequest, ip: string | null): Promise<Organization> {
+    async create(
+        auth: AuthContext,
+        input: CreateOrganizationRequest,
+        ip: string | null,
+    ): Promise<Organization> {
         const existing = await this.repository.findBySlug(this.database.db, input.slug);
         if (existing !== null) {
             throw new ConflictError("That organization slug is already in use.");
         }
         const organizationId = randomUUID();
-        const now = this.clock.now();
         try {
             const created = await this.database.transaction(
                 { organizationId, userId: auth.user.id },
@@ -133,9 +142,7 @@ export class OrganizationService {
             async (session) => {
                 const organization = await this.repository.update(session, organizationId, {
                     ...(input.name === undefined ? {} : { name: input.name }),
-                    ...(input.description === undefined
-                        ? {}
-                        : { description: input.description }),
+                    ...(input.description === undefined ? {} : { description: input.description }),
                     ...(input.websiteUrl === undefined ? {} : { websiteUrl: input.websiteUrl }),
                     updatedAt: now,
                 });
@@ -565,4 +572,3 @@ function toOrganization(row: {
         updatedAt: row.updatedAt.toISOString(),
     };
 }
-

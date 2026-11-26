@@ -42,9 +42,7 @@ export class JobQueue {
                 organizationId: options.organizationId ?? null,
                 ...(options.dedupeKey === undefined ? {} : { dedupeKey: options.dedupeKey }),
                 ...(options.runAt === undefined ? {} : { runAt: options.runAt }),
-                ...(options.maxAttempts === undefined
-                    ? {}
-                    : { maxAttempts: options.maxAttempts }),
+                ...(options.maxAttempts === undefined ? {} : { maxAttempts: options.maxAttempts }),
             })
             .onConflictDoNothing();
     }

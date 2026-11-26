@@ -20,9 +20,9 @@ export default function AboutPage(): ReactNode {
                     About nethack
                 </h1>
                 <p className="max-w-3xl text-base text-ink-muted">
-                    nethack is a competition platform. It does not run competitions itself; it
-                    gives organizations the structure to run them consistently and gives
-                    participants one place to take part.
+                    nethack is a competition platform. It does not run competitions itself; it gives
+                    organizations the structure to run them consistently and gives participants one
+                    place to take part.
                 </p>
             </Reveal>
 
@@ -41,9 +41,8 @@ export default function AboutPage(): ReactNode {
                                 competition, and manage your team from the workspace.
                             </p>
                             <p>
-                                Projects, attachments, and submission versions stay attached to
-                                your team. Organizer decisions and review notes appear in the same
-                                place.
+                                Projects, attachments, and submission versions stay attached to your
+                                team. Organizer decisions and review notes appear in the same place.
                             </p>
                         </CardContent>
                     </Card>

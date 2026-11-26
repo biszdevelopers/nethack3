@@ -1,10 +1,6 @@
 "use client";
 
-import {
-    useRef,
-    type CSSProperties,
-    type ReactNode,
-} from "react";
+import { useRef, type CSSProperties, type ReactNode } from "react";
 import { cn } from "../lib/cn.js";
 import { gsap, ScrollTrigger, prefersReducedMotion } from "./register.js";
 import {

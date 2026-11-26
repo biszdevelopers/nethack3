@@ -440,4 +440,3 @@ function toRegistration(row: RegistrationViewRow): Registration {
         decidedByUserId: row.decidedByUserId,
     };
 }
-

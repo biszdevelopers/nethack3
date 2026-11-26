@@ -19,9 +19,7 @@ export class CapabilityGraphError extends Error {
  * order breaks ties so initialization is deterministic. Cycles and missing
  * dependencies are reported together instead of failing on the first one.
  */
-export function resolveCapabilityOrder(
-    nodes: readonly CapabilityGraphNode[],
-): readonly string[] {
+export function resolveCapabilityOrder(nodes: readonly CapabilityGraphNode[]): readonly string[] {
     const problems: string[] = [];
     const byId = new Map<string, CapabilityGraphNode>();
 
@@ -81,9 +79,7 @@ export function resolveCapabilityOrder(
     }
 
     if (order.length !== nodes.length) {
-        const unresolved = nodes
-            .filter((node) => !order.includes(node.id))
-            .map((node) => node.id);
+        const unresolved = nodes.filter((node) => !order.includes(node.id)).map((node) => node.id);
         throw new CapabilityGraphError([`dependency cycle among: ${unresolved.join(", ")}`]);
     }
 

@@ -41,14 +41,16 @@ describe("loadConfiguration", () => {
     });
 
     it("requires encryption keys in production", () => {
-        expect(() =>
-            loadConfiguration(productionEnv({ SESSION_ENCRYPTION_KEYS: "" })),
-        ).toThrow(/SESSION_ENCRYPTION_KEYS is required/);
+        expect(() => loadConfiguration(productionEnv({ SESSION_ENCRYPTION_KEYS: "" }))).toThrow(
+            /SESSION_ENCRYPTION_KEYS is required/,
+        );
     });
 
     it("validates encryption key length", () => {
         expect(() =>
-            loadConfiguration(productionEnv({ SESSION_ENCRYPTION_KEYS: Buffer.from("short").toString("base64") })),
+            loadConfiguration(
+                productionEnv({ SESSION_ENCRYPTION_KEYS: Buffer.from("short").toString("base64") }),
+            ),
         ).toThrow(/32-byte base64/);
     });
 
