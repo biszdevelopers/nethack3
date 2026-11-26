@@ -11,6 +11,7 @@ import { domainEvents } from "../../../core/domain-event.js";
 import {
     ConflictError,
     InternalError,
+    isUniqueViolationError as isUniqueViolation,
     NotFoundError,
     ValidationError,
 } from "../../../core/errors.js";
@@ -440,11 +441,3 @@ function toRegistration(row: RegistrationViewRow): Registration {
     };
 }
 
-function isUniqueViolation(error: unknown): boolean {
-    return (
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        (error as { code?: unknown }).code === "23505"
-    );
-}

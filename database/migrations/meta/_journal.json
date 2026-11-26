@@ -15,6 +15,20 @@
       "when": 1795608860787,
       "tag": "0001_rls-policies",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795613049215,
+      "tag": "0002_tighten-settings-rls",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795619084291,
+      "tag": "0003_evaluation-history",
+      "breakpoints": true
     }
   ]
 }

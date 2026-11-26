@@ -1,7 +1,11 @@
 import { and, desc, eq, isNotNull, isNull, lt, or } from "drizzle-orm";
 import type { AnnouncementVisibility } from "@nethack/contracts";
 import type { DatabaseExecutor, DatabaseSession } from "../../../infrastructure/database/client.js";
-import { announcements, users } from "../../../infrastructure/database/schema/index.js";
+import {
+    announcements,
+    organizations,
+    users,
+} from "../../../infrastructure/database/schema/index.js";
 
 export interface AnnouncementRecord {
     readonly id: string;
@@ -18,6 +22,15 @@ export interface AnnouncementRecord {
 
 export interface AnnouncementRow extends AnnouncementRecord {
     readonly authorDisplayName: string;
+}
+
+export interface PublicAnnouncementRow {
+    readonly id: string;
+    readonly title: string;
+    readonly bodyMarkdown: string;
+    readonly publishedAt: Date | null;
+    readonly organizationName: string;
+    readonly organizationSlug: string;
 }
 
 export class AnnouncementRepository {
@@ -110,14 +123,16 @@ export class AnnouncementRepository {
 
     async listPublic(
         db: DatabaseExecutor,
-        organizationId: string,
+        organizationId: string | null,
         options: { limit: number; before: { createdAt: Date; id: string } | null },
-    ): Promise<readonly AnnouncementRow[]> {
+    ): Promise<readonly PublicAnnouncementRow[]> {
         const conditions = [
-            eq(announcements.organizationId, organizationId),
             eq(announcements.visibility, "public"),
             isNotNull(announcements.publishedAt),
         ];
+        if (organizationId !== null) {
+            conditions.push(eq(announcements.organizationId, organizationId));
+        }
         if (options.before !== null) {
             const cursorCondition = or(
                 lt(announcements.publishedAt, options.before.createdAt),
@@ -133,19 +148,14 @@ export class AnnouncementRepository {
         return db
             .select({
                 id: announcements.id,
-                organizationId: announcements.organizationId,
-                editionId: announcements.editionId,
                 title: announcements.title,
                 bodyMarkdown: announcements.bodyMarkdown,
-                visibility: announcements.visibility,
                 publishedAt: announcements.publishedAt,
-                authorUserId: announcements.authorUserId,
-                authorDisplayName: users.displayName,
-                createdAt: announcements.createdAt,
-                updatedAt: announcements.updatedAt,
+                organizationName: organizations.name,
+                organizationSlug: organizations.slug,
             })
             .from(announcements)
-            .innerJoin(users, eq(users.id, announcements.authorUserId))
+            .innerJoin(organizations, eq(organizations.id, announcements.organizationId))
             .where(and(...conditions))
             .orderBy(desc(announcements.publishedAt), desc(announcements.id))
             .limit(options.limit);

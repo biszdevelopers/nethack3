@@ -8,15 +8,19 @@ import type {
     CreateSeriesRequest,
     Division,
     Milestone,
+    OrganizerEdition,
     PublicCompetition,
     PublicCompetitionDetail,
     PublicOrganization,
+    UpdateDivisionRequest,
     UpdateEditionRequest,
+    UpdateMilestoneRequest,
+    UpdateSeriesRequest,
 } from "@nethack/contracts";
 import type { AuthContext } from "../../../authentication/types.js";
 import type { Clock } from "../../../core/clock.js";
 import { domainEvents } from "../../../core/domain-event.js";
-import { ConflictError, NotFoundError, ValidationError } from "../../../core/errors.js";
+import { ConflictError, isUniqueViolationError as isUniqueViolation, NotFoundError } from "../../../core/errors.js";
 import type { OutboxPublisher } from "../../../core/outbox.js";
 import type { AuditLogger } from "../../../infrastructure/audit/audit-logger.js";
 import type {
@@ -30,6 +34,7 @@ import type {
     DivisionRow,
     EditionRow,
     EditionUpdateValues,
+    EditionWithSeriesRow,
     MilestoneRow,
     PublicEditionRow,
     SeriesRow,
@@ -38,6 +43,18 @@ import type {
 const PUBLIC_EDITION_LIMIT = 100;
 
 type MutableEditionUpdate = { -readonly [K in keyof EditionUpdateValues]: EditionUpdateValues[K] };
+
+export interface EditionPageOptions {
+    readonly limit: number;
+    readonly seriesId: string | null;
+    readonly before: Date | null;
+    readonly beforeId: string | null;
+}
+
+export interface EditionPage {
+    readonly items: readonly OrganizerEdition[];
+    readonly hasMore: boolean;
+}
 
 export class CompetitionService {
     private readonly database: DatabaseConnection;
@@ -102,6 +119,95 @@ export class CompetitionService {
         } catch (error) {
             throw this.rethrowUnique(error, "That competition series slug is already in use.");
         }
+    }
+
+    async updateSeries(
+        auth: AuthContext,
+        organizationId: string,
+        seriesId: string,
+        input: UpdateSeriesRequest,
+        ip: string | null,
+    ): Promise<CompetitionSeries> {
+        const now = this.clock.now();
+        const row = await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const updated = await this.repository.updateSeries(
+                    session,
+                    organizationId,
+                    seriesId,
+                    {
+                        ...(input.name === undefined ? {} : { name: input.name }),
+                        ...(input.description === undefined
+                            ? {}
+                            : { description: input.description }),
+                        updatedAt: now,
+                    },
+                );
+                if (updated === null) {
+                    throw new NotFoundError("The competition series was not found.");
+                }
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: "competition.series.updated",
+                    entityType: "competition_series",
+                    entityId: seriesId,
+                    metadata: { fields: Object.keys(input) },
+                    ip,
+                });
+                return updated;
+            },
+        );
+        return toSeries(row);
+    }
+
+    async deleteSeries(
+        auth: AuthContext,
+        organizationId: string,
+        seriesId: string,
+        ip: string | null,
+    ): Promise<void> {
+        await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const series = await this.repository.lockSeries(session, organizationId, seriesId);
+                if (series === null) {
+                    throw new NotFoundError("The competition series was not found.");
+                }
+                const editionCount = await this.repository.countEditionsForSeries(
+                    session.db,
+                    organizationId,
+                    seriesId,
+                );
+                CompetitionRules.assertSeriesIsDeletable(editionCount);
+                await this.repository.deleteSeries(session, organizationId, seriesId);
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: "competition.series.deleted",
+                    entityType: "competition_series",
+                    entityId: seriesId,
+                    metadata: { slug: series.slug },
+                    ip,
+                });
+            },
+        );
+    }
+
+    async organizerEditions(
+        organizationId: string,
+        options: EditionPageOptions,
+    ): Promise<EditionPage> {
+        return this.editionPage(organizationId, options, false);
+    }
+
+    async seriesEditions(
+        organizationId: string,
+        seriesId: string,
+        options: Omit<EditionPageOptions, "seriesId">,
+    ): Promise<EditionPage> {
+        return this.editionPage(organizationId, { ...options, seriesId }, true);
     }
 
     async createEdition(
@@ -380,13 +486,7 @@ export class CompetitionService {
         input: CreateDivisionRequest,
         ip: string | null,
     ): Promise<Division> {
-        if (
-            input.minTeamSize !== null &&
-            input.maxTeamSize !== null &&
-            input.minTeamSize > input.maxTeamSize
-        ) {
-            throw new ValidationError("Minimum team size cannot exceed maximum team size.");
-        }
+        CompetitionRules.assertDivisionTeamSizes(input.minTeamSize, input.maxTeamSize);
         try {
             const row = await this.database.transaction(
                 { organizationId, userId: auth.user.id },
@@ -427,6 +527,129 @@ export class CompetitionService {
                 "That division slug is already in use for this edition.",
             );
         }
+    }
+
+    async updateDivision(
+        auth: AuthContext,
+        organizationId: string,
+        editionId: string,
+        divisionId: string,
+        input: UpdateDivisionRequest,
+        ip: string | null,
+    ): Promise<Division> {
+        const row = await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const edition = await this.repository.findEdition(
+                    session.db,
+                    organizationId,
+                    editionId,
+                );
+                if (edition === null) {
+                    throw new NotFoundError("The competition edition was not found.");
+                }
+                const current = await this.repository.findDivisionForEdition(
+                    session.db,
+                    organizationId,
+                    editionId,
+                    divisionId,
+                );
+                if (current === null) {
+                    throw new NotFoundError("The division was not found.");
+                }
+                CompetitionRules.assertDivisionTeamSizes(
+                    input.minTeamSize === undefined ? current.minTeamSize : input.minTeamSize,
+                    input.maxTeamSize === undefined ? current.maxTeamSize : input.maxTeamSize,
+                );
+                const updated = await this.repository.updateDivision(
+                    session,
+                    organizationId,
+                    editionId,
+                    divisionId,
+                    {
+                        ...(input.name === undefined ? {} : { name: input.name }),
+                        ...(input.description === undefined
+                            ? {}
+                            : { description: input.description }),
+                        ...(input.minTeamSize === undefined
+                            ? {}
+                            : { minTeamSize: input.minTeamSize }),
+                        ...(input.maxTeamSize === undefined
+                            ? {}
+                            : { maxTeamSize: input.maxTeamSize }),
+                    },
+                );
+                if (updated === null) {
+                    throw new NotFoundError("The division was not found.");
+                }
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: "competition.division.updated",
+                    entityType: "division",
+                    entityId: divisionId,
+                    metadata: { editionId, fields: Object.keys(input) },
+                    ip,
+                });
+                return updated;
+            },
+        );
+        return toDivision(row);
+    }
+
+    async deleteDivision(
+        auth: AuthContext,
+        organizationId: string,
+        editionId: string,
+        divisionId: string,
+        ip: string | null,
+    ): Promise<void> {
+        await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const edition = await this.repository.findEdition(
+                    session.db,
+                    organizationId,
+                    editionId,
+                );
+                if (edition === null) {
+                    throw new NotFoundError("The competition edition was not found.");
+                }
+                const division = await this.repository.lockDivisionForEdition(
+                    session,
+                    organizationId,
+                    editionId,
+                    divisionId,
+                );
+                if (division === null) {
+                    throw new NotFoundError("The division was not found.");
+                }
+                const [registrationCount, teamCount] = await Promise.all([
+                    this.repository.countDivisionRegistrations(
+                        session.db,
+                        organizationId,
+                        divisionId,
+                    ),
+                    this.repository.countDivisionTeams(session.db, organizationId, divisionId),
+                ]);
+                CompetitionRules.assertDivisionIsDeletable(registrationCount, teamCount);
+                await this.repository.deleteDivision(
+                    session,
+                    organizationId,
+                    editionId,
+                    divisionId,
+                );
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: "competition.division.deleted",
+                    entityType: "division",
+                    entityId: divisionId,
+                    metadata: { editionId, slug: division.slug },
+                    ip,
+                });
+            },
+        );
     }
 
     async milestones(organizationId: string, editionId: string): Promise<readonly Milestone[]> {
@@ -483,6 +706,105 @@ export class CompetitionService {
             },
         );
         return toMilestone(row);
+    }
+
+    async updateMilestone(
+        auth: AuthContext,
+        organizationId: string,
+        editionId: string,
+        milestoneId: string,
+        input: UpdateMilestoneRequest,
+        ip: string | null,
+    ): Promise<Milestone> {
+        const row = await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const edition = await this.repository.findEdition(
+                    session.db,
+                    organizationId,
+                    editionId,
+                );
+                if (edition === null) {
+                    throw new NotFoundError("The competition edition was not found.");
+                }
+                const updated = await this.repository.updateMilestone(
+                    session,
+                    organizationId,
+                    editionId,
+                    milestoneId,
+                    {
+                        ...(input.title === undefined ? {} : { title: input.title }),
+                        ...(input.description === undefined
+                            ? {}
+                            : { description: input.description }),
+                        ...(input.kind === undefined ? {} : { kind: input.kind }),
+                        ...(input.occursAt === undefined
+                            ? {}
+                            : { occursAt: new Date(input.occursAt) }),
+                    },
+                );
+                if (updated === null) {
+                    throw new NotFoundError("The milestone was not found.");
+                }
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: "competition.milestone.updated",
+                    entityType: "milestone",
+                    entityId: milestoneId,
+                    metadata: { editionId, fields: Object.keys(input) },
+                    ip,
+                });
+                return updated;
+            },
+        );
+        return toMilestone(row);
+    }
+
+    async deleteMilestone(
+        auth: AuthContext,
+        organizationId: string,
+        editionId: string,
+        milestoneId: string,
+        ip: string | null,
+    ): Promise<void> {
+        await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const edition = await this.repository.findEdition(
+                    session.db,
+                    organizationId,
+                    editionId,
+                );
+                if (edition === null) {
+                    throw new NotFoundError("The competition edition was not found.");
+                }
+                const milestone = await this.repository.findMilestone(
+                    session.db,
+                    organizationId,
+                    editionId,
+                    milestoneId,
+                );
+                if (milestone === null) {
+                    throw new NotFoundError("The milestone was not found.");
+                }
+                await this.repository.deleteMilestone(
+                    session,
+                    organizationId,
+                    editionId,
+                    milestoneId,
+                );
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: "competition.milestone.deleted",
+                    entityType: "milestone",
+                    entityId: milestoneId,
+                    metadata: { editionId, title: milestone.title },
+                    ip,
+                });
+            },
+        );
     }
 
     async publicCompetitions(limit: number): Promise<readonly PublicCompetition[]> {
@@ -576,6 +898,53 @@ export class CompetitionService {
         };
     }
 
+    private async editionPage(
+        organizationId: string,
+        options: EditionPageOptions,
+        verifySeries: boolean,
+    ): Promise<EditionPage> {
+        const result = await this.database.transaction({ organizationId }, async (session) => {
+            if (verifySeries && options.seriesId !== null) {
+                const series = await this.repository.findSeriesById(
+                    session.db,
+                    organizationId,
+                    options.seriesId,
+                );
+                if (series === null) {
+                    throw new NotFoundError("The competition series was not found.");
+                }
+            }
+            const rows = await this.repository.listEditionsPage(session.db, organizationId, {
+                limit: options.limit + 1,
+                seriesId: options.seriesId,
+                before: options.before,
+                beforeId: options.beforeId,
+            });
+            const visible = rows.slice(0, options.limit);
+            const editionIds = visible.map((row) => row.id);
+            const [registrationCounts, teamCounts] = await Promise.all([
+                this.repository.countRegistrationsByEdition(session.db, organizationId, editionIds),
+                this.repository.countTeamsByEdition(session.db, organizationId, editionIds),
+            ]);
+            return {
+                visible,
+                hasMore: rows.length > options.limit,
+                registrationCounts,
+                teamCounts,
+            };
+        });
+        return {
+            items: result.visible.map((row) =>
+                toOrganizerEdition(
+                    row,
+                    result.registrationCounts.get(row.id) ?? 0,
+                    result.teamCounts.get(row.id) ?? 0,
+                ),
+            ),
+            hasMore: result.hasMore,
+        };
+    }
+
     private async publishEvent(
         session: DatabaseSession,
         organizationId: string,
@@ -663,6 +1032,19 @@ function toEdition(row: EditionRow): CompetitionEdition {
     };
 }
 
+function toOrganizerEdition(
+    row: EditionWithSeriesRow,
+    registrationCount: number,
+    teamCount: number,
+): OrganizerEdition {
+    return {
+        ...toEdition(row),
+        seriesName: row.seriesName,
+        registrationCount,
+        teamCount,
+    };
+}
+
 function toDivision(row: DivisionRow): Division {
     return {
         id: row.id,
@@ -719,13 +1101,4 @@ function parseNullable(value: string | null): Date | null {
 
 function nullableIso(value: Date | null): string | null {
     return value === null ? null : value.toISOString();
-}
-
-function isUniqueViolation(error: unknown): boolean {
-    return (
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        (error as { code?: unknown }).code === "23505"
-    );
 }

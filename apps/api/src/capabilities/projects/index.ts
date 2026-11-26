@@ -1,5 +1,6 @@
 import type { CapabilityDefinition } from "../../core/capability.js";
 import { COMPETITIONS_CONTRACT, type CompetitionsContract } from "../competitions/contracts.js";
+import { ORGANIZATIONS_CONTRACT, type OrganizationsContract } from "../organizations/contracts.js";
 import { PARTICIPANTS_CONTRACT, type ParticipantsContract } from "../participants/contracts.js";
 import { TEAMS_CONTRACT, type TeamsContract } from "../teams/contracts.js";
 import {
@@ -19,6 +20,7 @@ export const projectsCapability: CapabilityDefinition = {
         const repository = new ProjectRepository();
         const contracts: ProjectContracts = {
             competitions: context.contracts.get<CompetitionsContract>(COMPETITIONS_CONTRACT),
+            organizations: context.contracts.get<OrganizationsContract>(ORGANIZATIONS_CONTRACT),
             participants: context.contracts.get<ParticipantsContract>(PARTICIPANTS_CONTRACT),
             teams: context.contracts.get<TeamsContract>(TEAMS_CONTRACT),
         };

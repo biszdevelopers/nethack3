@@ -19,7 +19,7 @@ import type { CompetitionsContract } from "../../competitions/contracts.js";
 import type { FilesContract } from "../../files/contracts.js";
 import type { OrganizationsContract } from "../../organizations/contracts.js";
 import type { ProjectSummary, ProjectsContract } from "../../projects/contracts.js";
-import type { TeamsContract } from "../../teams/contracts.js";
+import type { TeamSummary, TeamsContract } from "../../teams/contracts.js";
 import type { SubmissionSummary } from "../contracts.js";
 import { SubmissionRules } from "../domain/submission-rules.js";
 import type {
@@ -27,6 +27,7 @@ import type {
     SubmissionRepository,
     SubmissionRow,
     SubmissionVersionRow,
+    SubmissionWithVersionRow,
 } from "../infrastructure/submission-repository.js";
 
 const LIST_SCAN_BATCH = 50;
@@ -89,7 +90,10 @@ export class SubmissionService {
                         limit: options.limit,
                     }),
             );
-            return rows.map(toSubmission);
+            const resolver = new DisplayResolver(this.contracts);
+            return Promise.all(
+                rows.map((row) => this.toSubmissionView(organizationId, row, resolver)),
+            );
         }
 
         // Participants only see submissions they can reach through a project or team.
@@ -104,7 +108,8 @@ export class SubmissionService {
                       auth.user.id,
                   );
         const teamId = team?.id ?? null;
-        const collected: SubmissionRow[] = [];
+        const resolver = new DisplayResolver(this.contracts);
+        const collected: SubmissionWithVersionRow[] = [];
         let cursor = options.cursor;
         while (collected.length < options.limit) {
             const batch = await this.database.transaction(
@@ -122,7 +127,15 @@ export class SubmissionService {
                 break;
             }
             for (const row of batch) {
-                if (await this.canViewRow(organizationId, auth.user.id, teamId, row)) {
+                if (
+                    await this.canViewRow(
+                        organizationId,
+                        auth.user.id,
+                        teamId,
+                        row.submission,
+                        resolver,
+                    )
+                ) {
                     collected.push(row);
                     if (collected.length >= options.limit) {
                         break;
@@ -136,9 +149,11 @@ export class SubmissionService {
             if (last === undefined || batch.length < LIST_SCAN_BATCH) {
                 break;
             }
-            cursor = { createdAt: last.createdAt, id: last.id };
+            cursor = { createdAt: last.submission.createdAt, id: last.submission.id };
         }
-        return collected.map(toSubmission);
+        return Promise.all(
+            collected.map((row) => this.toSubmissionView(organizationId, row, resolver)),
+        );
     }
 
     async create(
@@ -192,7 +207,11 @@ export class SubmissionService {
                     return created;
                 },
             );
-            return toSubmission(row);
+            return toSubmission(
+                row,
+                SubmissionRules.displayTitle(null, project.title),
+                await this.teamName(organizationId, row.teamId),
+            );
         } catch (error) {
             if (isUniqueViolation(error)) {
                 throw new ConflictError("A submission already exists for this project.");
@@ -208,8 +227,9 @@ export class SubmissionService {
         submissionId: string,
     ): Promise<SubmissionDetail> {
         const row = await this.load(organizationId, submissionId);
-        const project = await this.assertCanView(organizationId, role, auth.user.id, row);
-        return this.buildDetail(organizationId, row, project);
+        const resolver = new DisplayResolver(this.contracts);
+        const project = await this.assertCanView(organizationId, role, auth.user.id, row, resolver);
+        return this.buildDetail(organizationId, row, project, resolver);
     }
 
     async createVersion(
@@ -292,7 +312,7 @@ export class SubmissionService {
                             ip,
                         });
                     }
-                    return { submission: next, versionId: inserted.id };
+                    return { submission: next, versionId: inserted.id, project };
                 },
             );
             // Files attach through the files capability, whose transactions need the
@@ -309,7 +329,12 @@ export class SubmissionService {
                     outcome.versionId,
                 );
             }
-            return await this.buildDetail(organizationId, outcome.submission);
+            return await this.buildDetail(
+                organizationId,
+                outcome.submission,
+                outcome.project,
+                new DisplayResolver(this.contracts),
+            );
         } catch (error) {
             if (isUniqueViolation(error)) {
                 throw new ConflictError(
@@ -388,10 +413,15 @@ export class SubmissionService {
                         note: input.note,
                     },
                 });
-                return next;
+                return { submission: next, project };
             },
         );
-        return this.buildDetail(organizationId, updated);
+        return this.buildDetail(
+            organizationId,
+            updated.submission,
+            updated.project,
+            new DisplayResolver(this.contracts),
+        );
     }
 
     async withdraw(
@@ -413,7 +443,12 @@ export class SubmissionService {
                 if (row === null) {
                     throw new NotFoundError("The submission was not found.");
                 }
-                await this.requireManagedProject(organizationId, role, auth.user.id, row.projectId);
+                const project = await this.requireManagedProject(
+                    organizationId,
+                    role,
+                    auth.user.id,
+                    row.projectId,
+                );
                 SubmissionRules.assertWithdrawable(row.status);
                 const next = await this.repository.update(session, organizationId, row.id, {
                     status: "withdrawn",
@@ -428,10 +463,15 @@ export class SubmissionService {
                     metadata: { from: row.status },
                     ip,
                 });
-                return next;
+                return { submission: next, project };
             },
         );
-        return this.buildDetail(organizationId, updated);
+        return this.buildDetail(
+            organizationId,
+            updated.submission,
+            updated.project,
+            new DisplayResolver(this.contracts),
+        );
     }
 
     async listEdition(
@@ -453,7 +493,8 @@ export class SubmissionService {
                 limit,
             }),
         );
-        return rows.map(toSubmission);
+        const resolver = new DisplayResolver(this.contracts);
+        return Promise.all(rows.map((row) => this.toSubmissionView(organizationId, row, resolver)));
     }
 
     async versions(
@@ -463,7 +504,13 @@ export class SubmissionService {
         submissionId: string,
     ): Promise<readonly SubmissionVersion[]> {
         const row = await this.load(organizationId, submissionId);
-        await this.assertCanView(organizationId, role, auth.user.id, row);
+        await this.assertCanView(
+            organizationId,
+            role,
+            auth.user.id,
+            row,
+            new DisplayResolver(this.contracts),
+        );
         const { versions, files } = await this.database.transaction(
             { organizationId },
             async (session) => ({
@@ -518,8 +565,9 @@ export class SubmissionService {
         role: OrganizationRole,
         userId: string,
         row: SubmissionRow,
+        resolver: DisplayResolver,
     ): Promise<ProjectSummary> {
-        const project = await this.contracts.projects.getProject(organizationId, row.projectId);
+        const project = await resolver.project(organizationId, row.projectId);
         if (project === null) {
             throw new NotFoundError("The submission was not found.");
         }
@@ -544,11 +592,12 @@ export class SubmissionService {
         userId: string,
         teamId: string | null,
         row: SubmissionRow,
+        resolver: DisplayResolver,
     ): Promise<boolean> {
         if (teamId !== null && row.teamId === teamId) {
             return true;
         }
-        const project = await this.contracts.projects.getProject(organizationId, row.projectId);
+        const project = await resolver.project(organizationId, row.projectId);
         if (project === null) {
             return false;
         }
@@ -561,21 +610,41 @@ export class SubmissionService {
         return this.contracts.projects.isProjectMember(organizationId, row.projectId, userId);
     }
 
+    private async toSubmissionView(
+        organizationId: string,
+        row: SubmissionWithVersionRow,
+        resolver: DisplayResolver,
+    ): Promise<Submission> {
+        const versionTitle = row.submission.currentVersion === 0 ? null : row.title;
+        const needsProject = versionTitle === null || versionTitle.trim().length === 0;
+        const project = needsProject
+            ? await resolver.project(organizationId, row.submission.projectId)
+            : null;
+        const team =
+            row.submission.teamId === null
+                ? null
+                : await resolver.team(organizationId, row.submission.teamId);
+        return toSubmission(
+            row.submission,
+            SubmissionRules.displayTitle(versionTitle, project?.title ?? null),
+            team?.name ?? null,
+        );
+    }
+
+    private async teamName(organizationId: string, teamId: string | null): Promise<string | null> {
+        if (teamId === null) {
+            return null;
+        }
+        const team = await this.contracts.teams.getTeam(organizationId, teamId);
+        return team?.name ?? null;
+    }
+
     private async buildDetail(
         organizationId: string,
         row: SubmissionRow,
-        loadedProject?: ProjectSummary,
+        project: ProjectSummary,
+        resolver: DisplayResolver,
     ): Promise<SubmissionDetail> {
-        const project =
-            loadedProject ??
-            (await this.contracts.projects.getProject(organizationId, row.projectId));
-        if (project === null) {
-            throw new NotFoundError("The project was not found.");
-        }
-        const team =
-            row.teamId === null
-                ? null
-                : await this.contracts.teams.getTeam(organizationId, row.teamId);
         const { versions, files } = await this.database.transaction(
             { organizationId },
             async (session) => ({
@@ -583,16 +652,56 @@ export class SubmissionService {
                 files: await this.repository.listAttachedFiles(session.db, organizationId, row.id),
             }),
         );
+        const current = versions.find((version) => version.version === row.currentVersion);
+        const team = row.teamId === null ? null : await resolver.team(organizationId, row.teamId);
         return toSubmissionDetail(
             row,
-            project.title,
+            SubmissionRules.displayTitle(current?.title ?? null, project.title),
             team?.name ?? null,
             toVersions(versions, files),
         );
     }
 }
 
-export function toSubmission(row: SubmissionRow): Submission {
+/**
+ * Request-scoped display cache. Project and team lookups repeat across rows, so
+ * each distinct id resolves once per service call.
+ */
+class DisplayResolver {
+    private readonly projects = new Map<string, Promise<ProjectSummary | null>>();
+    private readonly teams = new Map<string, Promise<TeamSummary | null>>();
+    private readonly contracts: SubmissionContracts;
+
+    constructor(contracts: SubmissionContracts) {
+        this.contracts = contracts;
+    }
+
+    project(organizationId: string, projectId: string): Promise<ProjectSummary | null> {
+        const cached = this.projects.get(projectId);
+        if (cached !== undefined) {
+            return cached;
+        }
+        const pending = this.contracts.projects.getProject(organizationId, projectId);
+        this.projects.set(projectId, pending);
+        return pending;
+    }
+
+    team(organizationId: string, teamId: string): Promise<TeamSummary | null> {
+        const cached = this.teams.get(teamId);
+        if (cached !== undefined) {
+            return cached;
+        }
+        const pending = this.contracts.teams.getTeam(organizationId, teamId);
+        this.teams.set(teamId, pending);
+        return pending;
+    }
+}
+
+export function toSubmission(
+    row: SubmissionRow,
+    projectTitle: string,
+    teamName: string | null,
+): Submission {
     return {
         id: row.id,
         organizationId: row.organizationId,
@@ -602,6 +711,8 @@ export function toSubmission(row: SubmissionRow): Submission {
         status: row.status,
         currentVersion: row.currentVersion,
         submittedAt: row.submittedAt === null ? null : row.submittedAt.toISOString(),
+        projectTitle,
+        teamName,
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
     };
@@ -632,9 +743,7 @@ export function toSubmissionDetail(
     versions: readonly SubmissionVersion[],
 ): SubmissionDetail {
     return {
-        ...toSubmission(row),
-        projectTitle,
-        teamName,
+        ...toSubmission(row, projectTitle, teamName),
         versions: [...versions],
         reviewNote: row.reviewNote,
         reviewNoteUpdatedAt:

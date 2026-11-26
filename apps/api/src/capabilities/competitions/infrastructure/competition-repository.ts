@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
 import type { CompetitionEditionStatus, MilestoneKind } from "@nethack/contracts";
 import type { DatabaseExecutor, DatabaseSession } from "../../../infrastructure/database/client.js";
 import {
@@ -51,6 +51,12 @@ export interface NewSeriesValues {
     readonly description: string;
 }
 
+export interface SeriesUpdateValues {
+    readonly updatedAt: Date;
+    readonly name?: string;
+    readonly description?: string;
+}
+
 export interface NewEditionValues {
     readonly organizationId: string;
     readonly seriesId: string;
@@ -93,6 +99,27 @@ export interface NewDivisionValues {
     readonly description: string;
     readonly minTeamSize: number | null;
     readonly maxTeamSize: number | null;
+}
+
+export interface DivisionUpdateValues {
+    readonly name?: string;
+    readonly description?: string;
+    readonly minTeamSize?: number | null;
+    readonly maxTeamSize?: number | null;
+}
+
+export interface MilestoneUpdateValues {
+    readonly title?: string;
+    readonly description?: string;
+    readonly kind?: MilestoneKind;
+    readonly occursAt?: Date;
+}
+
+export interface EditionPageOptions {
+    readonly limit: number;
+    readonly seriesId: string | null;
+    readonly before: Date | null;
+    readonly beforeId: string | null;
 }
 
 export interface NewMilestoneValues {
@@ -139,6 +166,76 @@ export class CompetitionRepository {
         return row;
     }
 
+    async lockSeries(
+        session: DatabaseSession,
+        organizationId: string,
+        seriesId: string,
+    ): Promise<SeriesRow | null> {
+        const rows = await session.db
+            .select()
+            .from(competitionSeries)
+            .where(
+                and(
+                    eq(competitionSeries.organizationId, organizationId),
+                    eq(competitionSeries.id, seriesId),
+                ),
+            )
+            .for("update")
+            .limit(1);
+        return rows[0] ?? null;
+    }
+
+    async updateSeries(
+        session: DatabaseSession,
+        organizationId: string,
+        seriesId: string,
+        values: SeriesUpdateValues,
+    ): Promise<SeriesRow | null> {
+        const rows = await session.db
+            .update(competitionSeries)
+            .set(values)
+            .where(
+                and(
+                    eq(competitionSeries.organizationId, organizationId),
+                    eq(competitionSeries.id, seriesId),
+                ),
+            )
+            .returning();
+        return rows[0] ?? null;
+    }
+
+    async deleteSeries(
+        session: DatabaseSession,
+        organizationId: string,
+        seriesId: string,
+    ): Promise<void> {
+        await session.db
+            .delete(competitionSeries)
+            .where(
+                and(
+                    eq(competitionSeries.organizationId, organizationId),
+                    eq(competitionSeries.id, seriesId),
+                ),
+            );
+    }
+
+    async countEditionsForSeries(
+        db: DatabaseExecutor,
+        organizationId: string,
+        seriesId: string,
+    ): Promise<number> {
+        const rows = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(competitionEditions)
+            .where(
+                and(
+                    eq(competitionEditions.organizationId, organizationId),
+                    eq(competitionEditions.seriesId, seriesId),
+                ),
+            );
+        return rows[0]?.count ?? 0;
+    }
+
     async findEdition(
         db: DatabaseExecutor,
         organizationId: string,
@@ -169,6 +266,39 @@ export class CompetitionRepository {
             .innerJoin(competitionSeries, eq(competitionSeries.id, competitionEditions.seriesId))
             .where(eq(competitionEditions.organizationId, organizationId))
             .orderBy(desc(competitionEditions.createdAt), desc(competitionEditions.id));
+        return rows.map((row) => ({ ...row.edition, seriesName: row.seriesName }));
+    }
+
+    async listEditionsPage(
+        db: DatabaseExecutor,
+        organizationId: string,
+        options: EditionPageOptions,
+    ): Promise<readonly EditionWithSeriesRow[]> {
+        const conditions = [eq(competitionEditions.organizationId, organizationId)];
+        if (options.seriesId !== null) {
+            conditions.push(eq(competitionEditions.seriesId, options.seriesId));
+        }
+        if (options.before !== null && options.beforeId !== null) {
+            const before = options.before;
+            const beforeId = options.beforeId;
+            const cursorCondition = or(
+                lt(competitionEditions.createdAt, before),
+                and(
+                    eq(competitionEditions.createdAt, before),
+                    lt(competitionEditions.id, beforeId),
+                ),
+            );
+            if (cursorCondition !== undefined) {
+                conditions.push(cursorCondition);
+            }
+        }
+        const rows = await db
+            .select({ edition: competitionEditions, seriesName: competitionSeries.name })
+            .from(competitionEditions)
+            .innerJoin(competitionSeries, eq(competitionSeries.id, competitionEditions.seriesId))
+            .where(and(...conditions))
+            .orderBy(desc(competitionEditions.createdAt), desc(competitionEditions.id))
+            .limit(options.limit);
         return rows.map((row) => ({ ...row.edition, seriesName: row.seriesName }));
     }
 
@@ -226,6 +356,54 @@ export class CompetitionRepository {
             .from(teams)
             .where(and(eq(teams.organizationId, organizationId), eq(teams.editionId, editionId)));
         return rows[0]?.count ?? 0;
+    }
+
+    async countRegistrationsByEdition(
+        db: DatabaseExecutor,
+        organizationId: string,
+        editionIds: readonly string[],
+    ): Promise<Map<string, number>> {
+        if (editionIds.length === 0) {
+            return new Map();
+        }
+        const rows = await db
+            .select({
+                editionId: registrations.editionId,
+                count: sql<number>`count(*)::int`,
+            })
+            .from(registrations)
+            .where(
+                and(
+                    eq(registrations.organizationId, organizationId),
+                    inArray(registrations.editionId, [...editionIds]),
+                ),
+            )
+            .groupBy(registrations.editionId);
+        return new Map(rows.map((row) => [row.editionId, row.count]));
+    }
+
+    async countTeamsByEdition(
+        db: DatabaseExecutor,
+        organizationId: string,
+        editionIds: readonly string[],
+    ): Promise<Map<string, number>> {
+        if (editionIds.length === 0) {
+            return new Map();
+        }
+        const rows = await db
+            .select({
+                editionId: teams.editionId,
+                count: sql<number>`count(*)::int`,
+            })
+            .from(teams)
+            .where(
+                and(
+                    eq(teams.organizationId, organizationId),
+                    inArray(teams.editionId, [...editionIds]),
+                ),
+            )
+            .groupBy(teams.editionId);
+        return new Map(rows.map((row) => [row.editionId, row.count]));
     }
 
     async countSubmissions(
@@ -286,6 +464,114 @@ export class CompetitionRepository {
         return rows[0] ?? null;
     }
 
+    async findDivisionForEdition(
+        db: DatabaseExecutor,
+        organizationId: string,
+        editionId: string,
+        divisionId: string,
+    ): Promise<DivisionRow | null> {
+        const rows = await db
+            .select()
+            .from(divisions)
+            .where(
+                and(
+                    eq(divisions.organizationId, organizationId),
+                    eq(divisions.editionId, editionId),
+                    eq(divisions.id, divisionId),
+                ),
+            )
+            .limit(1);
+        return rows[0] ?? null;
+    }
+
+    async lockDivisionForEdition(
+        session: DatabaseSession,
+        organizationId: string,
+        editionId: string,
+        divisionId: string,
+    ): Promise<DivisionRow | null> {
+        const rows = await session.db
+            .select()
+            .from(divisions)
+            .where(
+                and(
+                    eq(divisions.organizationId, organizationId),
+                    eq(divisions.editionId, editionId),
+                    eq(divisions.id, divisionId),
+                ),
+            )
+            .for("update")
+            .limit(1);
+        return rows[0] ?? null;
+    }
+
+    async updateDivision(
+        session: DatabaseSession,
+        organizationId: string,
+        editionId: string,
+        divisionId: string,
+        values: DivisionUpdateValues,
+    ): Promise<DivisionRow | null> {
+        const rows = await session.db
+            .update(divisions)
+            .set(values)
+            .where(
+                and(
+                    eq(divisions.organizationId, organizationId),
+                    eq(divisions.editionId, editionId),
+                    eq(divisions.id, divisionId),
+                ),
+            )
+            .returning();
+        return rows[0] ?? null;
+    }
+
+    async deleteDivision(
+        session: DatabaseSession,
+        organizationId: string,
+        editionId: string,
+        divisionId: string,
+    ): Promise<void> {
+        await session.db
+            .delete(divisions)
+            .where(
+                and(
+                    eq(divisions.organizationId, organizationId),
+                    eq(divisions.editionId, editionId),
+                    eq(divisions.id, divisionId),
+                ),
+            );
+    }
+
+    async countDivisionRegistrations(
+        db: DatabaseExecutor,
+        organizationId: string,
+        divisionId: string,
+    ): Promise<number> {
+        const rows = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(registrations)
+            .where(
+                and(
+                    eq(registrations.organizationId, organizationId),
+                    eq(registrations.divisionId, divisionId),
+                ),
+            );
+        return rows[0]?.count ?? 0;
+    }
+
+    async countDivisionTeams(
+        db: DatabaseExecutor,
+        organizationId: string,
+        divisionId: string,
+    ): Promise<number> {
+        const rows = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(teams)
+            .where(and(eq(teams.organizationId, organizationId), eq(teams.divisionId, divisionId)));
+        return rows[0]?.count ?? 0;
+    }
+
     async insertMilestone(
         session: DatabaseSession,
         values: NewMilestoneValues,
@@ -312,6 +598,64 @@ export class CompetitionRepository {
                 ),
             )
             .orderBy(asc(milestones.occursAt), asc(milestones.id));
+    }
+
+    async findMilestone(
+        db: DatabaseExecutor,
+        organizationId: string,
+        editionId: string,
+        milestoneId: string,
+    ): Promise<MilestoneRow | null> {
+        const rows = await db
+            .select()
+            .from(milestones)
+            .where(
+                and(
+                    eq(milestones.organizationId, organizationId),
+                    eq(milestones.editionId, editionId),
+                    eq(milestones.id, milestoneId),
+                ),
+            )
+            .limit(1);
+        return rows[0] ?? null;
+    }
+
+    async updateMilestone(
+        session: DatabaseSession,
+        organizationId: string,
+        editionId: string,
+        milestoneId: string,
+        values: MilestoneUpdateValues,
+    ): Promise<MilestoneRow | null> {
+        const rows = await session.db
+            .update(milestones)
+            .set(values)
+            .where(
+                and(
+                    eq(milestones.organizationId, organizationId),
+                    eq(milestones.editionId, editionId),
+                    eq(milestones.id, milestoneId),
+                ),
+            )
+            .returning();
+        return rows[0] ?? null;
+    }
+
+    async deleteMilestone(
+        session: DatabaseSession,
+        organizationId: string,
+        editionId: string,
+        milestoneId: string,
+    ): Promise<void> {
+        await session.db
+            .delete(milestones)
+            .where(
+                and(
+                    eq(milestones.organizationId, organizationId),
+                    eq(milestones.editionId, editionId),
+                    eq(milestones.id, milestoneId),
+                ),
+            );
     }
 
     async findVisibleEditionById(

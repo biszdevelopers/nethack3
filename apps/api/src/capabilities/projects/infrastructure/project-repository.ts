@@ -3,7 +3,6 @@ import type { ProjectStatus } from "@nethack/contracts";
 import type { DatabaseExecutor, DatabaseSession } from "../../../infrastructure/database/client.js";
 import {
     competitionEditions,
-    organizationSettings,
     organizations,
     projectMembers,
     projects,
@@ -33,6 +32,7 @@ export interface ProjectMemberView {
 
 export interface PublicProjectRow {
     readonly id: string;
+    readonly organizationId: string;
     readonly title: string;
     readonly slug: string;
     readonly summary: string;
@@ -317,7 +317,6 @@ export class ProjectRepository {
         const conditions: SQL[] = [
             eq(projects.status, "published"),
             isNotNull(projects.publishedAt),
-            eq(organizationSettings.publicShowcaseEnabled, true),
             inArray(competitionEditions.status, [...PUBLIC_EDITION_STATUSES]),
         ];
         if (options.competitionSlug !== null) {
@@ -337,6 +336,7 @@ export class ProjectRepository {
         return db
             .select({
                 id: projects.id,
+                organizationId: projects.organizationId,
                 title: projects.title,
                 slug: projects.slug,
                 summary: projects.summary,
@@ -360,10 +360,6 @@ export class ProjectRepository {
                 ),
             )
             .innerJoin(organizations, eq(organizations.id, projects.organizationId))
-            .innerJoin(
-                organizationSettings,
-                eq(organizationSettings.organizationId, projects.organizationId),
-            )
             .leftJoin(
                 teams,
                 and(
@@ -380,6 +376,7 @@ export class ProjectRepository {
         const rows = await db
             .select({
                 id: projects.id,
+                organizationId: projects.organizationId,
                 title: projects.title,
                 slug: projects.slug,
                 summary: projects.summary,
@@ -403,10 +400,6 @@ export class ProjectRepository {
                 ),
             )
             .innerJoin(organizations, eq(organizations.id, projects.organizationId))
-            .innerJoin(
-                organizationSettings,
-                eq(organizationSettings.organizationId, projects.organizationId),
-            )
             .leftJoin(
                 teams,
                 and(
@@ -419,7 +412,6 @@ export class ProjectRepository {
                     eq(projects.slug, slug),
                     eq(projects.status, "published"),
                     isNotNull(projects.publishedAt),
-                    eq(organizationSettings.publicShowcaseEnabled, true),
                     inArray(competitionEditions.status, [...PUBLIC_EDITION_STATUSES]),
                 ),
             )

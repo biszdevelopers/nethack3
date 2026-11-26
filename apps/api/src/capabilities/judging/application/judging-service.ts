@@ -23,10 +23,14 @@ import {
 } from "../../../core/errors.js";
 import type { OutboxPublisher } from "../../../core/outbox.js";
 import type { AuditLogger } from "../../../infrastructure/audit/audit-logger.js";
-import type { DatabaseConnection } from "../../../infrastructure/database/client.js";
+import type {
+    DatabaseConnection,
+    DatabaseSession,
+} from "../../../infrastructure/database/client.js";
 import type { CompetitionsContract, EditionSummary } from "../../competitions/contracts.js";
 import type { OrganizationSummary, OrganizationsContract } from "../../organizations/contracts.js";
 import type { SubmissionSummary, SubmissionsContract } from "../../submissions/contracts.js";
+import { nextEvaluationRevision, toEvaluationVersion } from "../domain/evaluation-history.js";
 import { JudgingRules, type ScorableCriterion } from "../domain/judging-rules.js";
 import type { JudgingSummary } from "../contracts.js";
 import type {
@@ -469,6 +473,15 @@ export class JudgingService {
                 if (updatedAssignment === null) {
                     throw new NotFoundError("The judging assignment was not found.");
                 }
+                await this.recordEvaluationVersion(session, {
+                    organizationId,
+                    assignmentId,
+                    judgeUserId: auth.user.id,
+                    evaluation,
+                    status: "draft",
+                    scores: input.scores,
+                    submittedAt: null,
+                });
                 return toEvaluation(evaluation, input.scores);
             },
         );
@@ -556,6 +569,15 @@ export class JudgingService {
                 if (updatedAssignment === null) {
                     throw new NotFoundError("The judging assignment was not found.");
                 }
+                await this.recordEvaluationVersion(session, {
+                    organizationId,
+                    assignmentId,
+                    judgeUserId: auth.user.id,
+                    evaluation,
+                    status: "submitted",
+                    scores: loaded.scores,
+                    submittedAt: now,
+                });
                 await this.audit.record(session, {
                     organizationId,
                     actorUserId: auth.user.id,
@@ -606,6 +628,11 @@ export class JudgingService {
                 organizationId,
                 assignmentId,
             ),
+            versions: await this.repository.listEvaluationVersions(
+                session.db,
+                organizationId,
+                assignmentId,
+            ),
         }));
         if (loaded.view === null) {
             throw new NotFoundError("The judging assignment was not found.");
@@ -616,6 +643,7 @@ export class JudgingService {
                 loaded.evaluation === null
                     ? null
                     : toEvaluation(loaded.evaluation.evaluation, loaded.evaluation.scores),
+            versions: loaded.versions.map(toEvaluationVersion),
         };
     }
 
@@ -708,6 +736,45 @@ export class JudgingService {
                 assignmentId,
             );
             return loaded === null ? null : toEvaluation(loaded.evaluation, loaded.scores);
+        });
+    }
+
+    private async recordEvaluationVersion(
+        session: DatabaseSession,
+        input: {
+            readonly organizationId: string;
+            readonly assignmentId: string;
+            readonly judgeUserId: string;
+            readonly evaluation: EvaluationRow;
+            readonly status: "draft" | "submitted";
+            readonly scores: readonly {
+                readonly criterionId: string;
+                readonly score: number;
+                readonly comment: string;
+            }[];
+            readonly submittedAt: Date | null;
+        },
+    ): Promise<void> {
+        const latestRevision = await this.repository.latestEvaluationRevision(
+            session.db,
+            input.organizationId,
+            input.evaluation.id,
+        );
+        await this.repository.insertEvaluationVersion(session, {
+            organizationId: input.organizationId,
+            evaluationId: input.evaluation.id,
+            assignmentId: input.assignmentId,
+            judgeUserId: input.judgeUserId,
+            revision: nextEvaluationRevision(latestRevision),
+            status: input.status,
+            overallComment: input.evaluation.overallComment,
+            weightedScore: input.evaluation.weightedScore,
+            scores: input.scores.map((score) => ({
+                criterionId: score.criterionId,
+                score: score.score,
+                comment: score.comment,
+            })),
+            submittedAt: input.submittedAt,
         });
     }
 
@@ -838,7 +905,9 @@ function toRubric(row: RubricWithCriteria): JudgingRubric {
         editionId: row.rubric.editionId,
         name: row.rubric.name,
         description: row.rubric.description,
-        criteria: row.criteria.map(toCriterion),
+        criteria: row.criteria
+            .toSorted((left, right) => left.position - right.position)
+            .map(toCriterion),
         createdAt: row.rubric.createdAt.toISOString(),
         updatedAt: row.rubric.updatedAt.toISOString(),
     };

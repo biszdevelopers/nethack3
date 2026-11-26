@@ -13,10 +13,10 @@ import type { DatabaseConnection } from "../../../infrastructure/database/client
 import type { AuditLogger } from "../../../infrastructure/audit/audit-logger.js";
 import type { AnnouncementSummary } from "../contracts.js";
 import { assertHasChanges } from "../domain/announcement-rules.js";
+import { toPublicAnnouncement } from "../domain/public-announcement.js";
 import type {
     AnnouncementRecord,
     AnnouncementRepository,
-    AnnouncementRow,
 } from "../infrastructure/announcement-repository.js";
 import type { OrganizationsContract } from "../../organizations/contracts.js";
 
@@ -217,15 +217,19 @@ export class AnnouncementService {
     }
 
     async listPublic(
-        organizationSlug: string,
+        organizationSlug: string | null,
         options: AnnouncementPageOptions,
     ): Promise<readonly PublicAnnouncement[]> {
-        const organization = await this.organizations.getSummaryBySlug(organizationSlug);
-        if (organization === null) {
-            return [];
+        let organizationId: string | null = null;
+        if (organizationSlug !== null) {
+            const organization = await this.organizations.getSummaryBySlug(organizationSlug);
+            if (organization === null) {
+                return [];
+            }
+            organizationId = organization.id;
         }
-        const rows = await this.repository.listPublic(this.database.db, organization.id, options);
-        return rows.map((row) => toPublicAnnouncement(row, organization));
+        const rows = await this.repository.listPublic(this.database.db, organizationId, options);
+        return rows.map(toPublicAnnouncement);
     }
 
     async listPublished(
@@ -259,23 +263,6 @@ function toAnnouncement(row: AnnouncementRecord & { authorDisplayName: string })
         authorDisplayName: row.authorDisplayName,
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
-    };
-}
-
-function toPublicAnnouncement(
-    row: AnnouncementRow,
-    organization: { readonly name: string; readonly slug: string },
-): PublicAnnouncement {
-    if (row.publishedAt === null) {
-        throw new Error("A public announcement must have a publication timestamp.");
-    }
-    return {
-        id: row.id,
-        title: row.title,
-        bodyMarkdown: row.bodyMarkdown,
-        publishedAt: row.publishedAt.toISOString(),
-        organizationName: organization.name,
-        organizationSlug: organization.slug,
     };
 }
 

@@ -103,12 +103,15 @@ export const saveEvaluationRequestSchema = z
     .strict();
 export type SaveEvaluationRequest = z.infer<typeof saveEvaluationRequestSchema>;
 
+export const evaluationStatusSchema = z.enum(["draft", "submitted"]);
+export type EvaluationStatus = z.infer<typeof evaluationStatusSchema>;
+
 export const evaluationSchema = z.object({
     id: idSchema,
     organizationId: idSchema,
     assignmentId: idSchema,
     judgeUserId: idSchema,
-    status: z.enum(["draft", "submitted"]),
+    status: evaluationStatusSchema,
     overallComment: z.string(),
     scores: z.array(evaluationScoreSchema),
     weightedScore: z.number().nullable(),
@@ -116,6 +119,17 @@ export const evaluationSchema = z.object({
     updatedAt: isoDateTimeSchema,
 });
 export type Evaluation = z.infer<typeof evaluationSchema>;
+
+export const evaluationVersionSchema = z.object({
+    revision: z.number().int().min(1),
+    status: evaluationStatusSchema,
+    overallComment: z.string(),
+    weightedScore: z.number().nullable(),
+    scores: z.array(evaluationScoreSchema),
+    submittedAt: isoDateTimeSchema.nullable(),
+    createdAt: isoDateTimeSchema,
+});
+export type EvaluationVersion = z.infer<typeof evaluationVersionSchema>;
 
 export const assignmentSubmissionSummarySchema = z.object({
     id: idSchema,
@@ -135,5 +149,6 @@ export type AssignmentDetail = z.infer<typeof assignmentDetailSchema>;
 
 export const assignmentHistorySchema = z.object({
     evaluation: evaluationSchema.nullable(),
+    versions: z.array(evaluationVersionSchema),
 });
 export type AssignmentHistory = z.infer<typeof assignmentHistorySchema>;

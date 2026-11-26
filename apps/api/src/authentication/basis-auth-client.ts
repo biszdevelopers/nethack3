@@ -110,6 +110,12 @@ export class BasisAuthClient {
                 this.config.clientId,
                 undefined,
                 ClientSecretBasic(this.config.clientSecret),
+                {
+                    timeout: 10,
+                    ...(this.config.allowInsecureHttp
+                        ? { execute: [allowInsecureRequests] }
+                        : {}),
+                },
             );
             if (this.config.allowInsecureHttp) {
                 allowInsecureRequests(configuration);

@@ -101,3 +101,36 @@ export class InternalError extends AppError {
 export function isAppError(error: unknown): error is AppError {
     return error instanceof AppError;
 }
+
+export interface DatabaseErrorDetails {
+    readonly code: string | null;
+    readonly constraint: string | null;
+}
+
+/**
+ * Drizzle wraps driver errors in DrizzleQueryError, so PostgreSQL codes live on
+ * the cause chain rather than the thrown object itself.
+ */
+export function databaseErrorDetails(error: unknown): DatabaseErrorDetails {
+    let current: unknown = error;
+    for (let depth = 0; depth < 4; depth += 1) {
+        if (typeof current !== "object" || current === null) {
+            break;
+        }
+        const code =
+            "code" in current && typeof current.code === "string" ? current.code : null;
+        const constraint =
+            "constraint" in current && typeof current.constraint === "string"
+                ? current.constraint
+                : null;
+        if (code !== null) {
+            return { code, constraint };
+        }
+        current = "cause" in current ? current.cause : undefined;
+    }
+    return { code: null, constraint: null };
+}
+
+export function isUniqueViolationError(error: unknown): boolean {
+    return databaseErrorDetails(error).code === "23505";
+}

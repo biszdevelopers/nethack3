@@ -31,7 +31,15 @@ Owns project file uploads, inspection, storage, listing, authorized downloads, d
 
 ## Contract
 
-`getFile(organizationId, fileId)` reads within the organization transaction. `attachToSubmission(...)` only attaches an approved file owned by the same organization; composite foreign keys enforce that the submission and version also belong to the organization.
+`getFile(organizationId, fileId)` reads within the organization transaction. `listProjectFiles(organizationId, projectId)` returns approved project-level rows only (`submission_id` and `version_id` are null), ordered by `created_at` descending; version snapshots never appear there.
+
+`attachToSubmission(...)` creates a new approved snapshot row for the given submission and version, copying the project-level file's metadata and sharing its storage object. The original project-level row stays unchanged so earlier versions keep their file lists. A snapshot for the same `(submission_id, version_id, storage_key)` is not inserted twice.
+
+Composite foreign keys enforce that the submission and version also belong to the organization. Snapshot rows carry `project_id`, so download authorization (project membership/organizer, or public when the project is published) works unchanged for version files.
+
+Deleting a row only removes the storage object when no other non-deleted row references the same storage key, preserving files shared by snapshots.
+
+Schema note: snapshot rows intentionally share `storage_key`, but the current schema and migrations define a global unique index `submission_files_storage_key_unique`. That index rejects a second row with the same key, so snapshots cannot be persisted until it is dropped or made partial (for example, unique only where `submission_id IS NULL`). This capability does not own schema or migrations.
 
 ## Download security
 

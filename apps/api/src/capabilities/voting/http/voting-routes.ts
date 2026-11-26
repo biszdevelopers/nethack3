@@ -5,6 +5,7 @@ import {
     createVotingRoundRequestSchema,
     listResponseSchema,
     voteResultSchema,
+    votableSubmissionSchema,
     votingRoundSchema,
 } from "@nethack/contracts";
 import type { CapabilityContext } from "../../../core/capability.js";
@@ -34,6 +35,26 @@ export async function registerVotingRoutes(
             const auth = await guard.require(request);
             const access = await guard.requireOrganization(request, auth);
             const items = await service.listRounds(access.organizationId, request.params.editionId);
+            return { items: [...items], nextCursor: null };
+        },
+    );
+
+    app.get(
+        "/api/v1/competitions/:editionId/votable-submissions",
+        {
+            schema: {
+                params: editionParams,
+                response: { 200: listResponseSchema(votableSubmissionSchema) },
+            },
+        },
+        async (request) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            const items = await service.votableSubmissions(
+                access.organizationId,
+                access.role,
+                request.params.editionId,
+            );
             return { items: [...items], nextCursor: null };
         },
     );

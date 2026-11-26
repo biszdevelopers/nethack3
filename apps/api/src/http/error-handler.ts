@@ -43,11 +43,10 @@ export function createErrorHandler(logger: Logger) {
         if (hasZodFastifySchemaValidationErrors(error)) {
             const details: Record<string, string[]> = {};
             for (const issue of error.validation) {
-                const zodIssue = issue.params.issue as { path: (string | number)[]; message: string };
-                const path = zodIssue.path.join(".");
+                const path = (issue.instancePath ?? "").replace(/^\//, "").replaceAll("/", ".");
                 const key = path.length > 0 ? path : "request";
                 const list = details[key] ?? [];
-                list.push(zodIssue.message);
+                list.push(issue.message ?? "Invalid value");
                 details[key] = list;
             }
             body.error = {

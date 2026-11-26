@@ -10,7 +10,7 @@ Owns `announcements`. Dependencies: `organizations` (uses the public `organizati
 | POST   | `/api/v1/organizations/:organizationId/announcements` | Owner or organizer              |
 | POST   | `/api/v1/announcements/:announcementId/publish`       | Owner or organizer (org header) |
 | PATCH  | `/api/v1/announcements/:announcementId`               | Owner or organizer (org header) |
-| GET    | `/api/v1/public/announcements?organization=<slug>`    | Anonymous                       |
+| GET    | `/api/v1/public/announcements[?organization=<slug>]`  | Anonymous                       |
 
 Drafts (`published_at is null`) are listed only for owners and organizers. Requests without an organization in the path use the `x-nethack-organization-id` header, matching the core guard.
 
@@ -24,7 +24,7 @@ Drafts (`published_at is null`) are listed only for owners and organizers. Reque
 - DELETE is not implemented because announcements have no deleted state.
 - Every mutation writes an audit record (`announcement.created`, `announcement.updated`, `announcement.published`).
 - Published announcements emit `announcements.announcement.published` with `{ announcementId, title, organizationId, organizationName, visibility }`.
-- Public listing returns only `visibility = public` rows with a non-null `publishedAt`; tenant row-level security enforces the same predicate.
+- Public listing returns only `visibility = public` rows with a non-null `publishedAt`; tenant row-level security enforces the same predicate. Without `organization`, the listing spans every organization, newest first, using the same bounded cursor pagination; `organizationName` and `organizationSlug` come from a read-only organizations join.
 - Public responses use `Cache-Control: public` with a short max-age. All authenticated responses rely on the server default `private, no-store`.
 
 ## Contract

@@ -107,3 +107,10 @@ export class ProjectRules {
         return `${base}-${randomBytes(4).toString("hex").slice(0, 6)}`;
     }
 }
+
+export function filterShowcasedProjects<T extends { readonly organizationId: string }>(
+    rows: readonly T[],
+    showcaseEnabled: ReadonlyMap<string, boolean>,
+): readonly T[] {
+    return rows.filter((row) => showcaseEnabled.get(row.organizationId) === true);
+}

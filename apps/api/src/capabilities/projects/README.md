@@ -20,7 +20,7 @@ Owns project metadata, project membership, publication state, and the public pro
 | PATCH | `/api/v1/projects/:projectId` | Project owner, project member with role `owner`, or organization owner/organizer. |
 | POST | `/api/v1/projects/:projectId/publish` | Project owner or organizer. Edition must not be `draft`, `registration_open`, or `archived`. Emits `projects.project.published`. |
 | GET/POST | `/api/v1/projects/:projectId/members` | List members or add an approved participant / team member by email. |
-| GET | `/api/v1/public/projects` | No auth. RLS public predicates plus explicit published/showcase filters. |
+| GET | `/api/v1/public/projects` | No auth. Published projects in publicly visible editions; organizations with `publicShowcaseEnabled = false` are filtered out via the organizations contract (per-request organization cache). |
 | GET | `/api/v1/public/projects/:slug` | No auth. Slug is unique per organization, so a cross-organization collision resolves to the most recently published project. |
 
 ## Data ownership
@@ -31,5 +31,6 @@ Project detail deliberately does not query `submissions` or `submission_versions
 
 - Every authenticated read and write runs inside a transaction that sets the organization context, so RLS applies in addition to API authorization.
 - Public reads use `database.db` without tenant context, which leaves only the RLS public predicates active.
+- Public showcase visibility is enforced in the API: published projects are filtered through `organizations.v1.isPublicShowcaseEnabled`, cached per distinct organization for the request. `organization_settings` is tenant-scoped and is never read by this capability.
 - Project slugs are `slugified-title-xxxxxx`; the database unique constraint on `(organization_id, slug)` is the final authority.
 - All mutations are audited with `audit_logs` rows inside the same transaction.

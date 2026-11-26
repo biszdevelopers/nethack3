@@ -34,13 +34,30 @@ export const organizationsCapability: CapabilityDefinition = {
                           websiteUrl: organization.websiteUrl,
                       };
             },
+            async getSummaryBySlug(slug) {
+                const organization = await repository.findBySlug(context.database.db, slug);
+                return organization === null
+                    ? null
+                    : {
+                          id: organization.id,
+                          name: organization.name,
+                          slug: organization.slug,
+                          description: organization.description,
+                          websiteUrl: organization.websiteUrl,
+                      };
+            },
             async isPublicShowcaseEnabled(organizationId) {
                 try {
-                    const settings = await repository.settings(
-                        context.database.db,
-                        organizationId,
+                    return await context.database.transaction(
+                        { organizationId },
+                        async (session) => {
+                            const settings = await repository.settings(
+                                session.db,
+                                organizationId,
+                            );
+                            return settings.publicShowcaseEnabled;
+                        },
                     );
-                    return settings.publicShowcaseEnabled;
                 } catch {
                     return false;
                 }

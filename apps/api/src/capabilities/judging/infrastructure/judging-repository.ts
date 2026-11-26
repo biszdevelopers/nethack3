@@ -4,6 +4,7 @@ import type { DatabaseExecutor, DatabaseSession } from "../../../infrastructure/
 import {
     evaluations,
     evaluationScores,
+    evaluationVersions,
     judgeAssignments,
     judgingCriteria,
     judgingRubrics,
@@ -11,11 +12,14 @@ import {
     users,
 } from "../../../infrastructure/database/schema/index.js";
 
+const EVALUATION_HISTORY_LIMIT = 50;
+
 export type RubricRow = typeof judgingRubrics.$inferSelect;
 export type CriterionRow = typeof judgingCriteria.$inferSelect;
 export type AssignmentRow = typeof judgeAssignments.$inferSelect;
 export type EvaluationRow = typeof evaluations.$inferSelect;
 export type EvaluationScoreRow = typeof evaluationScores.$inferSelect;
+export type EvaluationVersionRow = typeof evaluationVersions.$inferSelect;
 
 export interface RubricWithCriteria {
     readonly rubric: RubricRow;
@@ -96,6 +100,19 @@ export interface NewScoreValues {
     readonly criterionId: string;
     readonly score: number;
     readonly comment: string;
+}
+
+export interface NewEvaluationVersionValues {
+    readonly organizationId: string;
+    readonly evaluationId: string;
+    readonly assignmentId: string;
+    readonly judgeUserId: string;
+    readonly revision: number;
+    readonly status: EvaluationVersionRow["status"];
+    readonly overallComment: string;
+    readonly weightedScore: string | null;
+    readonly scores: EvaluationVersionRow["scores"];
+    readonly submittedAt: Date | null;
 }
 
 export class JudgingRepository {
@@ -476,6 +493,56 @@ export class JudgingRepository {
             return;
         }
         await session.db.insert(evaluationScores).values([...values]);
+    }
+
+    async latestEvaluationRevision(
+        db: DatabaseExecutor,
+        organizationId: string,
+        evaluationId: string,
+    ): Promise<number | null> {
+        const rows = await db
+            .select({ revision: sql<number | null>`max(${evaluationVersions.revision})` })
+            .from(evaluationVersions)
+            .where(
+                and(
+                    eq(evaluationVersions.organizationId, organizationId),
+                    eq(evaluationVersions.evaluationId, evaluationId),
+                ),
+            );
+        const revision = rows[0]?.revision;
+        return revision === undefined || revision === null ? null : Number(revision);
+    }
+
+    async insertEvaluationVersion(
+        session: DatabaseSession,
+        values: NewEvaluationVersionValues,
+    ): Promise<EvaluationVersionRow> {
+        const [row] = await session.db
+            .insert(evaluationVersions)
+            .values({ ...values, scores: [...values.scores] })
+            .returning();
+        if (row === undefined) {
+            throw new Error("The evaluation version could not be created.");
+        }
+        return row;
+    }
+
+    async listEvaluationVersions(
+        db: DatabaseExecutor,
+        organizationId: string,
+        assignmentId: string,
+    ): Promise<readonly EvaluationVersionRow[]> {
+        return db
+            .select()
+            .from(evaluationVersions)
+            .where(
+                and(
+                    eq(evaluationVersions.organizationId, organizationId),
+                    eq(evaluationVersions.assignmentId, assignmentId),
+                ),
+            )
+            .orderBy(desc(evaluationVersions.revision))
+            .limit(EVALUATION_HISTORY_LIMIT);
     }
 
     async countSubmittedEvaluations(

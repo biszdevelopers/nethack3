@@ -8,6 +8,7 @@ Owns voting rounds, ballots, and votes. Organizers create rounds for a competiti
 - `competitions` (`competitions.v1`) to confirm the edition belongs to the organization.
 - `participants` (`participants.v1`) to require an approved registration for the participant role.
 - `submissions` (`submissions.v1`) for submission titles, edition membership, and votable status.
+- `teams` (`teams.v1`) for team names on the votable-submission discovery list.
 - Core services: database transactions, clock, audit log, transactional outbox.
 
 ## Public contracts
@@ -30,6 +31,7 @@ All routes require authentication. `x-nethack-organization-id` establishes the o
 | Method | Route | Permission |
 | --- | --- | --- |
 | GET | `/api/v1/competitions/:editionId/voting-rounds` | Active organization member |
+| GET | `/api/v1/competitions/:editionId/votable-submissions` | Owner or organizer; judge/participant when a round of the edition lists their role |
 | POST | `/api/v1/competitions/:editionId/voting-rounds` | Owner or organizer; creates a `draft` round |
 | POST | `/api/v1/voting-rounds/:roundId/open` | Owner or organizer; `draft -> open` |
 | POST | `/api/v1/voting-rounds/:roundId/close` | Owner or organizer; `open -> closed` |
@@ -47,7 +49,8 @@ All routes require authentication. `x-nethack-organization-id` establishes the o
 - Eligibility: the caller's active organization role must be listed in `eligibleRoles`. `owner` counts as `organizer`. A caller whose effective role is `participant` must also have an approved registration for the edition; `judge` and `organizer` need no registration.
 - Selection rules: unique submission IDs, between 1 and `maxSelections`, all belonging to the round's edition, and in a votable status (`submitted`, `under_review`, `changes_requested`, `accepted`). `draft`, `rejected`, `disqualified`, and `withdrawn` are rejected.
 - Casting locks the round row with `SELECT ... FOR UPDATE`, re-checks the window, inserts the ballot and its votes in one transaction, and relies on the `(round, user)` and `(round, user, submission)` unique constraints as the final defense. A second ballot is a `409 conflict`.
-- Results count votes with one grouped query per round, ordered by votes descending then project title ascending, limited to 200 entries. `totalBallots` is the real ballot count; `publishedAt` is null until the round is published. Team names are not resolved (no teams dependency), so `teamName` is null.
+- Results count votes with one grouped query per round, ordered by votes descending then project title ascending, limited to 200 entries. `totalBallots` is the real ballot count; `publishedAt` is null until the round is published. Team names are not resolved on results, so `teamName` is null.
+- Votable-submission discovery returns only submissions in the ballot's votable set, mapped to `{ id, projectTitle, summary, teamId, teamName }`. Team names are resolved through `teams.v1` once per distinct team in the filtered result set; a missing team yields a null name. The endpoint is authenticated and relies on the server default `Cache-Control: private, no-store`.
 
 ## Audit and events
 
@@ -57,7 +60,7 @@ Published events: `voting.round.opened`, `voting.round.closed`, `voting.round.pu
 
 ## Tests
 
-`tests/voting-rules.test.ts` covers every allowed and forbidden transition, schedule and window validation, selection rules, eligibility (including owner-as-organizer and participant approval), result visibility, and votable submission statuses. The tests are pure and do not require a database.
+`tests/voting-rules.test.ts` covers every allowed and forbidden transition, schedule and window validation, selection rules, eligibility (including owner-as-organizer and participant approval), result visibility, and votable submission statuses. `tests/votable-submissions.test.ts` covers discovery filtering, field mapping, and team-name resolution. The tests are pure and do not require a database.
 
 ## Extraction
 

@@ -67,4 +67,28 @@ export class CompetitionRules {
             });
         }
     }
+
+    static assertDivisionTeamSizes(min: number | null, max: number | null): void {
+        if (min !== null && max !== null && min > max) {
+            throw new ValidationError("Minimum team size cannot exceed maximum team size.", {
+                minTeamSize: ["Minimum team size cannot exceed maximum team size."],
+            });
+        }
+    }
+
+    static assertSeriesIsDeletable(editionCount: number): void {
+        if (editionCount > 0) {
+            throw new ConflictError(
+                "The competition series still has editions. Delete them before deleting the series.",
+            );
+        }
+    }
+
+    static assertDivisionIsDeletable(registrationCount: number, teamCount: number): void {
+        if (registrationCount > 0 || teamCount > 0) {
+            throw new ConflictError(
+                "The division is referenced by registrations or teams and cannot be deleted.",
+            );
+        }
+    }
 }

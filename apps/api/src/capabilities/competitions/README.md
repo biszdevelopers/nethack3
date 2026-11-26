@@ -15,6 +15,7 @@ Owns competition series, competition editions, divisions, and the edition schedu
 | --- | --- |
 | `getEdition(organizationId, editionId)` | Edition summary including its series name. Runs in a transaction scoped to `organizationId` so row-level security exposes drafts. |
 | `getDivision(organizationId, divisionId)` | Division summary. Runs in an organization-scoped transaction. |
+| `listEditions(organizationId)` | All editions for an organization, newest first, including their series name. Runs in an organization-scoped transaction. |
 | `isPublicEdition(editionId)` | True when the edition is visible through the public RLS predicate. Called without tenant context. |
 
 ## Tables
@@ -31,14 +32,22 @@ All routes require authentication unless listed as public. `x-nethack-organizati
 | --- | --- | --- |
 | GET | `/api/v1/organizations/:organizationId/competitions` | Active organization member |
 | POST | `/api/v1/organizations/:organizationId/competitions` | Owner or organizer |
+| PATCH | `/api/v1/organizations/:organizationId/competitions/:seriesId` | Owner or organizer |
+| DELETE | `/api/v1/organizations/:organizationId/competitions/:seriesId` | Owner or organizer |
+| GET | `/api/v1/organizations/:organizationId/editions` | Owner or organizer |
+| GET | `/api/v1/organizations/:organizationId/competitions/:seriesId/editions` | Owner or organizer |
 | POST | `/api/v1/organizations/:organizationId/competitions/:seriesId/editions` | Owner or organizer |
 | GET | `/api/v1/competitions/:editionId` | Active organization member |
 | PATCH | `/api/v1/competitions/:editionId` | Owner or organizer |
 | POST | `/api/v1/competitions/:editionId/publish` | Owner or organizer |
 | GET | `/api/v1/competitions/:editionId/divisions` | Active organization member |
 | POST | `/api/v1/competitions/:editionId/divisions` | Owner or organizer |
+| PATCH | `/api/v1/competitions/:editionId/divisions/:divisionId` | Owner or organizer |
+| DELETE | `/api/v1/competitions/:editionId/divisions/:divisionId` | Owner or organizer |
 | GET | `/api/v1/competitions/:editionId/milestones` | Active organization member |
 | POST | `/api/v1/competitions/:editionId/milestones` | Owner or organizer |
+| PATCH | `/api/v1/competitions/:editionId/milestones/:milestoneId` | Owner or organizer |
+| DELETE | `/api/v1/competitions/:editionId/milestones/:milestoneId` | Owner or organizer |
 | GET | `/api/v1/public/competitions` | Public, cacheable |
 | GET | `/api/v1/public/competitions/:slug` | Public, cacheable |
 | GET | `/api/v1/public/organizations/:slug` | Public, cacheable |
@@ -47,7 +56,10 @@ All routes require authentication unless listed as public. `x-nethack-organizati
 
 - Edition status transitions are allowlisted: `draft -> published`, `published -> registration_open | archived`, `registration_open -> registration_closed | archived`, `registration_closed -> active | archived`, `active -> judging | completed | archived`, `judging -> voting | completed | archived`, `voting -> completed | archived`, `completed -> archived`. Anything else is a conflict.
 - `POST /publish` and a status change to `published` are allowed from `draft` only. Publishing sets `publishedAt` and emits `competitions.edition.published`.
-- Team size bounds (`teamMinSize <= teamMaxSize`) and date ordering are validated on create and on update using the merged edition state.
+- Team size bounds (`teamMinSize <= teamMaxSize`) and date ordering are validated on create and on update using the merged edition state. Division bounds use the same rule.
+- Edition lists are organizer views of every status, newest first, with cursor/limit pagination and an optional `seriesId` filter. `GET /organizations/:organizationId/competitions/:seriesId/editions` is the series-scoped equivalent.
+- Series slug is immutable. Series updates accept name and description only.
+- A series can be deleted only when it has no editions. A division can be deleted only when no registrations or teams reference it. Milestones can be deleted freely. Refused deletes return `409 conflict`.
 - Series and edition slugs are unique per organization; divisions are unique per edition. PostgreSQL `23505` violations become `409 conflict`.
 - Edition detail counts are real row counts. Missing rows produce `0`.
 - Divisions are ordered by name, milestones by occurrence time.
@@ -59,17 +71,23 @@ All routes require authentication unless listed as public. `x-nethack-organizati
 Audited organizer mutations:
 
 - `competition.series.created`
+- `competition.series.updated`
+- `competition.series.deleted`
 - `competition.edition.created`
 - `competition.edition.updated`
 - `competition.edition.published`
 - `competition.division.created`
+- `competition.division.updated`
+- `competition.division.deleted`
 - `competition.milestone.created`
+- `competition.milestone.updated`
+- `competition.milestone.deleted`
 
 Published event: `competitions.edition.published` with `{ editionId, organizationId, actorUserId, name, slug, publishedAt }`.
 
 ## Tests
 
-`tests/competition-rules.test.ts` covers every allowed and forbidden status transition, publish eligibility, team-size bounds, and date ordering. The tests are pure and do not require a database.
+`tests/competition-rules.test.ts` covers every allowed and forbidden status transition, publish eligibility, team-size bounds, date ordering, division bounds, and the series/division deletion guards. The tests are pure and do not require a database.
 
 ## Extraction
 

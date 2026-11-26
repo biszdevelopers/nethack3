@@ -61,14 +61,14 @@ export const submissionSchema = z.object({
     status: submissionStatusSchema,
     currentVersion: z.number().int().min(0),
     submittedAt: isoDateTimeSchema.nullable(),
+    projectTitle: z.string(),
+    teamName: z.string().nullable(),
     createdAt: isoDateTimeSchema,
     updatedAt: isoDateTimeSchema,
 });
 export type Submission = z.infer<typeof submissionSchema>;
 
 export const submissionDetailSchema = submissionSchema.extend({
-    projectTitle: z.string(),
-    teamName: z.string().nullable(),
     versions: z.array(submissionVersionSchema),
     reviewNote: z.string(),
     reviewNoteUpdatedAt: isoDateTimeSchema.nullable(),
@@ -92,13 +92,17 @@ export const createSubmissionVersionRequestSchema = z
         submit: z.boolean().default(false),
     })
     .strict();
-export type CreateSubmissionVersionRequest = z.infer<
-    typeof createSubmissionVersionRequestSchema
->;
+export type CreateSubmissionVersionRequest = z.infer<typeof createSubmissionVersionRequestSchema>;
 
 export const reviewSubmissionRequestSchema = z
     .object({
-        status: z.enum(["under_review", "changes_requested", "accepted", "rejected", "disqualified"]),
+        status: z.enum([
+            "under_review",
+            "changes_requested",
+            "accepted",
+            "rejected",
+            "disqualified",
+        ]),
         note: z.string().max(4000).default(""),
     })
     .strict();

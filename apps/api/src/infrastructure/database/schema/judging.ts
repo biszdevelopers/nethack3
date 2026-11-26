@@ -2,6 +2,7 @@ import {
     foreignKey,
     index,
     integer,
+    jsonb,
     numeric,
     pgEnum,
     pgTable,
@@ -187,5 +188,52 @@ export const evaluationScores = pgTable(
             columns: [table.criterionId, table.organizationId],
             foreignColumns: [judgingCriteria.id, judgingCriteria.organizationId],
         }).onDelete("restrict"),
+    ],
+);
+
+export type EvaluationVersionStatus = "draft" | "submitted";
+
+export interface EvaluationVersionScore {
+    readonly criterionId: string;
+    readonly score: number;
+    readonly comment: string;
+}
+
+export const evaluationVersions = pgTable(
+    "evaluation_versions",
+    {
+        id: uuid("id").primaryKey().defaultRandom(),
+        organizationId: uuid("organization_id")
+            .notNull()
+            .references(() => organizations.id, { onDelete: "cascade" }),
+        evaluationId: uuid("evaluation_id").notNull(),
+        assignmentId: uuid("assignment_id").notNull(),
+        judgeUserId: uuid("judge_user_id")
+            .notNull()
+            .references(() => users.id, { onDelete: "restrict" }),
+        revision: integer("revision").notNull(),
+        status: text("status").$type<EvaluationVersionStatus>().notNull(),
+        overallComment: text("overall_comment").notNull().default(""),
+        weightedScore: numeric("weighted_score", { precision: 7, scale: 2 }),
+        scores: jsonb("scores").$type<readonly EvaluationVersionScore[]>().notNull(),
+        submittedAt: timestamp("submitted_at", { withTimezone: true }),
+        createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    },
+    (table) => [
+        unique("evaluation_versions_evaluation_revision_unique").on(
+            table.evaluationId,
+            table.revision,
+        ),
+        unique("evaluation_versions_id_org_unique").on(table.id, table.organizationId),
+        index("evaluation_versions_assignment_revision_idx").on(
+            table.organizationId,
+            table.assignmentId,
+            table.revision.desc(),
+        ),
+        foreignKey({
+            name: "evaluation_versions_evaluation_fk",
+            columns: [table.evaluationId, table.organizationId],
+            foreignColumns: [evaluations.id, evaluations.organizationId],
+        }).onDelete("cascade"),
     ],
 );

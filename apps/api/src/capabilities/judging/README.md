@@ -1,6 +1,6 @@
 # Judging capability
 
-Owns judging rubrics, criteria, judge assignments, evaluations, and evaluation scores. It decides who judges which submission, how a rubric produces a weighted score, and when an evaluation is a draft or submitted.
+Owns judging rubrics, criteria, judge assignments, evaluations, evaluation scores, and immutable evaluation version snapshots. It decides who judges which submission, how a rubric produces a weighted score, and when an evaluation is a draft or submitted.
 
 ## Dependencies
 
@@ -21,7 +21,9 @@ Owns judging rubrics, criteria, judge assignments, evaluations, and evaluation s
 
 ## Tables
 
-Owned writes: `judging_rubrics`, `judging_criteria`, `judge_assignments`, `evaluations`, `evaluation_scores`. All access is organization-scoped through row-level security.
+Owned writes: `judging_rubrics`, `judging_criteria`, `judge_assignments`, `evaluations`, `evaluation_scores`, `evaluation_versions`. All access is organization-scoped through row-level security.
+
+`evaluation_versions` stores immutable snapshots of every saved draft and submitted evaluation. Rows are only inserted, never updated or deleted by the capability. `revision` is scoped per evaluation and increments from the previous maximum. Migration `0003_evaluation-history.sql` creates the table, its composite FK to `evaluations(id, organization_id)`, the revision index, RLS, and the `nethack_app` grant.
 
 Read-only joins outside the capability:
 
@@ -64,7 +66,8 @@ The assignment is the scoring authority. An organizer who is not the assigned ju
 - `weightedScore = round2(sum(score / maxScore * weight) / sum(weight) * 100)`.
 - Saving upserts the single evaluation row (`unique(assignment_id)`), replaces all score rows (`unique(evaluation_id, criterion_id)`), and moves the assignment to `in_progress`.
 - Submitting requires a draft evaluation, a complete scorecard, and an open assignment. It sets the evaluation and assignment to `submitted`, records `submittedAt`, and publishes `judging.evaluation.submitted` with `{ assignmentId, submissionId, projectId, judgeUserId, organizationId, editionId, weightedScore }`.
-- Evaluations are single-row per assignment, so `GET /history` returns the current evaluation and nothing else. The audit log remains the immutable history.
+- Every successful draft save and submission inserts an `evaluation_versions` snapshot in the same transaction. The snapshot contains the full scorecard, status, overall comment, weighted score, and submission timestamp. Revision `n` is built from the previous maximum revision plus one; existing snapshots are never mutated.
+- `GET /history` returns `{ evaluation, versions }`: the current single-row evaluation and up to 50 snapshots ordered newest revision first. The evaluation table remains the current state; `evaluation_versions` is the revision history.
 
 ## Audit
 
@@ -76,7 +79,7 @@ The assignment is the scoring authority. An organizer who is not the assigned ju
 
 ## Tests
 
-`tests/judging-rules.test.ts` covers scoring math, weight and maximum-score handling, rounding, missing/duplicate/extra criteria, score bounds, deadline checks, assignment state transitions, and judge eligibility. The tests are pure and do not require a database.
+`tests/judging-rules.test.ts` covers scoring math, weight and maximum-score handling, rounding, missing/duplicate/extra criteria, score bounds, deadline checks, assignment state transitions, and judge eligibility. `tests/evaluation-history.test.ts` covers revision numbering and snapshot mapping. The tests are pure and do not require a database.
 
 ## Extraction
 

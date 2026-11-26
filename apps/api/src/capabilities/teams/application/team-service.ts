@@ -13,7 +13,13 @@ import type {
 import { randomToken, sha256Hex } from "../../../authentication/crypto.js";
 import type { AuthContext } from "../../../authentication/types.js";
 import type { Clock } from "../../../core/clock.js";
-import { ConflictError, ForbiddenError, NotFoundError } from "../../../core/errors.js";
+import {
+    ConflictError,
+    databaseErrorDetails,
+    ForbiddenError,
+    isUniqueViolationError as isUniqueViolation,
+    NotFoundError,
+} from "../../../core/errors.js";
 import { domainEvents } from "../../../core/domain-event.js";
 import type { OutboxPublisher } from "../../../core/outbox.js";
 import type {
@@ -103,7 +109,7 @@ export class TeamService {
         const teamId = randomUUID();
 
         try {
-            return await this.database.transaction(
+            const team = await this.database.transaction(
                 { organizationId, userId: auth.user.id },
                 async (session) => {
                     const locked = await this.repository.lockRegistration(
@@ -126,7 +132,7 @@ export class TeamService {
                     if (existing !== null) {
                         throw new ConflictError("You already belong to a team in this edition.");
                     }
-                    const team = await this.repository.insert(session, {
+                    const inserted = await this.repository.insert(session, {
                         id: teamId,
                         organizationId,
                         editionId: input.editionId,
@@ -142,19 +148,13 @@ export class TeamService {
                         userId: auth.user.id,
                         role: "captain",
                     });
-                    await this.participants.setParticipantTeam(
-                        organizationId,
-                        input.editionId,
-                        auth.user.id,
-                        teamId,
-                    );
                     await this.audit.record(session, {
                         organizationId,
                         actorUserId: auth.user.id,
                         action: "team.created",
                         entityType: "team",
                         entityId: teamId,
-                        metadata: { name: team.name, editionId: edition.id },
+                        metadata: { name: inserted.name, editionId: edition.id },
                         ip,
                     });
                     await this.events.publish(session, {
@@ -164,16 +164,26 @@ export class TeamService {
                         aggregateId: teamId,
                         payload: {
                             teamId,
-                            teamName: team.name,
+                            teamName: inserted.name,
                             organizationId,
                             organizationName: await this.organizationName(organizationId),
                             captainUserId: auth.user.id,
                             captainEmail: auth.user.email,
                         },
                     });
-                    return toTeam(team, 1);
+                    return toTeam(inserted, 1);
                 },
             );
+            // The participant FK takes a key-share lock on the new team row.
+            // Running it after commit avoids a self-deadlock against the team
+            // FOR UPDATE lock owned by the transaction above.
+            await this.participants.setParticipantTeam(
+                organizationId,
+                input.editionId,
+                auth.user.id,
+                teamId,
+            );
+            return team;
         } catch (error) {
             const constraint = uniqueConstraint(error);
             if (constraint === "team_members_team_user_unique") {
@@ -423,7 +433,7 @@ export class TeamService {
 
         const now = this.clock.now();
         try {
-            return await this.database.transaction(
+            const acceptance = await this.database.transaction(
             { organizationId: preview.organizationId, userId: auth.user.id },
             async (session) => {
                 const invitation = await this.repository.lockInvitationByTokenHash(
@@ -478,12 +488,6 @@ export class TeamService {
                     auth.user.id,
                     now,
                 );
-                await this.participants.setParticipantTeam(
-                    invitation.organizationId,
-                    invitation.editionId,
-                    auth.user.id,
-                    invitation.teamId,
-                );
                 await this.audit.record(session, {
                     organizationId: invitation.organizationId,
                     actorUserId: auth.user.id,
@@ -511,10 +515,25 @@ export class TeamService {
                 return {
                     teamId: invitation.teamId,
                     teamName: invitation.teamName,
+                    editionId: invitation.editionId,
+                    organizationId: invitation.organizationId,
                     acceptedAt: now.toISOString(),
                 };
             },
             );
+            // See create(): the participant FK update must run after the team
+            // and invitation locks are released to avoid a self-deadlock.
+            await this.participants.setParticipantTeam(
+                acceptance.organizationId,
+                acceptance.editionId,
+                auth.user.id,
+                acceptance.teamId,
+            );
+            return {
+                teamId: acceptance.teamId,
+                teamName: acceptance.teamName,
+                acceptedAt: acceptance.acceptedAt,
+            };
         } catch (error) {
             if (uniqueConstraint(error) === "team_members_team_user_unique") {
                 throw new ConflictError("You already belong to a team in this edition.");
@@ -843,19 +862,10 @@ function isOrganizer(role: OrganizationRole): boolean {
     return ORGANIZER_ROLES.includes(role);
 }
 
-function isUniqueViolation(error: unknown): boolean {
-    return (
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        (error as { code?: unknown }).code === "23505"
-    );
-}
-
 function uniqueConstraint(error: unknown): string | null {
-    if (!isUniqueViolation(error)) {
+    const details = databaseErrorDetails(error);
+    if (details.code !== "23505") {
         return null;
     }
-    const constraint = (error as { constraint?: unknown }).constraint;
-    return typeof constraint === "string" ? constraint : "";
+    return details.constraint ?? "";
 }

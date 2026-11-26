@@ -15,16 +15,18 @@ import type { OutboxPublisher } from "../../../core/outbox.js";
 import {
     ConflictError,
     ForbiddenError,
+    isUniqueViolationError as isUniqueViolation,
     NotFoundError,
     ValidationError,
 } from "../../../core/errors.js";
 import { domainEvents } from "../../../core/domain-event.js";
 import type { AuditLogger } from "../../../infrastructure/audit/audit-logger.js";
 import type { CompetitionsContract, EditionSummary } from "../../competitions/contracts.js";
+import type { OrganizationsContract } from "../../organizations/contracts.js";
 import type { ParticipantsContract } from "../../participants/contracts.js";
 import type { TeamSummary, TeamsContract } from "../../teams/contracts.js";
 import type { ProjectSummary } from "../contracts.js";
-import { ProjectRules } from "../domain/project-rules.js";
+import { filterShowcasedProjects, ProjectRules } from "../domain/project-rules.js";
 import type {
     ProjectMemberView,
     ProjectRepository,
@@ -34,6 +36,7 @@ import type {
 
 export interface ProjectContracts {
     readonly competitions: CompetitionsContract;
+    readonly organizations: OrganizationsContract;
     readonly participants: ParticipantsContract;
     readonly teams: TeamsContract;
 }
@@ -471,16 +474,32 @@ export class ProjectService {
         cursor: ProjectCursor | null,
         limit: number,
     ): Promise<readonly PublicProjectEntry[]> {
-        const rows = await this.repository.publicList(this.database.db, {
-            competitionSlug,
-            cursor,
-            limit,
-        });
+        const showcaseEnabled = new Map<string, boolean>();
+        const visible: PublicProjectRow[] = [];
+        let pageCursor = cursor;
+        while (visible.length < limit) {
+            const remaining = limit - visible.length;
+            const batch = await this.repository.publicList(this.database.db, {
+                competitionSlug,
+                cursor: pageCursor,
+                limit: remaining,
+            });
+            if (batch.length === 0) {
+                break;
+            }
+            await this.loadShowcaseFlags(batch, showcaseEnabled);
+            visible.push(...filterShowcasedProjects(batch, showcaseEnabled));
+            const last = batch[batch.length - 1];
+            if (last === undefined || batch.length < remaining) {
+                break;
+            }
+            pageCursor = { createdAt: last.createdAt, id: last.id };
+        }
         const members = await this.repository.publicMembers(
             this.database.db,
-            rows.map((row) => row.id),
+            visible.map((row) => row.id),
         );
-        return rows.map((row) => ({
+        return visible.map((row) => ({
             project: toPublicProject(row, members.get(row.id) ?? []),
             createdAt: row.createdAt,
             id: row.id,
@@ -492,8 +511,29 @@ export class ProjectService {
         if (row === null) {
             throw new NotFoundError("The project was not found.");
         }
+        if (!(await this.contracts.organizations.isPublicShowcaseEnabled(row.organizationId))) {
+            throw new NotFoundError("The project was not found.");
+        }
         const members = await this.repository.publicMembers(this.database.db, [row.id]);
         return toPublicProject(row, members.get(row.id) ?? []);
+    }
+
+    private async loadShowcaseFlags(
+        rows: readonly { readonly organizationId: string }[],
+        cache: Map<string, boolean>,
+    ): Promise<void> {
+        const missing = new Set<string>();
+        for (const row of rows) {
+            if (!cache.has(row.organizationId)) {
+                missing.add(row.organizationId);
+            }
+        }
+        for (const organizationId of missing) {
+            cache.set(
+                organizationId,
+                await this.contracts.organizations.isPublicShowcaseEnabled(organizationId),
+            );
+        }
     }
 
     private async load(
@@ -603,11 +643,3 @@ function toPublicProject(row: PublicProjectRow, members: readonly string[]): Pub
     };
 }
 
-function isUniqueViolation(error: unknown): boolean {
-    return (
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        (error as { code?: unknown }).code === "23505"
-    );
-}

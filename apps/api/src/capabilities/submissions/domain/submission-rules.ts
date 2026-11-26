@@ -49,6 +49,20 @@ export class SubmissionRules {
         return role === "owner" || role === "organizer";
     }
 
+    /**
+     * Display title: current version title, then project title, then a neutral
+     * placeholder. Never fabricate content beyond the placeholder.
+     */
+    static displayTitle(versionTitle: string | null, projectTitle: string | null): string {
+        if (versionTitle !== null && versionTitle.trim().length > 0) {
+            return versionTitle;
+        }
+        if (projectTitle !== null && projectTitle.trim().length > 0) {
+            return projectTitle;
+        }
+        return "Untitled project";
+    }
+
     static assertSubmissionWindow(edition: EditionSubmissionWindow, now: Date): void {
         if (edition.status === "completed" || edition.status === "archived") {
             throw new ConflictError(

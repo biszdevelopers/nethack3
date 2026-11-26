@@ -236,7 +236,7 @@ export class FileService {
                         );
                     }
                     if (row.status === "deleted") {
-                        return { row, removed: false };
+                        return { row, removeStorage: false };
                     }
                     const deleted = await this.repository.markDeleted(
                         session,
@@ -247,6 +247,12 @@ export class FileService {
                     if (!deleted) {
                         throw new NotFoundError("The file was not found.");
                     }
+                    const references = await this.repository.countStorageReferences(
+                        session.db,
+                        membership.organizationId,
+                        row.storageKey,
+                        fileId,
+                    );
                     await this.audit.record(session, {
                         organizationId: membership.organizationId,
                         actorUserId: auth.user.id,
@@ -256,11 +262,11 @@ export class FileService {
                         metadata: { fileName: row.fileName, projectId: row.projectId },
                         ip,
                     });
-                    return { row, removed: true };
+                    return { row, removeStorage: references === 0 };
                 },
             );
             if (result !== null) {
-                if (result.removed) {
+                if (result.removeStorage) {
                     await this.storage.remove(result.row.storageKey);
                 }
                 return;
@@ -304,16 +310,20 @@ export class FileService {
                 throw new ConflictError("Only approved files can be attached to a submission.");
             }
             try {
-                const attached = await this.repository.attachToSubmission(
-                    session,
+                // shortcut: (submission_id, version_id, storage_key) has no unique
+                // constraint, so concurrent attaches may still insert duplicates. Add a
+                // partial unique index if duplicate snapshots become observable.
+                const existing = await this.repository.findSnapshot(
+                    session.db,
                     organizationId,
-                    fileId,
                     submissionId,
                     versionId,
+                    row.storageKey,
                 );
-                if (!attached) {
-                    throw new NotFoundError("The file was not found.");
+                if (existing) {
+                    return;
                 }
+                await this.repository.insertSnapshot(session, row, submissionId, versionId);
             } catch (error) {
                 if (isForeignKeyViolation(error)) {
                     throw new ValidationError(

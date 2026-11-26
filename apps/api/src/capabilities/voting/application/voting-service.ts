@@ -4,12 +4,19 @@ import type {
     CreateVotingRoundRequest,
     OrganizationRole,
     VoteResult,
+    VotableSubmission,
     VotingRound,
 } from "@nethack/contracts";
 import type { AuthContext } from "../../../authentication/types.js";
 import type { Clock } from "../../../core/clock.js";
 import { domainEvents } from "../../../core/domain-event.js";
-import { ConflictError, NotFoundError, ValidationError } from "../../../core/errors.js";
+import {
+    ConflictError,
+    ForbiddenError,
+    isUniqueViolationError as isUniqueViolation,
+    NotFoundError,
+    ValidationError,
+} from "../../../core/errors.js";
 import type { OutboxPublisher } from "../../../core/outbox.js";
 import type { AuditLogger } from "../../../infrastructure/audit/audit-logger.js";
 import type {
@@ -20,6 +27,8 @@ import type { CompetitionsContract } from "../../competitions/contracts.js";
 import type { OrganizationsContract } from "../../organizations/contracts.js";
 import type { ParticipantsContract } from "../../participants/contracts.js";
 import type { SubmissionsContract } from "../../submissions/contracts.js";
+import type { TeamsContract } from "../../teams/contracts.js";
+import { toVotableSubmissions } from "../domain/votable-submissions.js";
 import { normalizeEligibleRoles, VotingRules } from "../domain/voting-rules.js";
 import type {
     NewVoteValues,
@@ -36,6 +45,7 @@ export class VotingService {
     private readonly submissions: SubmissionsContract;
     private readonly participants: ParticipantsContract;
     private readonly organizations: OrganizationsContract;
+    private readonly teams: TeamsContract;
     private readonly events: OutboxPublisher;
     private readonly audit: AuditLogger;
     private readonly clock: Clock;
@@ -47,6 +57,7 @@ export class VotingService {
         submissions: SubmissionsContract,
         participants: ParticipantsContract,
         organizations: OrganizationsContract,
+        teams: TeamsContract,
         events: OutboxPublisher,
         audit: AuditLogger,
         clock: Clock,
@@ -57,6 +68,7 @@ export class VotingService {
         this.submissions = submissions;
         this.participants = participants;
         this.organizations = organizations;
+        this.teams = teams;
         this.events = events;
         this.audit = audit;
         this.clock = clock;
@@ -68,6 +80,29 @@ export class VotingService {
             this.repository.listRounds(session.db, organizationId, editionId),
         );
         return rows.map(toVotingRound);
+    }
+
+    async votableSubmissions(
+        organizationId: string,
+        role: OrganizationRole,
+        editionId: string,
+    ): Promise<readonly VotableSubmission[]> {
+        await this.requireEdition(organizationId, editionId);
+        await this.assertCanDiscoverVotableSubmissions(organizationId, editionId, role);
+        const submissions = await this.submissions.listEditionSubmissions(
+            organizationId,
+            editionId,
+        );
+        const votable = submissions.filter((submission) =>
+            VotingRules.isVotableSubmission(submission.status),
+        );
+        const teamNames = await this.resolveTeamNames(
+            organizationId,
+            votable.flatMap((submission) =>
+                submission.teamId === null ? [] : [submission.teamId],
+            ),
+        );
+        return toVotableSubmissions(votable, teamNames);
     }
 
     async createRound(
@@ -497,6 +532,44 @@ export class VotingService {
         }
     }
 
+    private async assertCanDiscoverVotableSubmissions(
+        organizationId: string,
+        editionId: string,
+        role: OrganizationRole,
+    ): Promise<void> {
+        const effective = VotingRules.effectiveRole(role);
+        if (effective === "organizer") {
+            return;
+        }
+        const rounds = await this.database.transaction({ organizationId }, (session) =>
+            this.repository.listRounds(session.db, organizationId, editionId),
+        );
+        const eligible = rounds.some((round) =>
+            normalizeEligibleRoles(round.eligibleRoles).includes(effective),
+        );
+        if (!eligible) {
+            throw new ForbiddenError(
+                "Your organization role is not eligible in any voting round of this edition.",
+            );
+        }
+    }
+
+    private async resolveTeamNames(
+        organizationId: string,
+        teamIds: readonly string[],
+    ): Promise<Map<string, string>> {
+        const names = new Map<string, string>();
+        await Promise.all(
+            [...new Set(teamIds)].map(async (teamId) => {
+                const team = await this.teams.getTeam(organizationId, teamId);
+                if (team !== null) {
+                    names.set(teamId, team.name);
+                }
+            }),
+        );
+        return names;
+    }
+
     private async assertSelectionsAreVotable(
         organizationId: string,
         round: VotingRoundRow,
@@ -570,11 +643,3 @@ function nullableIso(value: Date | null): string | null {
     return value === null ? null : value.toISOString();
 }
 
-function isUniqueViolation(error: unknown): boolean {
-    return (
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        (error as { code?: unknown }).code === "23505"
-    );
-}

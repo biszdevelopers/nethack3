@@ -1,6 +1,7 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
 import type { DatabaseExecutor, DatabaseSession } from "../../../infrastructure/database/client.js";
 import { submissionFiles } from "../../../infrastructure/database/schema/index.js";
+import { buildFileSnapshot } from "../domain/file-snapshot.js";
 
 export type FileRow = typeof submissionFiles.$inferSelect;
 
@@ -70,6 +71,8 @@ export class FileRepository {
                     eq(submissionFiles.organizationId, organizationId),
                     eq(submissionFiles.projectId, projectId),
                     eq(submissionFiles.status, "approved"),
+                    isNull(submissionFiles.submissionId),
+                    isNull(submissionFiles.versionId),
                 ),
             )
             .orderBy(desc(submissionFiles.createdAt), desc(submissionFiles.id));
@@ -94,24 +97,72 @@ export class FileRepository {
         return rows.length > 0;
     }
 
-    async attachToSubmission(
-        session: DatabaseSession,
+    async findSnapshot(
+        db: DatabaseExecutor,
         organizationId: string,
-        fileId: string,
         submissionId: string,
         versionId: string,
+        storageKey: string,
     ): Promise<boolean> {
-        const rows = await session.db
-            .update(submissionFiles)
-            .set({ submissionId, versionId })
+        const rows = await db
+            .select({ id: submissionFiles.id })
+            .from(submissionFiles)
             .where(
                 and(
                     eq(submissionFiles.organizationId, organizationId),
-                    eq(submissionFiles.id, fileId),
-                    eq(submissionFiles.status, "approved"),
+                    eq(submissionFiles.submissionId, submissionId),
+                    eq(submissionFiles.versionId, versionId),
+                    eq(submissionFiles.storageKey, storageKey),
                 ),
             )
-            .returning({ id: submissionFiles.id });
+            .limit(1);
         return rows.length > 0;
+    }
+
+    async insertSnapshot(
+        session: DatabaseSession,
+        source: FileRow,
+        submissionId: string,
+        versionId: string,
+    ): Promise<void> {
+        await session.db.insert(submissionFiles).values(
+            buildFileSnapshot(
+                {
+                    projectId: source.projectId,
+                    storageKey: source.storageKey,
+                    fileName: source.fileName,
+                    contentType: source.contentType,
+                    byteSize: source.byteSize,
+                    checksumSha256: source.checksumSha256,
+                    uploadedByUserId: source.uploadedByUserId,
+                    inspectedAt: source.inspectedAt,
+                },
+                {
+                    organizationId: source.organizationId,
+                    submissionId,
+                    versionId,
+                },
+            ),
+        );
+    }
+
+    async countStorageReferences(
+        db: DatabaseExecutor,
+        organizationId: string,
+        storageKey: string,
+        excludingFileId: string,
+    ): Promise<number> {
+        const rows = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(submissionFiles)
+            .where(
+                and(
+                    eq(submissionFiles.organizationId, organizationId),
+                    eq(submissionFiles.storageKey, storageKey),
+                    ne(submissionFiles.id, excludingFileId),
+                    ne(submissionFiles.status, "deleted"),
+                ),
+            );
+        return rows[0]?.count ?? 0;
     }
 }

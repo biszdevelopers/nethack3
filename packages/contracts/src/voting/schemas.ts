@@ -50,6 +50,15 @@ export const castBallotRequestSchema = z
     .strict();
 export type CastBallotRequest = z.infer<typeof castBallotRequestSchema>;
 
+export const votableSubmissionSchema = z.object({
+    id: idSchema,
+    projectTitle: z.string(),
+    summary: z.string(),
+    teamId: idSchema.nullable(),
+    teamName: z.string().nullable(),
+});
+export type VotableSubmission = z.infer<typeof votableSubmissionSchema>;
+
 export const voteResultSchema = z.object({
     roundId: idSchema,
     roundName: z.string(),

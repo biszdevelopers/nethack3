@@ -6,7 +6,6 @@ import {
     limitSchema,
     listResponseSchema,
     publicAnnouncementSchema,
-    slugSchema,
     updateAnnouncementRequestSchema,
 } from "@nethack/contracts";
 import type { CapabilityContext } from "../../../core/capability.js";
@@ -14,18 +13,13 @@ import { AuthGuard } from "../../../http/guards.js";
 import { decodeCursor, responsePage, setPublicCache } from "../../../http/pagination.js";
 import type { NethackServer } from "../../../http/types.js";
 import { assertHasChanges, canViewDrafts } from "../domain/announcement-rules.js";
+import { publicAnnouncementQuerySchema } from "../domain/public-announcement.js";
 import type { AnnouncementService } from "../application/announcement-service.js";
 
 const organizationParams = z.object({ organizationId: z.uuid() });
 const announcementParams = z.object({ announcementId: z.uuid() });
 
 const listQuerySchema = z.object({
-    cursor: cursorSchema.optional(),
-    limit: limitSchema.optional(),
-});
-
-const publicListQuerySchema = z.object({
-    organization: slugSchema,
     cursor: cursorSchema.optional(),
     limit: limitSchema.optional(),
 });
@@ -146,7 +140,7 @@ export async function registerAnnouncementRoutes(
         "/api/v1/public/announcements",
         {
             schema: {
-                querystring: publicListQuerySchema,
+                querystring: publicAnnouncementQuerySchema,
                 response: { 200: listResponseSchema(publicAnnouncementSchema) },
             },
         },
@@ -154,7 +148,7 @@ export async function registerAnnouncementRoutes(
             setPublicCache(reply);
             const limit = request.query.limit ?? 20;
             const cursor = decodeCursor(request.query.cursor);
-            const items = await service.listPublic(request.query.organization, {
+            const items = await service.listPublic(request.query.organization ?? null, {
                 limit: limit + 1,
                 before:
                     cursor === null

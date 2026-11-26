@@ -14,7 +14,7 @@ import type {
 import { randomToken, sha256Hex } from "../../../authentication/crypto.js";
 import type { AuthContext } from "../../../authentication/types.js";
 import type { Clock } from "../../../core/clock.js";
-import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../../../core/errors.js";
+import { ConflictError, ForbiddenError, isUniqueViolationError as isUniqueViolation, NotFoundError, ValidationError } from "../../../core/errors.js";
 import { domainEvents } from "../../../core/domain-event.js";
 import type { DatabaseConnection } from "../../../infrastructure/database/client.js";
 import type { OutboxPublisher } from "../../../core/outbox.js";
@@ -566,11 +566,3 @@ function toOrganization(row: {
     };
 }
 
-function isUniqueViolation(error: unknown): boolean {
-    return (
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        (error as { code?: unknown }).code === "23505"
-    );
-}

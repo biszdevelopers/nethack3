@@ -48,8 +48,9 @@ disqualified        -> terminal
 ## Data ownership and files
 
 - The capability reads only its own tables plus user display names where needed. Project ownership/membership, teams, editions, and files are resolved through contracts.
+- Every submission response carries display fields: `projectTitle` is the current version title, then the project title, then `Untitled project`; `teamName` is resolved from the submission's team. List endpoints resolve project and team lookups through request-scoped `Map` caches so each distinct id is fetched once per request. `currentVersion = 0` uses the project title.
 - Approved project files are attached after the version transaction commits. The files contract updates `submission_files`, whose foreign key needs the submission row committed before acquiring its lock; attaching inside the `FOR UPDATE` transaction would block on that lock. `attachToSubmission` moves a file to the newest version, so a version's file list reflects the latest attachment.
-- Submission detail never reads another capability's tables; `projectTitle` and `teamName` come from the `projects` and `teams` contracts.
+- Submission detail never reads another capability's tables; `projectTitle` and `teamName` come from the submission's current version and the `projects`/`teams` contracts.
 
 ## Events and auditing
 
@@ -58,4 +59,8 @@ disqualified        -> terminal
 
 ## Contract
 
-`submissions.v1` exposes `getSubmission`, `listEditionSubmissions`, `isSubmittedForProject`, and `countSubmissions`, always inside an organization-scoped transaction. Summaries include the current version's `title` and `summary` (empty when no version exists).
+`submissions.v1` exposes `getSubmission`, `listEditionSubmissions`, `isSubmittedForProject`, and `countSubmissions`, always inside an organization-scoped transaction. Summaries include the current version's `title` and `summary`, falling back to the project title/summary and finally `Untitled project` for the title when no version exists.
+
+## Query shape
+
+List queries left join `submission_versions` on `(submission_id, organization_id, version = current_version)` so the current version title arrives with the submission row instead of one query per row. Project and team display lookups are cached per request; the submission list itself stays a single keyset-paginated query.

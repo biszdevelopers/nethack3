@@ -108,3 +108,31 @@ describe("CompetitionRules.assertEditionIsValid", () => {
         ).toThrow(ValidationError);
     });
 });
+
+describe("CompetitionRules.assertDivisionTeamSizes", () => {
+    it("accepts unset or ordered bounds", () => {
+        expect(() => CompetitionRules.assertDivisionTeamSizes(null, null)).not.toThrow();
+        expect(() => CompetitionRules.assertDivisionTeamSizes(2, 5)).not.toThrow();
+        expect(() => CompetitionRules.assertDivisionTeamSizes(3, null)).not.toThrow();
+    });
+
+    it("rejects minimum team size above maximum team size", () => {
+        expect(() => CompetitionRules.assertDivisionTeamSizes(5, 2)).toThrow(ValidationError);
+    });
+});
+
+describe("CompetitionRules deletion rules", () => {
+    it("allows deleting an unused series or division", () => {
+        expect(() => CompetitionRules.assertSeriesIsDeletable(0)).not.toThrow();
+        expect(() => CompetitionRules.assertDivisionIsDeletable(0, 0)).not.toThrow();
+    });
+
+    it("rejects deleting a series with editions", () => {
+        expect(() => CompetitionRules.assertSeriesIsDeletable(1)).toThrow(ConflictError);
+    });
+
+    it("rejects deleting a division with registrations or teams", () => {
+        expect(() => CompetitionRules.assertDivisionIsDeletable(1, 0)).toThrow(ConflictError);
+        expect(() => CompetitionRules.assertDivisionIsDeletable(0, 1)).toThrow(ConflictError);
+    });
+});

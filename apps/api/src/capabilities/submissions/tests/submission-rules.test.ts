@@ -97,6 +97,25 @@ describe("SubmissionRules submission window", () => {
     });
 });
 
+describe("SubmissionRules display title", () => {
+    it("prefers the current version title", () => {
+        expect(SubmissionRules.displayTitle("Version title", "Project title")).toBe(
+            "Version title",
+        );
+    });
+
+    it("falls back to the project title without a version", () => {
+        expect(SubmissionRules.displayTitle(null, "Project title")).toBe("Project title");
+        expect(SubmissionRules.displayTitle("", "Project title")).toBe("Project title");
+        expect(SubmissionRules.displayTitle("   ", "Project title")).toBe("Project title");
+    });
+
+    it("uses the placeholder only when neither title exists", () => {
+        expect(SubmissionRules.displayTitle(null, null)).toBe("Untitled project");
+        expect(SubmissionRules.displayTitle(null, " ")).toBe("Untitled project");
+    });
+});
+
 describe("SubmissionRules review transitions", () => {
     it("allows every first review decision from submitted", () => {
         for (const target of [

@@ -8,6 +8,7 @@ export interface OrganizationSummary {
 
 export interface OrganizationsContract {
     getSummary(organizationId: string): Promise<OrganizationSummary | null>;
+    getSummaryBySlug(slug: string): Promise<OrganizationSummary | null>;
     isPublicShowcaseEnabled(organizationId: string): Promise<boolean>;
 }
 

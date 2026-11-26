@@ -58,17 +58,14 @@ export class ApiClient {
 
     constructor(options: ApiClientOptions) {
         this.baseUrl = options.baseUrl.replace(/\/$/, "");
-        this.fetchImpl = options.fetchImpl ?? fetch;
+        this.fetchImpl =
+            options.fetchImpl ?? ((input: RequestInfo | URL, init?: RequestInit) => fetch(input, init));
         this.getCsrfToken = options.getCsrfToken ?? (() => null);
         this.getOrganizationId = options.getOrganizationId ?? (() => null);
         this.onUnauthorized = options.onUnauthorized ?? (() => undefined);
     }
 
-    async request<T>(
-        method: string,
-        path: string,
-        options: RequestOptions<T> = {},
-    ): Promise<T> {
+    async request<T>(method: string, path: string, options: RequestOptions<T> = {}): Promise<T> {
         const url = this.buildUrl(path, options.query);
         const headers: Record<string, string> = {
             Accept: "application/json",
@@ -84,14 +81,16 @@ export class ApiClient {
             headers["Content-Type"] = "application/json";
             init.body = JSON.stringify(options.body);
         }
+        // Organization context is required by organization-scoped reads as well as
+        // writes, so it is attached to every request that has one.
+        const organizationId = this.getOrganizationId();
+        if (organizationId !== null && organizationId.length > 0) {
+            headers["X-Nethack-Organization-Id"] = organizationId;
+        }
         if (UNSAFE_METHODS.has(method)) {
             const csrf = this.getCsrfToken();
             if (csrf !== null && csrf.length > 0) {
                 headers["X-CSRF-Token"] = csrf;
-            }
-            const organizationId = this.getOrganizationId();
-            if (organizationId !== null && organizationId.length > 0) {
-                headers["X-Nethack-Organization-Id"] = organizationId;
             }
         }
         const response = await this.fetchImpl(url, init);
@@ -142,10 +141,7 @@ export class ApiClient {
         return url.toString();
     }
 
-    private async parseResponse<T>(
-        response: Response,
-        schema?: z.ZodType<T>,
-    ): Promise<T> {
+    private async parseResponse<T>(response: Response, schema?: z.ZodType<T>): Promise<T> {
         if (response.status === 204) {
             return undefined as T;
         }

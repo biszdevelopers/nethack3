@@ -101,6 +101,13 @@ export const competitionEditionDetailSchema = competitionEditionSchema.extend({
 });
 export type CompetitionEditionDetail = z.infer<typeof competitionEditionDetailSchema>;
 
+export const organizerEditionSchema = competitionEditionSchema.extend({
+    seriesName: z.string(),
+    registrationCount: z.number().int().nonnegative(),
+    teamCount: z.number().int().nonnegative(),
+});
+export type OrganizerEdition = z.infer<typeof organizerEditionSchema>;
+
 export const createSeriesRequestSchema = z
     .object({
         name: z.string().trim().min(2).max(120),
@@ -161,6 +168,53 @@ export const updateEditionRequestSchema = z
     })
     .strict();
 export type UpdateEditionRequest = z.infer<typeof updateEditionRequestSchema>;
+
+export const updateSeriesRequestSchema = z
+    .object({
+        name: z.string().trim().min(2).max(120).optional(),
+        description: z.string().max(2000).optional(),
+    })
+    .strict()
+    .refine((value) => value.name !== undefined || value.description !== undefined, {
+        message: "Provide a name or a description.",
+    });
+export type UpdateSeriesRequest = z.infer<typeof updateSeriesRequestSchema>;
+
+export const updateDivisionRequestSchema = z
+    .object({
+        name: z.string().trim().min(2).max(120).optional(),
+        description: z.string().max(2000).optional(),
+        minTeamSize: z.number().int().min(1).max(50).nullable().optional(),
+        maxTeamSize: z.number().int().min(1).max(50).nullable().optional(),
+    })
+    .strict()
+    .refine(
+        (value) =>
+            value.name !== undefined ||
+            value.description !== undefined ||
+            value.minTeamSize !== undefined ||
+            value.maxTeamSize !== undefined,
+        { message: "Provide at least one field to update." },
+    );
+export type UpdateDivisionRequest = z.infer<typeof updateDivisionRequestSchema>;
+
+export const updateMilestoneRequestSchema = z
+    .object({
+        title: z.string().trim().min(2).max(160).optional(),
+        description: z.string().max(2000).optional(),
+        kind: milestoneKindSchema.optional(),
+        occursAt: isoDateTimeSchema.optional(),
+    })
+    .strict()
+    .refine(
+        (value) =>
+            value.title !== undefined ||
+            value.description !== undefined ||
+            value.kind !== undefined ||
+            value.occursAt !== undefined,
+        { message: "Provide at least one field to update." },
+    );
+export type UpdateMilestoneRequest = z.infer<typeof updateMilestoneRequestSchema>;
 
 export const createDivisionRequestSchema = z
     .object({
