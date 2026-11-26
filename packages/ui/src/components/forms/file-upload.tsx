@@ -117,6 +117,7 @@ export function FileUpload({
                         accept={accept}
                         multiple={multiple}
                         disabled={disabled}
+                        tabIndex={-1}
                         aria-describedby={field["aria-describedby"]}
                         aria-invalid={field["aria-invalid"]}
                         onChange={(event) => {
@@ -180,7 +181,7 @@ export function FileUpload({
                                         aria-label={`Remove ${file.name}`}
                                         disabled={disabled}
                                         onClick={() => removeFile(index)}
-                                        className="flex size-6 shrink-0 items-center justify-center rounded-sm text-ink-muted transition-colors hover:bg-app hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
+                                        className="relative flex size-6 shrink-0 items-center justify-center rounded-sm text-ink-muted transition-colors after:absolute after:-inset-1.5 after:content-[''] hover:bg-app hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
                                     >
                                         <X className="size-3.5" aria-hidden="true" />
                                     </button>

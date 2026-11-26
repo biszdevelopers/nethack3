@@ -59,7 +59,7 @@ export function CommandPalette({
                         placeholder={placeholder}
                         className="h-12 w-full border-b border-line bg-transparent px-4 text-sm text-ink placeholder:text-ink-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
                     />
-                    <Command.List className="max-h-80 overflow-y-auto p-2">
+                    <Command.List label={label} className="max-h-80 overflow-y-auto p-2">
                         <Command.Empty className="px-4 py-8 text-center text-sm text-ink-muted">
                             {emptyMessage}
                         </Command.Empty>

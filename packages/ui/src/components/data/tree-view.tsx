@@ -68,13 +68,14 @@ function TreeItem({
     return (
         <li
             role="treeitem"
+            aria-label={node.label}
             aria-level={depth + 1}
             aria-selected={node.id === selectedId}
             aria-expanded={hasChildren ? isExpanded : undefined}
             tabIndex={node.id === focusedId ? 0 : -1}
             ref={(element) => registerRef(node.id, element)}
             onKeyDown={(event) => onKeyDown(event, node)}
-            className="focus-visible:outline-none"
+            className="group outline-none"
         >
             <div
                 role="presentation"
@@ -82,6 +83,7 @@ function TreeItem({
                 className={cn(
                     "flex cursor-pointer items-center gap-1 rounded-sm py-1 pr-2 text-sm",
                     "hover:bg-raised",
+                    "group-focus-visible:bg-raised group-focus-visible:ring-2 group-focus-visible:ring-primary group-focus-visible:ring-inset",
                     node.id === selectedId ? "bg-primary-soft text-primary" : "text-ink",
                 )}
             >
@@ -97,7 +99,7 @@ function TreeItem({
                 <span className="truncate">{node.label}</span>
             </div>
             {hasChildren && isExpanded ? (
-                <ul className="ml-4 flex flex-col">
+                <ul role="group" className="ml-4 flex flex-col">
                     {children.map((child) => (
                         <TreeItem
                             key={child.id}
@@ -176,6 +178,9 @@ export function TreeView({
     };
 
     const handleKeyDown = (event: KeyboardEvent<HTMLLIElement>, node: TreeNode): void => {
+        if (event.target !== event.currentTarget) {
+            return;
+        }
         const index = visibleNodes.findIndex((entry) => entry.node.id === node.id);
         const current = visibleNodes[index];
         if (current === undefined) {

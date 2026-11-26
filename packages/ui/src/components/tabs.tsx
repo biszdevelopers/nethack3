@@ -12,7 +12,7 @@ export const TabsList = forwardRef<
         <TabsPrimitive.List
             ref={ref}
             className={cn(
-                "inline-flex h-10 items-center gap-1 rounded-md border border-line bg-panel p-1",
+                "inline-flex h-11 items-center gap-1 rounded-md border border-line bg-panel p-1",
                 className,
             )}
             {...rest}
@@ -28,7 +28,7 @@ export const TabsTrigger = forwardRef<
         <TabsPrimitive.Trigger
             ref={ref}
             className={cn(
-                "inline-flex h-8 items-center justify-center rounded-sm px-3 text-sm text-ink-muted transition-colors",
+                "inline-flex h-9 items-center justify-center rounded-sm px-3 text-sm text-ink-muted transition-colors",
                 "hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                 "data-[state=active]:bg-raised data-[state=active]:text-ink",
                 "disabled:pointer-events-none disabled:opacity-50",
@@ -46,7 +46,10 @@ export const TabsContent = forwardRef<
     return (
         <TabsPrimitive.Content
             ref={ref}
-            className={cn("mt-4 focus-visible:outline-none", className)}
+            className={cn(
+                "mt-4 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset",
+                className,
+            )}
             {...rest}
         />
     );

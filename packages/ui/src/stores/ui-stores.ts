@@ -51,13 +51,19 @@ class ToastStore {
 }
 
 export const toastStore = new ToastStore();
+const EMPTY_TOASTS: readonly ToastRecord[] = [];
+const EMPTY_OVERLAYS: readonly OverlayEntry[] = [];
 
 export function useToast(): {
     toasts: readonly ToastRecord[];
     toast: (input: ToastInput) => string;
     dismiss: (id: string) => void;
 } {
-    const toasts = useSyncExternalStore(toastStore.subscribe, toastStore.getSnapshot, () => []);
+    const toasts = useSyncExternalStore(
+        toastStore.subscribe,
+        toastStore.getSnapshot,
+        () => EMPTY_TOASTS,
+    );
     return {
         toasts,
         toast: (input) => toastStore.show(input),
@@ -125,7 +131,11 @@ export function useOverlay(): {
     close: (id: string) => void;
     closeAll: () => void;
 } {
-    const entries = useSyncExternalStore(overlayStore.subscribe, overlayStore.getSnapshot, () => []);
+    const entries = useSyncExternalStore(
+        overlayStore.subscribe,
+        overlayStore.getSnapshot,
+        () => EMPTY_OVERLAYS,
+    );
     return {
         overlays: entries.map((entry) => ({
             id: entry.id,

@@ -154,6 +154,7 @@ export const PinInput = forwardRef<HTMLFieldSetElement, PinInputProps>(function 
                                 disabled={disabled}
                                 value={digit}
                                 aria-label={`Digit ${index + 1} of ${length}`}
+                                aria-describedby={field["aria-describedby"]}
                                 aria-invalid={field["aria-invalid"]}
                                 onChange={(event) => {
                                     distribute(index, event.target.value);

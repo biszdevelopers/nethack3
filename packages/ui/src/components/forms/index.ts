@@ -21,3 +21,4 @@ export * from "./switch.js";
 export * from "./tag-input.js";
 export * from "./time-input.js";
 export * from "./validation-summary.js";
+export * from "./select-menu.js";

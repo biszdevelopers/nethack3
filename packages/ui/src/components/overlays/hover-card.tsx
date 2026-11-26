@@ -28,7 +28,7 @@ export const HoverCardContent = forwardRef<
                 ref={ref}
                 sideOffset={sideOffset}
                 className={cn(
-                    "z-50 w-64 max-w-[calc(100vw-2rem)] rounded-md border border-line bg-panel p-4 text-sm text-ink",
+                    "z-50 w-64 max-w-[calc(100vw-2rem)] rounded-md border border-line bg-panel p-4 text-sm text-ink animate-[ui-pop-in_160ms_cubic-bezier(0.16,1,0.3,1)]",
                     "focus:outline-none",
                     className,
                 )}

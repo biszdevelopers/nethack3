@@ -24,8 +24,9 @@ export function ToastViewport(): ReactNode {
                         }
                     }}
                     duration={toast.durationMs ?? 6000}
+                    data-slot="toast"
                     className={cn(
-                        "flex w-full items-start gap-3 rounded-md border bg-panel p-4 text-ink",
+                        "flex w-full animate-[ui-toast-in_220ms_cubic-bezier(0.16,1,0.3,1)] items-start gap-3 rounded-md border bg-panel p-4 text-ink",
                         TONE_BORDER[toast.tone ?? "neutral"],
                     )}
                 >
@@ -40,7 +41,7 @@ export function ToastViewport(): ReactNode {
                         )}
                     </div>
                     <ToastPrimitive.Close
-                        className="ml-auto rounded-sm p-1 text-ink-muted hover:bg-raised hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        className="relative ml-auto inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-ink-muted after:absolute after:-inset-1.5 after:content-[''] hover:bg-raised hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                         aria-label="Dismiss notification"
                     >
                         <X className="size-3.5" aria-hidden="true" />

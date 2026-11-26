@@ -18,7 +18,7 @@ export const PopoverContent = forwardRef<
                 align={align}
                 sideOffset={sideOffset}
                 className={cn(
-                    "z-50 w-72 max-w-[calc(100vw-2rem)] rounded-md border border-line bg-panel p-4 text-ink",
+                    "z-50 w-72 max-w-[calc(100vw-2rem)] rounded-md border border-line bg-panel p-4 text-ink animate-[ui-pop-in_160ms_cubic-bezier(0.16,1,0.3,1)]",
                     "focus:outline-none",
                     className,
                 )}

@@ -8,6 +8,7 @@ export interface FieldProps {
         id: string;
         "aria-describedby": string | undefined;
         "aria-invalid": boolean | undefined;
+        "aria-required": boolean | undefined;
     }) => ReactNode;
     readonly description?: string;
     readonly error?: string;
@@ -35,9 +36,12 @@ export function Field({
                 <Label htmlFor={id}>
                     {label}
                     {required ? (
-                        <span className="ml-1 text-primary" aria-hidden="true">
-                            *
-                        </span>
+                        <>
+                            <span className="ml-1 text-primary" aria-hidden="true">
+                                *
+                            </span>
+                            <span className="sr-only"> (required)</span>
+                        </>
                     ) : optionalLabel === undefined ? null : (
                         <span className="ml-2 text-xs font-normal text-ink-subtle">
                             {optionalLabel}
@@ -49,6 +53,7 @@ export function Field({
                 id,
                 "aria-describedby": describedBy.length > 0 ? describedBy : undefined,
                 "aria-invalid": error === undefined ? undefined : true,
+                "aria-required": required ? true : undefined,
             })}
             {description === undefined ? null : (
                 <p id={descriptionId} className="text-xs text-ink-muted">

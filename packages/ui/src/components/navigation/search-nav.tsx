@@ -30,7 +30,7 @@ export function SearchNavigation({
 }: SearchNavigationProps): ReactNode {
     const listId = useId();
     const [query, setQuery] = useState("");
-    const linkRefs = useRef<Array<HTMLAnchorElement | null>>([]);
+    const linkRefs = useRef<Array<HTMLAnchorElement | HTMLButtonElement | null>>([]);
 
     const normalized = query.trim().toLocaleLowerCase();
     const filtered =
@@ -67,7 +67,7 @@ export function SearchNavigation({
         }
     };
 
-    const onLinkKeyDown = (event: KeyboardEvent<HTMLAnchorElement>, index: number): void => {
+    const onLinkKeyDown = (event: KeyboardEvent<HTMLElement>, index: number): void => {
         if (event.key === "ArrowDown") {
             event.preventDefault();
             focusLink((index + 1) % filtered.length);
@@ -120,26 +120,49 @@ export function SearchNavigation({
                 <ul id={listId} className="flex flex-col gap-0.5">
                     {filtered.map((item, index) => (
                         <li key={item.id}>
-                            <a
-                                ref={(node) => {
-                                    linkRefs.current[index] = node;
-                                }}
-                                href={item.href}
-                                onClick={() => onSelect?.(item)}
-                                onKeyDown={(event) => onLinkKeyDown(event, index)}
-                                className={cn(
-                                    "flex min-h-9 flex-col justify-center rounded-sm px-2 py-1.5 transition-colors",
-                                    "text-ink-muted hover:bg-raised hover:text-ink focus-visible:bg-raised focus-visible:text-ink",
-                                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                                )}
-                            >
-                                <span className="truncate text-sm">{item.label}</span>
-                                {item.description === undefined ? null : (
-                                    <span className="truncate text-xs text-ink-subtle">
-                                        {item.description}
-                                    </span>
-                                )}
-                            </a>
+                            {item.href === undefined ? (
+                                <button
+                                    type="button"
+                                    ref={(node) => {
+                                        linkRefs.current[index] = node;
+                                    }}
+                                    onClick={() => onSelect?.(item)}
+                                    onKeyDown={(event) => onLinkKeyDown(event, index)}
+                                    className={cn(
+                                        "flex min-h-9 w-full flex-col justify-center rounded-sm px-2 py-1.5 text-left transition-colors",
+                                        "text-ink-muted hover:bg-raised hover:text-ink focus-visible:bg-raised focus-visible:text-ink",
+                                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                                    )}
+                                >
+                                    <span className="truncate text-sm">{item.label}</span>
+                                    {item.description === undefined ? null : (
+                                        <span className="truncate text-xs text-ink-subtle">
+                                            {item.description}
+                                        </span>
+                                    )}
+                                </button>
+                            ) : (
+                                <a
+                                    ref={(node) => {
+                                        linkRefs.current[index] = node;
+                                    }}
+                                    href={item.href}
+                                    onClick={() => onSelect?.(item)}
+                                    onKeyDown={(event) => onLinkKeyDown(event, index)}
+                                    className={cn(
+                                        "flex min-h-9 flex-col justify-center rounded-sm px-2 py-1.5 transition-colors",
+                                        "text-ink-muted hover:bg-raised hover:text-ink focus-visible:bg-raised focus-visible:text-ink",
+                                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                                    )}
+                                >
+                                    <span className="truncate text-sm">{item.label}</span>
+                                    {item.description === undefined ? null : (
+                                        <span className="truncate text-xs text-ink-subtle">
+                                            {item.description}
+                                        </span>
+                                    )}
+                                </a>
+                            )}
                         </li>
                     ))}
                 </ul>

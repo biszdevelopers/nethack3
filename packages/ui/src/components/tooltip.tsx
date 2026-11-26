@@ -1,4 +1,10 @@
-import { forwardRef, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import {
+    cloneElement,
+    forwardRef,
+    isValidElement,
+    type ComponentPropsWithoutRef,
+    type ReactNode,
+} from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { cn } from "../lib/cn.js";
 
@@ -16,7 +22,7 @@ export const TooltipContent = forwardRef<
                 ref={ref}
                 sideOffset={sideOffset}
                 className={cn(
-                    "z-50 max-w-xs rounded-sm border border-line bg-panel px-2 py-1 text-xs text-ink",
+                    "z-50 max-w-xs animate-[ui-fade-in_120ms_ease-out] rounded-sm border border-line bg-panel px-2 py-1 text-xs text-ink",
                     "focus:outline-none",
                     className,
                 )}
@@ -33,9 +39,18 @@ export function TooltipLabel({
     readonly label: string;
     readonly children: ReactNode;
 }): ReactNode {
+    const labelled = isValidElement<{
+        "aria-label"?: string;
+        "aria-labelledby"?: string;
+    }>(children)
+        ? children.props["aria-label"] !== undefined ||
+          children.props["aria-labelledby"] !== undefined
+            ? children
+            : cloneElement(children, { "aria-label": label })
+        : children;
     return (
         <Tooltip>
-            <TooltipTrigger asChild>{children}</TooltipTrigger>
+            <TooltipTrigger asChild>{labelled}</TooltipTrigger>
             <TooltipContent>{label}</TooltipContent>
         </Tooltip>
     );

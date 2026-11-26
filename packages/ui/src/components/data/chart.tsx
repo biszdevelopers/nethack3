@@ -153,7 +153,7 @@ export function Chart({
                             const y = yForValue(datum.value);
                             return (
                                 <rect
-                                    key={`${datum.label}-${index}`}
+                                    key={datum.label}
                                     x={x}
                                     y={y}
                                     width={barWidth}
@@ -177,7 +177,7 @@ export function Chart({
                         ) : null}
                         {data.map((datum, index) => (
                             <circle
-                                key={`${datum.label}-${index}`}
+                                key={datum.label}
                                 cx={xForIndex(index)}
                                 cy={yForValue(datum.value)}
                                 r={isSparkline ? 1.5 : 2.5}
@@ -191,7 +191,7 @@ export function Chart({
                     ? null
                     : data.map((datum, index) => (
                           <text
-                              key={`label-${datum.label}-${index}`}
+                              key={`label-${datum.label}`}
                               x={
                                   variant === "bar"
                                       ? padding.left + index * barSlot + barSlot / 2
@@ -225,7 +225,7 @@ export function Chart({
                 </thead>
                 <tbody>
                     {data.map((datum, index) => (
-                        <tr key={`table-${datum.label}-${index}`}>
+                        <tr key={`table-${datum.label}`}>
                             <th scope="row">{datum.label}</th>
                             <td>{datum.value}</td>
                         </tr>

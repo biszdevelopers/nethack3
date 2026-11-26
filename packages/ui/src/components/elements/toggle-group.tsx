@@ -24,9 +24,23 @@ export const ToggleGroup = forwardRef<HTMLDivElement, ToggleGroupProps>(function
         className,
     );
     if (rest.type === "single") {
-        return <ToggleGroupPrimitive.Root ref={ref} {...rest} className={classes} />;
+        return (
+            <ToggleGroupPrimitive.Root
+                ref={ref}
+                {...rest}
+                data-slot="toggle-group"
+                className={classes}
+            />
+        );
     }
-    return <ToggleGroupPrimitive.Root ref={ref} {...rest} className={classes} />;
+    return (
+        <ToggleGroupPrimitive.Root
+            ref={ref}
+            {...rest}
+            data-slot="toggle-group"
+            className={classes}
+        />
+    );
 });
 
 export const ToggleGroupItem = forwardRef<
@@ -38,7 +52,7 @@ export const ToggleGroupItem = forwardRef<
             ref={ref}
             data-slot="toggle-group-item"
             className={cn(
-                "inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-line-strong bg-transparent px-3 text-sm text-ink-muted transition-colors select-none",
+                "inline-flex h-9 min-h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md border border-line-strong bg-transparent px-3 text-sm text-ink-muted transition-colors select-none",
                 "hover:bg-raised hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-app",
                 "data-[state=on]:bg-raised data-[state=on]:text-ink",
                 "disabled:pointer-events-none disabled:opacity-50",

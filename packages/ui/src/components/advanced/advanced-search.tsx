@@ -158,7 +158,7 @@ export function AdvancedSearch({
                                         type="button"
                                         aria-label={`Remove ${chip.label} filter`}
                                         onClick={chip.remove}
-                                        className="rounded-sm p-0.5 text-ink-muted transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                        className="relative rounded-sm p-0.5 text-ink-muted transition-colors after:absolute after:-inset-1.5 after:content-[''] hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                                     >
                                         <X className="size-3" aria-hidden="true" />
                                     </button>

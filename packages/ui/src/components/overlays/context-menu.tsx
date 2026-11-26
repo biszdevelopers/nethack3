@@ -15,7 +15,7 @@ export const ContextMenuContent = forwardRef<
             <ContextMenuPrimitive.Content
                 ref={ref}
                 className={cn(
-                    "z-50 min-w-48 rounded-md border border-line bg-panel p-1 text-ink",
+                    "z-50 min-w-48 rounded-md border border-line bg-panel p-1 text-ink animate-[ui-pop-in_160ms_cubic-bezier(0.16,1,0.3,1)]",
                     "focus:outline-none",
                     className,
                 )}

@@ -118,6 +118,7 @@ export const Combobox = forwardRef<HTMLButtonElement, ComboboxProps>(function Co
                     </PopoverPrimitive.Trigger>
                     <PopoverPrimitive.Portal>
                         <PopoverPrimitive.Content
+                            id={listId}
                             align="start"
                             sideOffset={6}
                             className={cn(
@@ -136,16 +137,22 @@ export const Combobox = forwardRef<HTMLButtonElement, ComboboxProps>(function Co
                                         className="h-10 w-full bg-transparent text-sm text-ink outline-none placeholder:text-ink-subtle"
                                     />
                                 </div>
-                                <Command.List id={listId} className="max-h-64 overflow-y-auto p-1">
+                                <Command.List
+                                    label={label}
+                                    aria-busy={loading || undefined}
+                                    className="max-h-64 overflow-y-auto p-1"
+                                >
                                     {loading ? (
                                         <Command.Loading className="flex items-center gap-2 px-2 py-6 text-sm text-ink-muted">
-                                            <Spinner className="size-4" label="Searching" />
+                                            <Spinner className="size-4" label="" />
                                             Searching
                                         </Command.Loading>
                                     ) : null}
-                                    <Command.Empty className="px-2 py-6 text-center text-sm text-ink-muted">
-                                        {emptyMessage}
-                                    </Command.Empty>
+                                    {loading ? null : (
+                                        <Command.Empty className="px-2 py-6 text-center text-sm text-ink-muted">
+                                            <span role="status">{emptyMessage}</span>
+                                        </Command.Empty>
+                                    )}
                                     {options.map((option) => (
                                         <Command.Item
                                             key={option.value}
@@ -157,7 +164,7 @@ export const Combobox = forwardRef<HTMLButtonElement, ComboboxProps>(function Co
                                                 handleOpenChange(false);
                                             }}
                                             className={cn(
-                                                "flex cursor-pointer items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-sm outline-none",
+                                                "flex min-h-9 cursor-pointer items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-sm outline-none",
                                                 "data-[selected=true]:bg-raised data-[selected=true]:text-ink",
                                                 "data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50",
                                             )}

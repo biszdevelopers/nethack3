@@ -7,7 +7,8 @@ import { Field } from "../field.js";
 
 export const selectTriggerVariants = tv({
     base: [
-        "flex w-full items-center justify-between gap-2 rounded-md border border-line bg-app px-3 text-left text-ink",
+        "flex w-full min-w-0 items-center justify-between gap-2 rounded-md border border-line bg-app px-3 text-left text-ink",
+        "[&>span]:truncate",
         "transition-colors duration-150",
         "focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30",
         "disabled:cursor-not-allowed disabled:opacity-50",
@@ -113,7 +114,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
                             position="popper"
                             sideOffset={6}
                             className={cn(
-                                "z-50 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md border border-line bg-panel text-ink",
+                                "z-50 min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md border border-line bg-panel text-ink animate-[ui-pop-in_160ms_cubic-bezier(0.16,1,0.3,1)]",
                                 contentClassName,
                             )}
                         >
@@ -146,7 +147,7 @@ function SelectItem({ option }: { readonly option: SelectOption }): ReactNode {
             value={option.value}
             disabled={option.disabled === true}
             className={cn(
-                "relative flex cursor-pointer select-none items-center gap-2 rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none",
+                "relative flex min-h-9 cursor-pointer select-none items-center gap-2 rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none",
                 "focus:bg-raised focus:text-ink",
                 "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
             )}

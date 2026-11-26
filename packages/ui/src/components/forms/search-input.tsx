@@ -98,7 +98,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(functi
                             aria-label={clearLabel}
                             onClick={clear}
                             disabled={disabled === true}
-                            className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-sm text-ink-muted transition-colors hover:bg-raised hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
+                            className="absolute right-2 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded-sm text-ink-muted transition-colors after:absolute after:-inset-1.5 after:content-[''] hover:bg-raised hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
                         >
                             <X className="size-3.5" aria-hidden="true" />
                         </button>

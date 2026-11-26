@@ -154,9 +154,14 @@ export function Listbox({
                 {...rest}
             >
                 {options.length === 0 ? (
-                    <p aria-live="polite" className="px-2 py-3 text-sm text-ink-muted">
+                    <div
+                        role="option"
+                        aria-selected={false}
+                        aria-disabled="true"
+                        className="px-2 py-3 text-sm text-ink-muted"
+                    >
                         {emptyMessage}
-                    </p>
+                    </div>
                 ) : (
                     options.map((option, index) => {
                         const isSelected = selected.includes(option.value);
@@ -175,7 +180,11 @@ export function Listbox({
                                     setActiveIndex(index);
                                     toggle(option);
                                 }}
-                                onMouseEnter={() => setActiveIndex(index)}
+                                onMouseEnter={() => {
+                                    if (option.disabled !== true) {
+                                        setActiveIndex(index);
+                                    }
+                                }}
                                 className={cn(
                                     "flex cursor-pointer items-start justify-between gap-2 rounded-sm px-2 py-1.5 text-sm",
                                     isSelected ? "bg-primary-soft text-ink" : "text-ink-muted",

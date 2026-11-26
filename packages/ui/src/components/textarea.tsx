@@ -4,13 +4,30 @@ import { cn } from "../lib/cn.js";
 
 export const textareaVariants = tv({
     base: [
-        "flex min-h-24 w-full rounded-md border border-line bg-app px-3 py-2 text-sm text-ink",
+        "flex w-full rounded-md border text-ink",
         "placeholder:text-ink-subtle",
-        "transition-colors duration-150 resize-y",
-        "focus-visible:outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/30",
+        "transition-[color,background-color,border-color,box-shadow] duration-150 resize-y",
+        "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/25",
         "disabled:cursor-not-allowed disabled:opacity-50",
         "aria-[invalid=true]:border-ink aria-[invalid=true]:ring-1 aria-[invalid=true]:ring-ink",
     ],
+    variants: {
+        variant: {
+            outline: "border-line bg-app hover:border-line-strong focus-visible:border-primary",
+            soft: "border-transparent bg-raised focus-visible:border-primary/50",
+            subtle: "border-transparent bg-transparent hover:bg-raised focus-visible:bg-raised",
+            ghost: "border-transparent bg-transparent hover:bg-raised/60",
+        },
+        size: {
+            sm: "min-h-20 px-3 py-2 text-xs",
+            md: "min-h-24 px-3.5 py-2.5 text-sm",
+            lg: "min-h-32 px-4 py-3 text-sm",
+        },
+    },
+    defaultVariants: {
+        variant: "outline",
+        size: "md",
+    },
 });
 
 export interface TextareaProps
@@ -18,8 +35,14 @@ export interface TextareaProps
         VariantProps<typeof textareaVariants> {}
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
-    { className, ...rest },
+    { className, variant, size, ...rest },
     ref,
 ) {
-    return <textarea ref={ref} className={cn(textareaVariants(), className)} {...rest} />;
+    return (
+        <textarea
+            ref={ref}
+            className={cn(textareaVariants({ variant, size }), className)}
+            {...rest}
+        />
+    );
 });

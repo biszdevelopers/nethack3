@@ -139,7 +139,7 @@ export const TagInput = forwardRef<HTMLInputElement, TagInputProps>(function Tag
                                         aria-label={`Remove ${tag}`}
                                         disabled={disabled === true}
                                         onClick={() => removeTag(index)}
-                                        className="flex size-4 items-center justify-center rounded-sm text-ink-muted transition-colors hover:bg-app hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
+                                        className="relative flex size-4 items-center justify-center rounded-sm text-ink-muted transition-colors after:absolute after:-inset-2 after:content-[''] hover:bg-app hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
                                     >
                                         <X className="size-3" aria-hidden="true" />
                                     </button>

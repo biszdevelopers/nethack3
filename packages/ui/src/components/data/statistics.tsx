@@ -55,10 +55,14 @@ export function Statistics({
                     className="flex min-w-0 flex-col gap-1 rounded-md border border-line bg-panel p-4"
                 >
                     <dt className="text-xs text-ink-muted">{item.label}</dt>
-                    <dd className="text-2xl font-semibold tabular-nums text-ink">{item.value}</dd>
-                    {item.hint === undefined ? null : (
-                        <p className="text-xs text-ink-subtle">{item.hint}</p>
-                    )}
+                    <dd className="flex flex-col gap-1">
+                        <span className="text-2xl font-semibold tabular-nums text-ink">
+                            {item.value}
+                        </span>
+                        {item.hint === undefined ? null : (
+                            <span className="text-xs text-ink-subtle">{item.hint}</span>
+                        )}
+                    </dd>
                 </div>
             ))}
         </dl>

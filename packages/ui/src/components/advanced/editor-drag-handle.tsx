@@ -24,6 +24,7 @@ export function EditorDragHandle({
             data-slot="editor-drag-handle"
             className={cn(
                 "inline-flex size-7 shrink-0 cursor-grab items-center justify-center rounded-sm text-ink-subtle",
+                "relative after:absolute after:-inset-1.5 after:content-['']",
                 "transition-colors hover:bg-raised hover:text-ink active:cursor-grabbing",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                 "disabled:pointer-events-none disabled:opacity-50",

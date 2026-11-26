@@ -3,6 +3,7 @@ import { cn } from "../../lib/cn.js";
 import { EmptyState } from "../empty-state.js";
 
 export interface KeyValueItem {
+    readonly id?: string;
     readonly label: string;
     readonly value: ReactNode;
 }
@@ -45,8 +46,8 @@ export function KeyValue({
             className={cn("grid gap-x-6 gap-y-3", COLUMN_CLASS[columns], className)}
             data-slot="key-value"
         >
-            {items.map((item, index) => (
-                <div key={`${item.label}-${index}`} className="flex min-w-0 flex-col gap-0.5">
+            {items.map((item) => (
+                <div key={item.id ?? item.label} className="flex min-w-0 flex-col gap-0.5">
                     <dt className="text-xs text-ink-subtle">{item.label}</dt>
                     <dd className="break-words text-sm text-ink">{item.value}</dd>
                 </div>

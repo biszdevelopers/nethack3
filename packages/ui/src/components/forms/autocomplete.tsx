@@ -76,6 +76,28 @@ export function Autocomplete({
     const resolvedActiveIndex =
         activeIndex >= 0 && activeIndex < filtered.length ? activeIndex : -1;
 
+    const findEnabled = (start: number, direction: 1 | -1): number => {
+        for (let offset = 1; offset <= filtered.length; offset += 1) {
+            const index = (start + direction * offset + filtered.length) % filtered.length;
+            const option = filtered[index];
+            if (option !== undefined && option.disabled !== true) {
+                return index;
+            }
+        }
+        return -1;
+    };
+
+    const firstEnabled = (): number => filtered.findIndex((option) => option.disabled !== true);
+    const lastEnabled = (): number => {
+        for (let index = filtered.length - 1; index >= 0; index -= 1) {
+            const option = filtered[index];
+            if (option !== undefined && option.disabled !== true) {
+                return index;
+            }
+        }
+        return -1;
+    };
+
     const selectOption = (option: AutocompleteOption): void => {
         if (option.disabled === true) {
             return;
@@ -90,19 +112,17 @@ export function Autocomplete({
         if (event.key === "ArrowDown") {
             event.preventDefault();
             setOpen(true);
-            setActiveIndex((index) =>
-                filtered.length === 0 ? -1 : Math.min(index + 1, filtered.length - 1),
-            );
+            setActiveIndex((index) => findEnabled(index, 1));
         } else if (event.key === "ArrowUp") {
             event.preventDefault();
             setOpen(true);
-            setActiveIndex((index) => (index <= 0 ? 0 : index - 1));
+            setActiveIndex((index) => findEnabled(index <= 0 ? filtered.length : index, -1));
         } else if (event.key === "Home" && open) {
             event.preventDefault();
-            setActiveIndex(0);
+            setActiveIndex(firstEnabled());
         } else if (event.key === "End" && open) {
             event.preventDefault();
-            setActiveIndex(filtered.length - 1);
+            setActiveIndex(lastEnabled());
         } else if (event.key === "Enter" && open) {
             const option = filtered[resolvedActiveIndex];
             if (option !== undefined) {
@@ -188,7 +208,11 @@ export function Autocomplete({
                                         aria-selected={index === resolvedActiveIndex}
                                         aria-disabled={option.disabled === true || undefined}
                                         onMouseDown={(event) => event.preventDefault()}
-                                        onMouseEnter={() => setActiveIndex(index)}
+                                        onMouseEnter={() => {
+                                            if (option.disabled !== true) {
+                                                setActiveIndex(index);
+                                            }
+                                        }}
                                         onClick={() => selectOption(option)}
                                         className={cn(
                                             "cursor-pointer rounded-sm px-2 py-1.5",

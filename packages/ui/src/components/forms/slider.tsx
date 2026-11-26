@@ -92,9 +92,15 @@ export const Slider = forwardRef<HTMLSpanElement, SliderProps>(function Slider(
                                 ? `${label ?? "Value"} ${index === 0 ? "minimum" : "maximum"}`
                                 : (label ?? "Value")
                         }
+                        aria-valuetext={
+                            formatValue === undefined
+                                ? undefined
+                                : formatValue([values[index] ?? 0])
+                        }
                         aria-describedby={describedBy}
                         className={cn(
-                            "block size-4 rounded-full border border-primary bg-app",
+                            "relative block size-4 rounded-full border border-primary bg-app",
+                            "after:absolute after:-inset-2 after:content-['']",
                             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-app",
                             "data-[disabled]:pointer-events-none",
                         )}

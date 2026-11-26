@@ -68,7 +68,11 @@ function SidebarNavigationSection({
             ) : (
                 <p className="px-2 py-1 text-xs font-medium text-ink-subtle">{section.title}</p>
             )}
-            <ul id={contentId} hidden={collapsed} className="flex flex-col gap-0.5">
+            <ul
+                id={contentId}
+                hidden={collapsed}
+                className={cn("flex flex-col gap-0.5", collapsed && "hidden")}
+            >
                 {section.items.map((item) => {
                     const isActive =
                         activeId === undefined ? item.active === true : activeId === item.id;

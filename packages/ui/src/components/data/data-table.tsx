@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import {
     columnVisibilityFeature,
     createPaginatedRowModel,
@@ -83,24 +83,45 @@ function columnDefinitionLabel<TData extends RowData>(
     return typeof definition === "string" ? definition : header.column.id;
 }
 
+function SelectAllCheckbox({
+    checked,
+    indeterminate,
+    onChange,
+}: {
+    readonly checked: boolean;
+    readonly indeterminate: boolean;
+    readonly onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+}): ReactNode {
+    const ref = useRef<HTMLInputElement>(null);
+    useEffect(() => {
+        if (ref.current !== null) {
+            ref.current.indeterminate = indeterminate;
+        }
+    }, [indeterminate]);
+    return (
+        <input
+            ref={ref}
+            type="checkbox"
+            className="size-4 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            checked={checked}
+            onChange={onChange}
+            aria-label="Select all rows on this page"
+        />
+    );
+}
+
 function createSelectionColumn<TData extends RowData>(): DataTableColumn<TData> {
     return {
         id: "__select",
         enableSorting: false,
         enableHiding: false,
         header: ({ table }) => (
-            <input
-                type="checkbox"
-                className="size-4 accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            <SelectAllCheckbox
                 checked={table.getIsAllPageRowsSelected()}
+                indeterminate={
+                    table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected()
+                }
                 onChange={table.getToggleAllPageRowsSelectedHandler()}
-                aria-label="Select all rows on this page"
-                ref={(element) => {
-                    if (element !== null) {
-                        element.indeterminate =
-                            table.getIsSomePageRowsSelected() && !table.getIsAllPageRowsSelected();
-                    }
-                }}
             />
         ),
         cell: ({ row }) => (

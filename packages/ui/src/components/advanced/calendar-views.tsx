@@ -190,7 +190,7 @@ function MonthView({
                                                 }
                                             }}
                                             tabIndex={isFocused ? 0 : -1}
-                                            aria-current={isSelected ? "date" : undefined}
+                                            aria-pressed={isSelected}
                                             aria-label={format(day, "PPPP")}
                                             onClick={() => {
                                                 onFocusedDateChange(day);

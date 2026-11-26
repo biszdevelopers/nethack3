@@ -26,7 +26,7 @@ interface DayGroup {
 }
 
 function groupByDay(items: readonly ActivityFeedItem[]): DayGroup[] {
-    const sorted = [...items].sort(
+    const sorted = items.toSorted(
         (left, right) => right.timestamp.getTime() - left.timestamp.getTime(),
     );
     const groups: DayGroup[] = [];

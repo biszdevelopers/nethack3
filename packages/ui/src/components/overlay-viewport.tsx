@@ -1,12 +1,15 @@
 import { useSyncExternalStore, type ReactNode } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { X } from "lucide-react";
 import { overlayStore } from "../stores/ui-stores.js";
+
+const EMPTY_OVERLAYS: readonly never[] = [];
 
 export function OverlayViewport(): ReactNode {
     const entries = useSyncExternalStore(
         overlayStore.subscribe,
         overlayStore.getSnapshot,
-        () => [],
+        () => EMPTY_OVERLAYS,
     );
 
     return (
@@ -33,6 +36,14 @@ export function OverlayViewport(): ReactNode {
                                 </DialogPrimitive.Description>
                             )}
                             {entry.content}
+                            {entry.dismissible === false ? null : (
+                                <DialogPrimitive.Close
+                                    className="absolute right-4 top-4 inline-flex size-9 items-center justify-center rounded-sm text-ink-muted transition-colors after:absolute after:-inset-1 after:content-[''] hover:bg-raised hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                    aria-label="Close dialog"
+                                >
+                                    <X className="size-4" aria-hidden="true" />
+                                </DialogPrimitive.Close>
+                            )}
                         </DialogPrimitive.Content>
                     </DialogPrimitive.Portal>
                 </DialogPrimitive.Root>
