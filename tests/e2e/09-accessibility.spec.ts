@@ -55,6 +55,16 @@ test.describe("accessibility and visual layout", () => {
         await expectNoSeriousViolations(page, "workspace overview");
     });
 
+    test("workspace command palette navigates with the keyboard", async ({ page }) => {
+        test.setTimeout(180_000);
+        await signIn(page, USERS.participant);
+        await page.keyboard.press("Control+k");
+        const palette = page.getByRole("dialog", { name: "Command palette" });
+        await expect(palette).toBeVisible();
+        await palette.getByText("Competitions", { exact: true }).click();
+        await expect(page).toHaveURL(/\/competitions$/);
+    });
+
     test("public home matches the visual baseline", async ({ page }) => {
         test.setTimeout(180_000);
         await page.goto(siteUrl("/"));
@@ -66,6 +76,75 @@ test.describe("accessibility and visual layout", () => {
             caret: "hide",
             maxDiffPixelRatio: 0.03,
             mask: [page.locator('[data-gsap="parallax"]')],
+        });
+    });
+
+    test("public home light theme matches the visual baseline", async ({ page }) => {
+        test.setTimeout(180_000);
+        await page.goto(siteUrl("/"));
+        await page.getByRole("button", { name: "Switch to light mode" }).click();
+        await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+        await expect(page).toHaveScreenshot("public-home-light.png", {
+            animations: "disabled",
+            caret: "hide",
+            maxDiffPixelRatio: 0.03,
+            mask: [page.locator('[data-gsap="parallax"]')],
+        });
+    });
+
+    test("public mobile home matches the visual baseline", async ({ page }) => {
+        test.setTimeout(180_000);
+        await page.setViewportSize({ width: 412, height: 915 });
+        await page.goto(siteUrl("/"));
+        await expect(
+            page.getByRole("heading", { name: "Welcome to nethack", level: 1 }),
+        ).toBeVisible({ timeout: 60_000 });
+        await expect(page).toHaveScreenshot("public-home-mobile.png", {
+            animations: "disabled",
+            caret: "hide",
+            maxDiffPixelRatio: 0.03,
+            mask: [page.locator('[data-gsap="parallax"]')],
+        });
+    });
+
+    test("public tablet home matches the visual baseline", async ({ page }) => {
+        test.setTimeout(180_000);
+        await page.setViewportSize({ width: 768, height: 1024 });
+        await page.goto(siteUrl("/"));
+        await expect(
+            page.getByRole("heading", { name: "Welcome to nethack", level: 1 }),
+        ).toBeVisible({ timeout: 60_000 });
+        await expect(page).toHaveScreenshot("public-home-tablet.png", {
+            animations: "disabled",
+            caret: "hide",
+            maxDiffPixelRatio: 0.03,
+            mask: [page.locator('[data-gsap="parallax"]')],
+        });
+    });
+
+    test("empty archive state matches the visual baseline", async ({ page }) => {
+        test.setTimeout(180_000);
+        await page.goto(siteUrl("/past"));
+        await expect(page.getByRole("heading", { name: "No completed competitions" })).toBeVisible({
+            timeout: 60_000,
+        });
+        await expect(page).toHaveScreenshot("public-past-empty.png", {
+            animations: "disabled",
+            caret: "hide",
+            maxDiffPixelRatio: 0.03,
+        });
+    });
+
+    test("not-found page matches the visual baseline", async ({ page }) => {
+        test.setTimeout(180_000);
+        await page.goto(siteUrl("/this-page-does-not-exist"));
+        await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible({
+            timeout: 60_000,
+        });
+        await expect(page).toHaveScreenshot("public-not-found.png", {
+            animations: "disabled",
+            caret: "hide",
+            maxDiffPixelRatio: 0.03,
         });
     });
 });

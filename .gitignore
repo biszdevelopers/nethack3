@@ -161,6 +161,7 @@ vite.config.ts.timestamp-*
 .nx/migrate-runs
 
 # Test and build artifacts
+artifacts/
 playwright-report/
 blob-report/
 test-results/

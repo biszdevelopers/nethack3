@@ -6,8 +6,9 @@ test.describe("negative access paths", () => {
     test("shows an empty state for a user without an organization", async ({ page }) => {
         await signIn(page, USERS.nobody);
         await expect(page.getByRole("heading", { name: "Welcome, Fixture Nobody" })).toBeVisible();
-        await expect(page.getByText("No active organization", { exact: true })).toBeVisible();
+        await expect(page.getByRole("heading", { name: "Welcome to nethack" })).toBeVisible();
         await expect(page.getByText("No organization selected")).toBeVisible();
+        await expect(page.getByRole("link", { name: "Open notifications" })).toBeVisible();
 
         await page.goto("/competitions");
         await expect(page.getByText("No active organization", { exact: true })).toBeVisible();

@@ -134,16 +134,43 @@ jobs:
 
     security:
         runs-on: ubuntu-latest
+        env:
+            NETHACK_TEST_DB_PORT: "5432"
+        services:
+            postgres:
+                image: postgres:18
+                env:
+                    POSTGRES_PASSWORD: nethack_dev_password
+                    POSTGRES_USER: nethack
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd "pg_isready -U nethack" --health-interval 5s --health-timeout 5s --health-retries 20
         steps:
             - uses: actions/checkout@v4
             - uses: oven-sh/setup-bun@v2
               with:
                   bun-version: 1.3.14
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
             - run: bun install --frozen-lockfile
+            - name: Create database and runtime role
+              env:
+                  PGPASSWORD: nethack_dev_password
+              run: |
+                  psql -h 127.0.0.1 -U nethack -d postgres -c "create database nethack_test;"
+                  psql -h 127.0.0.1 -U nethack -d postgres -c "create role nethack_app login password 'nethack_app_password' nosuperuser nobypassrls nocreatedb nocreaterole;"
+                  psql -h 127.0.0.1 -U nethack -d postgres -c "grant connect on database nethack_test to nethack_app;"
             - run: bun run test:security
+            - run: bun run security:scan
             # Production advisories block release. The remaining moderate finding is a
             # dev-only esbuild used by drizzle-kit's migration generator.
             - run: bun audit --audit-level=high
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: sbom
+                  path: artifacts/sbom.cdx.json
 
     e2e:
         runs-on: ubuntu-latest
