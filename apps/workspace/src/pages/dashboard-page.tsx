@@ -12,7 +12,7 @@ import {
 } from "@nethack/ui";
 import type { StatisticItem } from "@nethack/ui";
 import { useActiveMembership } from "../application/session.js";
-import { OrganizationRequired } from "../components/organization-required.js";
+import { OnboardingPanel } from "../components/onboarding-panel.js";
 import { QueryErrorState, QueryLoading } from "../components/query-state.js";
 import { formatDateTime, timeUntil } from "../lib/format.js";
 import { humanizeStatus, statusBadgeTone } from "../lib/status.js";
@@ -43,7 +43,7 @@ export function DashboardPage(): ReactNode {
         return (
             <div className="flex flex-col gap-6">
                 <PageHeading name={user?.displayName ?? null} />
-                <OrganizationRequired />
+                <OnboardingPanel hasMemberships={(session.data?.memberships.length ?? 0) > 0} />
             </div>
         );
     }

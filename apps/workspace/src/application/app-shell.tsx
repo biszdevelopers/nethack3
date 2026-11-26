@@ -17,6 +17,7 @@ import {
     DropdownMenuTrigger,
     LoadingBlock,
     PageTransition,
+    CommandPalette,
     useGsapStagger,
     Separator,
     StatusIndicator,
@@ -132,6 +133,34 @@ export function AppShell(): ReactNode {
     const role = membership?.role ?? null;
     const visible = (item: NavigationItem): boolean =>
         item.roles === undefined || (role !== null && item.roles.includes(role));
+
+    const commandItems = [
+        ...PRIMARY_NAVIGATION,
+        ...REVIEW_NAVIGATION,
+        ...ORGANIZATION_NAVIGATION,
+        ...ACCOUNT_NAVIGATION,
+    ]
+        .filter(visible)
+        .map((item) => ({
+            id: item.to,
+            label: item.label,
+            description: `Go to ${item.label.toLowerCase()}`,
+            onSelect: () => navigate(item.to),
+        }));
+    const commandGroups = [
+        {
+            heading: "Navigate",
+            items: [
+                ...commandItems,
+                {
+                    id: "toggle-theme",
+                    label: colorMode === "dark" ? "Switch to light mode" : "Switch to dark mode",
+                    description: "Change the workspace appearance",
+                    onSelect: toggleColorMode,
+                },
+            ],
+        },
+    ];
 
     const onSelectOrganization = (organizationId: string): void => {
         organizationSelectionStore.select(organizationId);
@@ -292,6 +321,7 @@ export function AppShell(): ReactNode {
                         </Suspense>
                     </PageTransition>
                 </main>
+                <CommandPalette groups={commandGroups} />
             </div>
         </div>
     );

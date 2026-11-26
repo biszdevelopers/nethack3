@@ -29,7 +29,7 @@ export function EmptyState({
                 </div>
             )}
             <div className="flex max-w-md flex-col gap-1">
-                <p className="text-base font-medium text-ink">{title}</p>
+                <h3 className="text-base font-medium text-ink">{title}</h3>
                 <p className="text-sm text-ink-muted">{description}</p>
             </div>
             {action}
