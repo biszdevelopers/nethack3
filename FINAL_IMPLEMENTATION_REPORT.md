@@ -61,7 +61,7 @@ All results below were executed on this host unless marked otherwise.
 | Type checking | `bun run typecheck` | Pass for contracts, UI, API, workspace, and site |
 | Combined quality gate | `bun run check` | Pass (format, lint, typecheck, Vitest) |
 | Unit, architecture, security, migration, UI | `bun run test` | 28 root files / 286 tests and 17 UI files / 35 tests passed |
-| Integration and API security | `bun run test:integration`; `bun run test:security` | 16 files / 77 API/auth/security tests and 15 static security tests passed against local PostgreSQL 18 |
+| Integration, API security, and worker | `bun run test:integration`; `bun run test:security` | 17 files / 81 API/auth/security/worker tests and 15 static security tests passed against local PostgreSQL 18 |
 | Production build | `bun run build` | Pass: contracts, UI, API, workspace, site |
 | End-to-end | `bun run test:e2e` | 34 cases in 9 files, 1 desktop skip, 33 passed; accessibility/visual spec 16/16 |
 | Runtime matrix | `bun run verify:runtime` | 7/7 checks passed and exited 0: API health 200 and site HTTP 200 under Node 24 and Bun 1.3.14, plus package builds |
@@ -135,6 +135,6 @@ Not verified:
 
 ## 6. Readiness statement
 
-The repository contains a working, tested implementation of the product surface described in `FULL_PLAN.md`: the capability-based Fastify API, organization-aware PostgreSQL schema with RLS, Basis Auth OIDC integration, Nethack UI catalog, public Next.js site, authenticated React workspace, background worker, deployment definitions, and engineering documentation. The current tree passes formatting, linting, type checking, the combined quality gate, 321 unit/architecture/security/UI tests, 77 integration/API-security tests, the production build, runtime verification under Node and Bun, the full Playwright suite, the high-severity dependency audit, the secret scan/SBOM generator, and a backup/restore drill.
+The repository contains a working, tested implementation of the product surface described in `FULL_PLAN.md`: the capability-based Fastify API, organization-aware PostgreSQL schema with RLS, Basis Auth OIDC integration, Nethack UI catalog, public Next.js site, authenticated React workspace, background worker, deployment definitions, and engineering documentation. The current tree passes formatting, linting, type checking, the combined quality gate, 321 unit/architecture/security/UI tests, 81 integration/API-security/worker tests, the production build, runtime verification under Node and Bun, the full Playwright suite, the high-severity dependency audit, the secret scan/SBOM generator, and a backup/restore drill.
 
 It is not a verified production release. Production launch is blocked by the absence of Docker-based deployment verification and a live Basis Auth conformance run. The remaining gaps are tracked explicitly: incomplete per-component visual/state coverage, no loading-state screenshot baseline, no load or Lighthouse/Core Web Vitals measurement, no DAST/fuzzing or independent security assessment, no judge calibration, no organization-creation flow, and production deployment/auth conformance that require external infrastructure. The legacy migration is a tested tool with a synthetic fixture, not a completed data migration.
