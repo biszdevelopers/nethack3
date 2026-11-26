@@ -66,7 +66,7 @@ All results below were executed on this host unless marked otherwise.
 | End-to-end | `bun run test:e2e` | 34 cases in 9 files, 1 desktop skip, 33 passed; accessibility/visual spec 16/16 |
 | Runtime matrix | `bun run verify:runtime` | 7/7 checks passed and exited 0: API health 200 and site HTTP 200 under Node 24 and Bun 1.3.14, plus package builds |
 | Dependency audit | `bun audit --audit-level=high` | Pass, no high-severity advisory reported |
-| Secret scan and SBOM | `bun run security:scan` | Pass across 625 text files; 71-component CycloneDX SBOM written and uploaded by CI |
+| Secret scan and SBOM | `bun run security:scan` | Pass across 627 text files; 71-component CycloneDX SBOM written and uploaded by CI |
 | Migration tool | `tests/migration/migrate-legacy.test.ts` | 22 tests passed |
 | Backup and restore | `scripts/backup-database.ts`, `scripts/restore-database.ts` | 170 KiB custom-format dump created and restored into a scratch database with 42 tables; a restore-script import bug was fixed and the drill re-ran cleanly |
 | Container images | Docker | Not executed; Docker is not installed |
