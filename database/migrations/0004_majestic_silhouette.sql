@@ -1,0 +1,2 @@
+DROP INDEX "submission_files_storage_key_unique";--> statement-breakpoint
+CREATE UNIQUE INDEX "submission_files_version_storage_unique" ON "submission_files" USING btree ("submission_id","version_id","storage_key") WHERE "submission_files"."submission_id" is not null and "submission_files"."version_id" is not null;

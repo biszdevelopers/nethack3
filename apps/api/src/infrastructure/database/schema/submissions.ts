@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
     foreignKey,
     index,
@@ -140,7 +141,9 @@ export const submissionFiles = pgTable(
     },
     (table) => [
         unique("submission_files_id_org_unique").on(table.id, table.organizationId),
-        uniqueIndex("submission_files_storage_key_unique").on(table.storageKey),
+        uniqueIndex("submission_files_version_storage_unique")
+            .on(table.submissionId, table.versionId, table.storageKey)
+            .where(sql`${table.submissionId} is not null and ${table.versionId} is not null`),
         index("submission_files_project_idx").on(table.organizationId, table.projectId),
         index("submission_files_submission_idx").on(table.organizationId, table.submissionId),
         index("submission_files_version_idx").on(table.organizationId, table.versionId),
