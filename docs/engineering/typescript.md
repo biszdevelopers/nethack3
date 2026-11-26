@@ -24,17 +24,17 @@ Every TypeScript project extends `tsconfig.base.json`. The mandatory strictness 
 
 No application, package, test, or tool configuration may weaken these options. Build configurations may add options; they may not remove or relax these.
 
-| Option                             | Consequence in this repository                                                                                     |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `strict`                           | No implicit `any`, strict null checks, strict function types, strict property initialization                        |
-| `noUncheckedIndexedAccess`         | Indexed reads and `array[index]` produce `T \| undefined`; handle absence instead of asserting                       |
-| `exactOptionalPropertyTypes`       | `property?: string` does not accept `undefined`; use `string \| undefined` where absence is explicit                |
-| `noImplicitOverride`               | Subclass members that override a base member declare `override`                                                     |
-| `noImplicitReturns`                | Every code path in a function with a return value returns explicitly                                                |
-| `noFallthroughCasesInSwitch`       | Switch cases end in `break`, `return`, or `throw`                                                                   |
-| `forceConsistentCasingInFileNames` | Imports match file casing exactly; required for Linux builds and case-sensitive containers                          |
-| `verbatimModuleSyntax`             | Type-only imports use `import type`; no type imports are emitted as runtime imports                                  |
-| `skipLibCheck`                     | Declaration files from dependencies are not typechecked; application code still is                                          |
+| Option | Consequence in this repository |
+| --- | --- |
+| `strict` | No implicit `any`, strict null checks, strict function types, strict property initialization |
+| `noUncheckedIndexedAccess` | Indexed reads and `array[index]` produce `T \| undefined`; handle absence instead of asserting |
+| `exactOptionalPropertyTypes` | `property?: string` does not accept `undefined`; use `string \| undefined` where absence is explicit |
+| `noImplicitOverride` | Subclass members that override a base member declare `override` |
+| `noImplicitReturns` | Every code path in a function with a return value returns explicitly |
+| `noFallthroughCasesInSwitch` | Switch cases end in `break`, `return`, or `throw` |
+| `forceConsistentCasingInFileNames` | Imports match file casing exactly; required for Linux builds and case-sensitive containers |
+| `verbatimModuleSyntax` | Type-only imports use `import type`; no type imports are emitted as runtime imports |
+| `skipLibCheck` | Declaration files from dependencies are not typechecked; application code still is |
 
 Projects target ES2023 and use `module` and `moduleResolution` NodeNext, `isolatedModules`, and `resolveJsonModule`. Relative ESM imports use the emitted `.js` specifier, consistent with NodeNext.
 

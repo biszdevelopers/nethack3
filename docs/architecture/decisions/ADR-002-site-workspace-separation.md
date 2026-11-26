@@ -14,11 +14,11 @@ The public site needs server-side rendering, static generation, incremental rege
 
 Nethack has three application runtimes:
 
-| Runtime   | Implementation             | Responsibility                                             |
-| --------- | -------------------------- | ---------------------------------------------------------- |
-| Public    | Next.js App Router         | Public content, SSR, SSG, ISR, streaming                   |
-| Workspace | React with Vite, static    | Authenticated interaction and presentation                  |
-| API       | Fastify                    | Identity, sessions, authorization, business rules, data    |
+| Runtime   | Implementation          | Responsibility                                          |
+| --------- | ----------------------- | ------------------------------------------------------- |
+| Public    | Next.js App Router      | Public content, SSR, SSG, ISR, streaming                |
+| Workspace | React with Vite, static | Authenticated interaction and presentation              |
+| API       | Fastify                 | Identity, sessions, authorization, business rules, data |
 
 The public site uses Server Components, static rendering where possible, SSR for request-dependent public pages, and ISR where appropriate. It consumes public API data only.
 

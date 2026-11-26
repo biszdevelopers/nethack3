@@ -1,25 +1,17 @@
 # Security requirements
 
-Status: security specification. These are required controls and verification
-obligations. Their presence in this document does not mean they are implemented
-or verified. A control is verified only when the named test or review has been
-executed and its evidence is recorded.
+Status: security specification. These are required controls and verification obligations. Their presence in this document does not mean they are implemented or verified. A control is verified only when the named test or review has been executed and its evidence is recorded.
 
 ## 1. Standard and verification model
 
 ### 1.1 Baseline
 
-nethack must use OWASP Application Security Verification Standard 5.0.0 as its
-baseline. The target is:
+nethack must use OWASP Application Security Verification Standard 5.0.0 as its baseline. The target is:
 
 - Level 2 across the application.
-- Level 3 for identity, organization isolation, file handling, and privileged
-  administration.
+- Level 3 for identity, organization isolation, file handling, and privileged administration.
 
-ASVS is a verification standard, not a checklist to be copied into code. Each
-applicable requirement must be assessed against the actual implementation,
-recorded with a result, and supported by evidence. Requirements that do not
-apply must be marked not applicable with a reason.
+ASVS is a verification standard, not a checklist to be copied into code. Each applicable requirement must be assessed against the actual implementation, recorded with a result, and supported by evidence. Requirements that do not apply must be marked not applicable with a reason.
 
 ### 1.2 ASVS chapter coverage
 
@@ -43,14 +35,11 @@ apply must be marked not applicable with a reason.
 | V16 Security Logging and Error Handling | Level 2 | Level 3 for privileged administration and security events |
 | V17 WebRTC | Out of scope | nethack does not provide WebRTC functionality |
 
-The exact ASVS requirement identifiers, level, result, evidence, tester, and
-date must be recorded in the security verification worksheet for each release.
-A chapter-level statement is not a substitute for requirement-level evidence.
+The exact ASVS requirement identifiers, level, result, evidence, tester, and date must be recorded in the security verification worksheet for each release. A chapter-level statement is not a substitute for requirement-level evidence.
 
 ### 1.3 Level 3 scope
 
-The following areas must be verified at Level 3, in addition to the Level 2
-baseline:
+The following areas must be verified at Level 3, in addition to the Level 2 baseline:
 
 | Level 3 area | Controls in this document | Required evidence |
 | --- | --- | --- |
@@ -59,13 +48,9 @@ baseline:
 | File handling | SEC-FILE-01 through SEC-FILE-10 | Malicious-file fixtures, inspection-worker isolation tests, download-header tests, independent file-handling review |
 | Privileged administration | SEC-ADMIN-01 through SEC-ADMIN-04; SEC-LOG-01 through SEC-LOG-04 | Authorization matrix tests, audit-event tests, break-glass exercises, periodic access review |
 
-A control that appears in more than one area must be verified once per area
-where the evidence required by each area differs. Level 3 is not satisfied by a
-code inspection alone.
+A control that appears in more than one area must be verified once per area where the evidence required by each area differs. Level 3 is not satisfied by a code inspection alone.
 
-Controls in section 2 are Level 2 unless they fall within one of the Level 3
-areas above. The Level 3 designation adds verification depth and evidence
-requirements; it does not replace the Level 2 baseline.
+Controls in section 2 are Level 2 unless they fall within one of the Level 3 areas above. The Level 3 designation adds verification depth and evidence requirements; it does not replace the Level 2 baseline.
 
 ### 1.4 Verification suites
 
@@ -77,20 +62,13 @@ requirements; it does not replace the Level 2 baseline.
 | `tests/e2e` | Playwright browser flows across real origins | Login, logout, cookie attributes, CSRF in a browser, stored XSS rendering, cross-organization navigation, file upload/download, administrative flows |
 | `tests/visual` | Visual regression and state coverage | Must not be used as security evidence except for visible security states such as error and empty states |
 
-Controls that are verified by CI or an operational review rather than one of the
-four application suites name that evidence explicitly. The four application
-suites remain mandatory for application behavior. A CI result or review does not
-replace a missing application test for a control that is exercised at runtime.
+Controls that are verified by CI or an operational review rather than one of the four application suites name that evidence explicitly. The four application suites remain mandatory for application behavior. A CI result or review does not replace a missing application test for a control that is exercised at runtime.
 
-Tests must run under both supported runtimes where the code under test is
-runtime-neutral. Authentication, database, worker, and API tests must run under
-Node.js and Bun as required by `FULL_PLAN.md` section 5.
+Tests must run under both supported runtimes where the code under test is runtime-neutral. Authentication, database, worker, and API tests must run under Node.js and Bun as required by `FULL_PLAN.md` section 5.
 
 ## 2. Control requirements
 
-Each control below is mandatory. The verification column names the suite that
-must contain the check; the exact test case names are recorded with the
-evidence.
+Each control below is mandatory. The verification column names the suite that must contain the check; the exact test case names are recorded with the evidence.
 
 ### 2.1 Identity and session
 
@@ -209,26 +187,17 @@ evidence.
 
 The suite must contain, at minimum:
 
-- Stored, reflected, and DOM XSS fixtures for profiles, project text,
-  announcements, filenames, and rich text.
-- SQL injection attempts against every filter, sort, search, and identifier
-  parameter.
-- BOLA and IDOR attempts for every resource type, including nested resources
-  and files.
-- Cross-organization access attempts using valid sessions from another
-  organization.
+- Stored, reflected, and DOM XSS fixtures for profiles, project text, announcements, filenames, and rich text.
+- SQL injection attempts against every filter, sort, search, and identifier parameter.
+- BOLA and IDOR attempts for every resource type, including nested resources and files.
+- Cross-organization access attempts using valid sessions from another organization.
 - CSRF attempts with missing, wrong, replayed, and cross-session tokens.
-- SSRF attempts against loopback, private, link-local, metadata, redirect, and
-  DNS-rebinding style destinations.
-- Open redirect attempts through login return paths and provider redirect
-  parameters.
+- SSRF attempts against loopback, private, link-local, metadata, redirect, and DNS-rebinding style destinations.
+- Open redirect attempts through login return paths and provider redirect parameters.
 - Session fixation and cookie injection attempts.
 - Refresh-token reuse and concurrent refresh attempts.
-- Backchannel forgery, replay, wrong-audience, wrong-issuer, wrong-`typ`, and
-  expired-token attempts.
-- Malicious upload fixtures: path traversal names, archive bombs, encrypted
-  archives, symlinks, SVG, HTML, executables, polyglots, MIME mismatches,
-  oversized files, and active PDF content.
+- Backchannel forgery, replay, wrong-audience, wrong-issuer, wrong-`typ`, and expired-token attempts.
+- Malicious upload fixtures: path traversal names, archive bombs, encrypted archives, symlinks, SVG, HTML, executables, polyglots, MIME mismatches, oversized files, and active PDF content.
 - Duplicate voting and duplicate submission attempts.
 - Unauthorized administrative actions and role escalation attempts.
 
@@ -236,19 +205,14 @@ The suite must contain, at minimum:
 
 The suite must contain, at minimum:
 
-- No forbidden DOM sinks, `eval`, dynamic script construction, or unsafe HTML
-  rendering.
+- No forbidden DOM sinks, `eval`, dynamic script construction, or unsafe HTML rendering.
 - No string-concatenated SQL or unparameterized raw SQL.
 - No unscoped tenant repository method or query.
-- No client-provided role, permission, or organization claim used as
-  authority.
-- No server-only secret, private token, database client, or administrative
-  credential in a browser bundle.
+- No client-provided role, permission, or organization claim used as authority.
+- No server-only secret, private token, database client, or administrative credential in a browser bundle.
 - No `BYPASSRLS`, session-level tenant setting, or runtime DDL credential.
-- No wildcard credentialed CORS, insecure cookie, or missing security header
-  configuration.
-- No floating production dependency, second lockfile, or unreviewed lifecycle
-  script.
+- No wildcard credentialed CORS, insecure cookie, or missing security header configuration.
+- No floating production dependency, second lockfile, or unreviewed lifecycle script.
 - No secret in logs, source maps, fixtures, or repository files.
 - No auth logic in public-site middleware.
 
@@ -256,17 +220,13 @@ The suite must contain, at minimum:
 
 The suite must contain, at minimum:
 
-- Login transaction lifecycle, callback validation, code exchange, and ID token
-  validation against a provider double.
-- Session creation, storage inspection, expiry, revocation, and cookie
-  attributes.
+- Login transaction lifecycle, callback validation, code exchange, and ID token validation against a provider double.
+- Session creation, storage inspection, expiry, revocation, and cookie attributes.
 - Token encryption, key versioning, and rotation.
 - Refresh concurrency with real database locks.
-- Logout, backchannel proof, logout token, revocation token, denylist, and
-  `tokens_valid_after`.
+- Logout, backchannel proof, logout token, revocation token, denylist, and `tokens_valid_after`.
 - Standard `401 invalid_token` and `403` responses.
-- RLS with the runtime role: missing context, cross-organization select,
-  insert, update, delete, and pool isolation.
+- RLS with the runtime role: missing context, cross-organization select, insert, update, delete, and pool isolation.
 - Composite foreign keys and organization-scoped unique constraints.
 - Route-level authorization for every role and operation.
 - Cache headers, CORS, CSP, and download headers.
@@ -283,8 +243,7 @@ The suite must contain, at minimum:
 - Organization selection and cross-organization navigation attempts.
 - Role-appropriate visible actions and server-side rejection of hidden actions.
 - Stored XSS rendering attempts.
-- File upload, quarantine, approval, authorized download, and rejected file
-  behavior.
+- File upload, quarantine, approval, authorized download, and rejected file behavior.
 - Administrative flows and audit visibility.
 - CSRF attempts from a cross-origin page.
 - Asset-origin requests without cookies or credentials.
@@ -300,51 +259,32 @@ The suite must contain, at minimum:
 | Medium | CVSS 4.0-6.9, limited impact or significant preconditions | Must have an owner, remediation date, and documented risk decision before release |
 | Low | CVSS 0.1-3.9, informational, defense-in-depth improvement | May ship with a tracked remediation item |
 
-A finding is evaluated on exploitability, not score alone. A high-severity
-finding with no reachable path may be documented as non-exploitable only with
-evidence and security-owner approval. A low-severity finding with an active
-exploitation path is treated as high.
+A finding is evaluated on exploitability, not score alone. A high-severity finding with no reachable path may be documented as non-exploitable only with evidence and security-owner approval. A low-severity finding with an active exploitation path is treated as high.
 
 ### 4.2 Blocking rule
 
 A release must not ship when any of the following is true:
 
-- A known exploitable critical or high-severity vulnerability exists in nethack
-  code, a production dependency, a container base image, or production
-  configuration.
-- A critical or high-severity finding is suppressed, ignored, or excluded from
-  a scanner without a recorded false-positive analysis.
-- Authentication, authorization, tenant isolation, file handling, or
-  administrative controls have an unresolved failure in the release security
-  suite.
+- A known exploitable critical or high-severity vulnerability exists in nethack code, a production dependency, a container base image, or production configuration.
+- A critical or high-severity finding is suppressed, ignored, or excluded from a scanner without a recorded false-positive analysis.
+- Authentication, authorization, tenant isolation, file handling, or administrative controls have an unresolved failure in the release security suite.
 - The SBOM is missing, incomplete, or does not match the deployed artifact.
-- Required secret scanning or dependency scanning did not run for the release
-  candidate.
-- A required rotation or revocation procedure cannot be executed during the
-  release window.
+- Required secret scanning or dependency scanning did not run for the release candidate.
+- A required rotation or revocation procedure cannot be executed during the release window.
 
 ### 4.3 Exceptions
 
-There is no severity downgrade by convenience. A critical or high finding may
-be released only when:
+There is no severity downgrade by convenience. A critical or high finding may be released only when:
 
-1. The finding is proven to be a false positive, with the scanner rule, version,
-   and evidence recorded.
+1. The finding is proven to be a false positive, with the scanner rule, version, and evidence recorded.
 2. The affected code or feature is removed from the release.
-3. A compensating control fully blocks the exploitation path and is tested, and
-   the security owner records a time-bounded acceptance.
+3. A compensating control fully blocks the exploitation path and is tested, and the security owner records a time-bounded acceptance.
 
-The acceptance must name the risk owner, the affected versions, the
-compensating control, the detection method, the expiry date, and the
-remediation plan.
+The acceptance must name the risk owner, the affected versions, the compensating control, the detection method, the expiry date, and the remediation plan.
 
 ### 4.4 Emergency patching
 
-A critical or high advisory affecting production triggers the emergency
-procedure in `docs/security/incident-response.md`. The patch is built from the
-committed lockfile, scanned, tested, deployed through the normal release path,
-and followed by a post-incident review. If the vendor has no patch, the
-affected feature is disabled or isolated until a safe version is available.
+A critical or high advisory affecting production triggers the emergency procedure in `docs/security/incident-response.md`. The patch is built from the committed lockfile, scanned, tested, deployed through the normal release path, and followed by a post-incident review. If the vendor has no patch, the affected feature is disabled or isolated until a safe version is available.
 
 ## 5. SBOM, scanning, and release evidence
 
@@ -354,14 +294,11 @@ Every release candidate must produce an SBOM that:
 
 - Uses CycloneDX JSON (1.5 or later) or SPDX (2.3 or later).
 - Includes direct and transitive application dependencies.
-- Includes container base-image and operating-system packages for every
-  deployed image.
+- Includes container base-image and operating-system packages for every deployed image.
 - Records package names, versions, licenses, and dependency relationships.
-- Is generated from the locked dependency graph and the built image, not from a
-  hand-maintained list.
+- Is generated from the locked dependency graph and the built image, not from a hand-maintained list.
 - Is stored immutably with the release artifact and referenced by digest.
-- Is retained for at least as long as the release is supported and according to
-  the incident-evidence retention policy.
+- Is retained for at least as long as the release is supported and according to the incident-evidence retention policy.
 
 ### 5.2 Required scans
 
@@ -380,13 +317,11 @@ Every release candidate must produce an SBOM that:
 - Use exact versions in production.
 - Commit `bun.lock` and install with `--frozen-lockfile` in CI.
 - Remove unused packages.
-- Review new packages for maintenance, popularity, ownership, transitive
-  weight, lifecycle scripts, native code, and known advisories.
+- Review new packages for maintenance, popularity, ownership, transitive weight, lifecycle scripts, native code, and known advisories.
 - Review transitive dependency changes in lockfile diffs.
 - Monitor advisories continuously and subscribe to automated alerts.
 - Keep an emergency upgrade procedure with a tested rollback.
-- Never patch a dependency by editing files inside `node_modules` or by
-  monkey-patching at runtime.
+- Never patch a dependency by editing files inside `node_modules` or by monkey-patching at runtime.
 
 ### 5.4 Release evidence
 
@@ -400,27 +335,17 @@ The release record must contain:
 - The rollback plan and the previous deployable artifact.
 - The names of the people who approved the release.
 
-A release is not approved because the build passes. It is approved when the
-required evidence exists and the blocking conditions are false.
+A release is not approved because the build passes. It is approved when the required evidence exists and the blocking conditions are false.
 
 ## 6. Verification and reporting
 
-- Every control in section 2 must have at least one executed check before it is
-  marked verified.
-- A test that only asserts a configuration value is not sufficient for a
-  runtime control unless the configuration is the control.
-- Security tests must fail when the control is removed. A test that passes
-  against a deliberately broken implementation is not evidence.
-- Findings must be recorded with severity, affected asset, reproduction,
-  evidence, remediation, owner, and status.
-- The requirement tracker is updated only after execution. File presence is not
-  verification.
-- Independent penetration testing and focused review of authentication,
-  authorization, tenant isolation, and file handling are required before
-  launch.
-- The threat model, this document, and the test suites are reviewed together
-  after every incident and at every release cycle.
-
+- Every control in section 2 must have at least one executed check before it is marked verified.
+- A test that only asserts a configuration value is not sufficient for a runtime control unless the configuration is the control.
+- Security tests must fail when the control is removed. A test that passes against a deliberately broken implementation is not evidence.
+- Findings must be recorded with severity, affected asset, reproduction, evidence, remediation, owner, and status.
+- The requirement tracker is updated only after execution. File presence is not verification.
+- Independent penetration testing and focused review of authentication, authorization, tenant isolation, and file handling are required before launch.
+- The threat model, this document, and the test suites are reviewed together after every incident and at every release cycle.
 
 ## Dependency audit status
 

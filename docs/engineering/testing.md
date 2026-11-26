@@ -4,28 +4,28 @@ Required test layers, capability suites, runtime matrices, negative paths, and e
 
 ## Testing stack
 
-| Layer               | Tool                                   |
-| ------------------- | -------------------------------------- |
-| Unit                | Vitest                                 |
-| Integration         | Vitest                                 |
-| API                 | Fastify injection                      |
-| End-to-end          | Playwright                             |
-| Accessibility       | axe-core with Playwright               |
-| Load                | k6                                     |
-| Architecture        | Vitest architecture checks             |
-| Visual regression   | Playwright screenshots                 |
-| Dependency security | Vulnerability scanning                 |
-| Static analysis     | Oxlint and security analyzers          |
+| Layer               | Tool                          |
+| ------------------- | ----------------------------- |
+| Unit                | Vitest                        |
+| Integration         | Vitest                        |
+| API                 | Fastify injection             |
+| End-to-end          | Playwright                    |
+| Accessibility       | axe-core with Playwright      |
+| Load                | k6                            |
+| Architecture        | Vitest architecture checks    |
+| Visual regression   | Playwright screenshots        |
+| Dependency security | Vulnerability scanning        |
+| Static analysis     | Oxlint and security analyzers |
 
 ## Test pyramid
 
 The suite has more fast tests than slow tests, and each layer has a distinct purpose.
 
-| Layer        | Purpose                                                                 | Speed     |
-| ------------ | ----------------------------------------------------------------------- | --------- |
-| Unit         | Domain rules, value objects, algorithms, validation, pure transformations | Fast      |
-| Integration  | Application operations, persistence, transactions, authorization, events, HTTP contracts | Medium    |
-| End-to-end   | Real user journeys across the site, workspace, API, database, and identity | Slow      |
+| Layer | Purpose | Speed |
+| --- | --- | --- |
+| Unit | Domain rules, value objects, algorithms, validation, pure transformations | Fast |
+| Integration | Application operations, persistence, transactions, authorization, events, HTTP contracts | Medium |
+| End-to-end | Real user journeys across the site, workspace, API, database, and identity | Slow |
 
 Rules:
 
@@ -41,16 +41,16 @@ Rules:
 
 Every capability under `apps/api/src/capabilities/<name>` owns tests in its `tests/` folder. Every capability must be independently testable and must cover:
 
-| Area              | Required coverage                                                                 |
-| ----------------- | --------------------------------------------------------------------------------- |
-| Domain rules      | Invariants, state transitions, eligibility, deadlines, ownership, uniqueness       |
-| Application       | Each public operation, including success and failure branches                      |
-| Contracts         | Input and output schemas, compatibility, rejection of unknown or malformed input    |
-| Persistence       | Mapping, constraints, transactions, rollback behavior                              |
-| Authorization     | Identity, organization context, membership, operation permission, ownership        |
-| Events            | Emission, payload shape, idempotent consumption, failure isolation                 |
-| Errors            | Error category, code, message safety, correlation ID                               |
-| Concurrency       | Duplicate submissions, duplicate votes, simultaneous invitation acceptance, lost updates |
+| Area | Required coverage |
+| --- | --- |
+| Domain rules | Invariants, state transitions, eligibility, deadlines, ownership, uniqueness |
+| Application | Each public operation, including success and failure branches |
+| Contracts | Input and output schemas, compatibility, rejection of unknown or malformed input |
+| Persistence | Mapping, constraints, transactions, rollback behavior |
+| Authorization | Identity, organization context, membership, operation permission, ownership |
+| Events | Emission, payload shape, idempotent consumption, failure isolation |
+| Errors | Error category, code, message safety, correlation ID |
+| Concurrency | Duplicate submissions, duplicate votes, simultaneous invitation acceptance, lost updates |
 
 The Core has its own tests: registry validation, duplicate identifiers, missing dependencies, cycle detection, deterministic initialization order, contract registration conflicts, startup and shutdown order, and event dispatch isolation.
 
@@ -84,17 +84,17 @@ An architecture test fails the build. A violation cannot be waived by a comment 
 
 Every significant server change passes both runtimes with the same source and the same lockfile.
 
-| Area                       | Node.js  | Bun      |
-| -------------------------- | -------- | -------- |
-| Public Next.js site        | Required | Required |
-| Workspace development      | Required | Required |
-| Workspace static output    | Supported | Supported |
-| Fastify API                | Required | Required |
-| Database operations        | Required | Required |
-| Background workers         | Required | Required |
-| Database migrations        | Required | Required |
-| Authentication             | Required | Required |
-| File processing            | Required | Required |
+| Area                    | Node.js   | Bun       |
+| ----------------------- | --------- | --------- |
+| Public Next.js site     | Required  | Required  |
+| Workspace development   | Required  | Required  |
+| Workspace static output | Supported | Supported |
+| Fastify API             | Required  | Required  |
+| Database operations     | Required  | Required  |
+| Background workers      | Required  | Required  |
+| Database migrations     | Required  | Required  |
+| Authentication          | Required  | Required  |
+| File processing         | Required  | Required  |
 
 Both environments:
 
@@ -133,23 +133,23 @@ The journey covers a real application session, an organization-aware API request
 
 Every important negative path is tested. Passing only the happy path is not acceptance.
 
-| Area                     | Required negative cases                                                                 |
-| ------------------------ | --------------------------------------------------------------------------------------- |
-| Authentication           | Missing, expired, malformed, revoked, wrong-audience token; failed state; invalid nonce; reused authorization code |
-| Sessions                 | Fixation, session invalidation, refresh rotation, refresh-token reuse, backchannel logout, disabled account |
-| Authorization            | Missing permission, wrong role, resource in another organization, guessed identifier, archived resource |
-| Validation               | Missing field, wrong type, oversized payload, unexpected field, invalid date or time zone |
-| CSRF and origin          | Missing or wrong CSRF token, wrong Origin, state-changing GET, wrong content type        |
-| XSS                      | Stored, reflected, and DOM payloads in names, descriptions, announcements, and rich text |
-| SQL injection            | Payloads in identifiers, filters, sort fields, and search terms                          |
-| SSRF                     | Loopback, private address, redirect to private address, oversized response, slow response |
-| Files                    | Wrong signature, wrong MIME type, oversize file, executable content, malicious SVG, archive traversal, decompression bomb |
-| Submissions              | Deadline passed, duplicate submission, invalid revision, unauthorized edit, concurrent update |
-| Voting                   | Duplicate vote, ineligible voter, closed round, replayed ballot, concurrent vote          |
-| Judging                  | Unassigned judge, conflict of interest, score outside rubric, edited evaluation after lock |
-| Administration           | Organization-scoped admin acting on another organization, global privilege without grant, unaudited action |
-| Pagination and filtering | Invalid cursor, oversized limit, unsupported sort, conflicting filters                   |
-| Rate limiting            | Login, invitation, upload, vote, and search bursts                                       |
+| Area | Required negative cases |
+| --- | --- |
+| Authentication | Missing, expired, malformed, revoked, wrong-audience token; failed state; invalid nonce; reused authorization code |
+| Sessions | Fixation, session invalidation, refresh rotation, refresh-token reuse, backchannel logout, disabled account |
+| Authorization | Missing permission, wrong role, resource in another organization, guessed identifier, archived resource |
+| Validation | Missing field, wrong type, oversized payload, unexpected field, invalid date or time zone |
+| CSRF and origin | Missing or wrong CSRF token, wrong Origin, state-changing GET, wrong content type |
+| XSS | Stored, reflected, and DOM payloads in names, descriptions, announcements, and rich text |
+| SQL injection | Payloads in identifiers, filters, sort fields, and search terms |
+| SSRF | Loopback, private address, redirect to private address, oversized response, slow response |
+| Files | Wrong signature, wrong MIME type, oversize file, executable content, malicious SVG, archive traversal, decompression bomb |
+| Submissions | Deadline passed, duplicate submission, invalid revision, unauthorized edit, concurrent update |
+| Voting | Duplicate vote, ineligible voter, closed round, replayed ballot, concurrent vote |
+| Judging | Unassigned judge, conflict of interest, score outside rubric, edited evaluation after lock |
+| Administration | Organization-scoped admin acting on another organization, global privilege without grant, unaudited action |
+| Pagination and filtering | Invalid cursor, oversized limit, unsupported sort, conflicting filters |
+| Rate limiting | Login, invitation, upload, vote, and search bursts |
 
 Security tests also cover stored, reflected, and DOM XSS; SQL injection; IDOR; cross-organization access; CSRF; SSRF; open redirects; session fixation; refresh-token reuse; backchannel logout; malicious uploads; duplicate voting; duplicate submissions; concurrent updates; and unauthorized administrative actions.
 
@@ -202,18 +202,18 @@ Load tests run against a production-like environment with realistic data volumes
 
 Root scripts from `package.json`:
 
-| Command                     | Purpose                                                      |
-| --------------------------- | ------------------------------------------------------------ |
+| Command                     | Purpose                                                          |
+| --------------------------- | ---------------------------------------------------------------- |
 | `bun run test`              | All Vitest suites: unit, integration, architecture, and security |
-| `bun run test:architecture` | Architecture boundary and convention checks                   |
-| `bun run test:integration`  | API and persistence integration suites                        |
-| `bun run test:security`     | Security negative-path suite                                  |
-| `bun run test:e2e`          | Playwright end-to-end journeys                                |
-| `bun run test:visual`       | Playwright visual regression suite                            |
-| `bun run test:load`         | k6 load scenarios                                             |
-| `bun run verify:runtime`    | Node.js and Bun runtime verification                          |
-| `bun run check`             | Format check, lint, typecheck, and Vitest                      |
-| `bun run test:watch`        | Vitest watch mode during development                          |
+| `bun run test:architecture` | Architecture boundary and convention checks                      |
+| `bun run test:integration`  | API and persistence integration suites                           |
+| `bun run test:security`     | Security negative-path suite                                     |
+| `bun run test:e2e`          | Playwright end-to-end journeys                                   |
+| `bun run test:visual`       | Playwright visual regression suite                               |
+| `bun run test:load`         | k6 load scenarios                                                |
+| `bun run verify:runtime`    | Node.js and Bun runtime verification                             |
+| `bun run check`             | Format check, lint, typecheck, and Vitest                        |
+| `bun run test:watch`        | Vitest watch mode during development                             |
 
 Rules:
 

@@ -25,14 +25,14 @@ Basis Auth is an independent service with its own database. Nethack never querie
 
 ## Applications
 
-| Application | Path             | Runtime                | Owns                                                                                   |
-| ----------- | ---------------- | ---------------------- | -------------------------------------------------------------------------------------- |
-| Public site | `apps/site`      | Next.js App Router     | Public content rendering, metadata, public cache policy                                |
-| Workspace   | `apps/workspace` | React, Vite, browser   | Authenticated presentation, interaction, client-side navigation                         |
-| API         | `apps/api`       | Fastify, Node.js or Bun | Identity verification, sessions, authorization, business rules, persistence, workers   |
-| UI          | `packages/ui`    | Browser                | Shared design system, tokens, primitives, components, hooks, providers                  |
-| Contracts   | `packages/contracts` | Isomorphic         | Zod schemas, request and response types, shared domain literals                          |
-| API client  | `packages/api-client` | Browser or server  | Typed HTTP communication with the API                                                   |
+| Application | Path | Runtime | Owns |
+| --- | --- | --- | --- |
+| Public site | `apps/site` | Next.js App Router | Public content rendering, metadata, public cache policy |
+| Workspace | `apps/workspace` | React, Vite, browser | Authenticated presentation, interaction, client-side navigation |
+| API | `apps/api` | Fastify, Node.js or Bun | Identity verification, sessions, authorization, business rules, persistence, workers |
+| UI | `packages/ui` | Browser | Shared design system, tokens, primitives, components, hooks, providers |
+| Contracts | `packages/contracts` | Isomorphic | Zod schemas, request and response types, shared domain literals |
+| API client | `packages/api-client` | Browser or server | Typed HTTP communication with the API |
 
 The Core lives inside `apps/api/src/core`. It is not a separate package initially. Capabilities live inside `apps/api/src/capabilities` and `apps/workspace/src/capabilities`.
 
@@ -53,16 +53,16 @@ The Core lives inside `apps/api/src/core`. It is not a separate package initiall
 
 ## Trust boundaries
 
-| Boundary                   | Rule                                                                                          |
-| -------------------------- | --------------------------------------------------------------------------------------------- |
-| Browser to workspace       | Static assets only; no secrets; UI cannot enforce authorization                               |
-| Workspace to API           | Session cookie plus CSRF protection; exact origin allowlist; API validates every request      |
-| Browser to public site     | Public content only; no session cookie; no authenticated data                                 |
-| Public site to API         | Public read-only endpoints; no private credentials                                           |
-| API to basis Auth          | Server-to-server OIDC with PKCE; client secret and tokens never reach the browser              |
-| API to PostgreSQL          | Runtime role with least privilege; separate migration role; organization context enforced     |
-| API to files               | Quarantine, inspection, approved storage, authorized download                                 |
-| API to external services   | Restricted hosts, timeouts, bounded responses, no arbitrary SSRF                              |
+| Boundary | Rule |
+| --- | --- |
+| Browser to workspace | Static assets only; no secrets; UI cannot enforce authorization |
+| Workspace to API | Session cookie plus CSRF protection; exact origin allowlist; API validates every request |
+| Browser to public site | Public content only; no session cookie; no authenticated data |
+| Public site to API | Public read-only endpoints; no private credentials |
+| API to basis Auth | Server-to-server OIDC with PKCE; client secret and tokens never reach the browser |
+| API to PostgreSQL | Runtime role with least privilege; separate migration role; organization context enforced |
+| API to files | Quarantine, inspection, approved storage, authorized download |
+| API to external services | Restricted hosts, timeouts, bounded responses, no arbitrary SSRF |
 
 ## Repository layout
 
@@ -110,15 +110,15 @@ apps/api/src/
 
 ## Documentation map
 
-| Document                                  | Subject                                                   |
-| ----------------------------------------- | --------------------------------------------------------- |
+| Document | Subject |
+| --- | --- |
 | `docs/architecture/capability-architecture.md` | Capability model, static registration, catalog, extraction |
-| `docs/architecture/core.md`               | Core responsibilities, lifecycle, contracts, events        |
-| `docs/architecture/dependency-rules.md`   | Allowed imports and enforcement                            |
-| `docs/architecture/data-ownership.md`     | Table ownership, tenant isolation, migrations              |
-| `docs/architecture/runtime-boundaries.md` | Runtime isolation, credentials, cookies, caching           |
-| `docs/architecture/decisions/`            | Accepted architecture decision records                     |
-| `docs/engineering/constitution.md`        | Binding engineering rules                                  |
+| `docs/architecture/core.md` | Core responsibilities, lifecycle, contracts, events |
+| `docs/architecture/dependency-rules.md` | Allowed imports and enforcement |
+| `docs/architecture/data-ownership.md` | Table ownership, tenant isolation, migrations |
+| `docs/architecture/runtime-boundaries.md` | Runtime isolation, credentials, cookies, caching |
+| `docs/architecture/decisions/` | Accepted architecture decision records |
+| `docs/engineering/constitution.md` | Binding engineering rules |
 
 ## Non-goals
 

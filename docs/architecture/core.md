@@ -224,14 +224,14 @@ Rules:
 
 Capabilities access shared technical services through narrow interfaces, never concrete clients.
 
-| Interface       | Responsibility                                              |
-| --------------- | ----------------------------------------------------------- |
-| `Database`      | Transaction runner and scoped query access                   |
-| `Clock`         | Current time, injectable for tests and deadline logic        |
-| `Mailer`        | Outbound email delivery                                      |
-| `FileStorage`   | Object storage operations behind file policy                 |
-| `Logger`        | Structured, correlated logging                               |
-| `IdGenerator`   | Stable identifier generation                                |
+| Interface     | Responsibility                                        |
+| ------------- | ----------------------------------------------------- |
+| `Database`    | Transaction runner and scoped query access            |
+| `Clock`       | Current time, injectable for tests and deadline logic |
+| `Mailer`      | Outbound email delivery                               |
+| `FileStorage` | Object storage operations behind file policy          |
+| `Logger`      | Structured, correlated logging                        |
+| `IdGenerator` | Stable identifier generation                          |
 
 Implementations live in `apps/api/src/infrastructure`. A capability may use only the interfaces it declares. Domain code receives no database client, HTTP request, or framework object.
 

@@ -140,7 +140,6 @@ Do not sacrifice clarity to save a negligible amount of computation. A linear sc
 - Performance regressions block merge when they exceed an accepted target or lack justification.
 - Targets are reviewed when production measurements show that an initial number is unrealistic. Changing a target requires an ADR, not a silent edit.
 
-
 ## Motion budget
 
 GSAP motion is part of the reference-aligned interface and is measured like any other performance feature.

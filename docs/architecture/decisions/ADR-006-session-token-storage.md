@@ -22,13 +22,13 @@ Nethack owns its application session.
 - The browser never receives access tokens, refresh tokens, Basis Auth client secrets, signing keys, or encryption keys.
 - Idle and absolute session lifetimes are bounded and validated from configuration.
 - Refresh rotation is serialized per session:
-  1. Begin a transaction.
-  2. Lock the session row with `SELECT ... FOR UPDATE`.
-  3. Read the current encrypted refresh token.
-  4. Return the current access token if another request already rotated within the skew window.
-  5. Exchange the refresh token with Basis Auth while the row is locked, with a bounded provider timeout.
-  6. Persist the new encrypted refresh token and expiry before releasing the lock.
-  7. Commit and release waiting requests.
+    1. Begin a transaction.
+    2. Lock the session row with `SELECT ... FOR UPDATE`.
+    3. Read the current encrypted refresh token.
+    4. Return the current access token if another request already rotated within the skew window.
+    5. Exchange the refresh token with Basis Auth while the row is locked, with a bounded provider timeout.
+    6. Persist the new encrypted refresh token and expiry before releasing the lock.
+    7. Commit and release waiting requests.
 - Two concurrent requests never consume the same refresh token.
 - A consumed or expired refresh token is treated as `invalid_grant`: clear the refresh state and require a new sign-in. Reuse that indicates compromise invalidates the session family.
 - Logout invalidates the local session, revokes the provider refresh token, and processes backchannel logout idempotently.

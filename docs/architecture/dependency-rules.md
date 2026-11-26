@@ -21,14 +21,14 @@ Dependencies point inward toward domain code and shared contracts. Framework and
 
 ## Application rules
 
-| From              | May depend on                                                                 | Must not depend on                                          |
-| ----------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `apps/site`       | `packages/ui`, `packages/contracts`, `packages/api-client`, Next.js, React    | `apps/api`, `apps/workspace`, server internals of the API   |
-| `apps/workspace`  | `packages/ui`, `packages/contracts`, `packages/api-client`, React, Vite       | `apps/api`, `apps/site`, database, Node server modules      |
-| `apps/api`        | `packages/contracts`, its own core, capabilities, infrastructure, workers     | `apps/site`, `apps/workspace`, `packages/ui`                |
-| `packages/ui`     | React, Radix, Tailwind, UI utilities                                          | `apps/*`, `packages/contracts`, `packages/api-client`        |
-| `packages/contracts` | Zod                                                                        | `apps/*`, `packages/ui`, `packages/api-client`, database     |
-| `packages/api-client` | `packages/contracts`, standard fetch APIs                                | `apps/*`, `packages/ui`, database, server secrets            |
+| From | May depend on | Must not depend on |
+| --- | --- | --- |
+| `apps/site` | `packages/ui`, `packages/contracts`, `packages/api-client`, Next.js, React | `apps/api`, `apps/workspace`, server internals of the API |
+| `apps/workspace` | `packages/ui`, `packages/contracts`, `packages/api-client`, React, Vite | `apps/api`, `apps/site`, database, Node server modules |
+| `apps/api` | `packages/contracts`, its own core, capabilities, infrastructure, workers | `apps/site`, `apps/workspace`, `packages/ui` |
+| `packages/ui` | React, Radix, Tailwind, UI utilities | `apps/*`, `packages/contracts`, `packages/api-client` |
+| `packages/contracts` | Zod | `apps/*`, `packages/ui`, `packages/api-client`, database |
+| `packages/api-client` | `packages/contracts`, standard fetch APIs | `apps/*`, `packages/ui`, database, server secrets |
 
 `packages/ui` is a design system, not a domain layer. It must not know about competitions, teams, submissions, or API routes.
 

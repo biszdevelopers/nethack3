@@ -12,13 +12,13 @@ The same rules apply to human-authored and agent-authored code. A change is not 
 
 Five dimensions carry equal weight and must not be traded without a documented reason.
 
-| Dimension       | Requirement                                                                                     |
-| --------------- | ----------------------------------------------------------------------------------------------- |
+| Dimension | Requirement |
+| --- | --- |
 | Maintainability | An unfamiliar developer can understand and modify the code without learning a private framework |
-| Extensibility   | Adding a capability does not require unrelated architectural changes                            |
-| Security        | Strong boundaries, strict validation, least privilege, defense in depth                         |
-| Performance     | Excellent perceived responsiveness and low resource consumption                                 |
-| User experience | Complete, polished, consistent interface with no unfinished components                          |
+| Extensibility | Adding a capability does not require unrelated architectural changes |
+| Security | Strong boundaries, strict validation, least privilege, defense in depth |
+| Performance | Excellent perceived responsiveness and low resource consumption |
+| User experience | Complete, polished, consistent interface with no unfinished components |
 
 ## Non-negotiable principles
 
@@ -54,13 +54,13 @@ An abstraction must make the system simpler to understand or modify. Otherwise i
 
 ## Applications
 
-| Application      | Path             | Technology                    | Responsibility                                                |
-| ---------------- | ---------------- | ----------------------------- | ------------------------------------------------------------- |
-| Public site      | `apps/site`      | Next.js App Router            | Public SSR, SSG, ISR, streaming, public content only          |
-| Workspace        | `apps/workspace` | React, Vite, React Router 7   | Authenticated interaction and presentation                    |
-| API              | `apps/api`       | Fastify, TypeScript           | Identity, sessions, authorization, business rules, persistence |
-| Identity         | external         | Basis Auth, Microsoft Entra   | Authentication only; nethack owns authorization               |
-| Database         | external         | PostgreSQL, Drizzle           | Application state; separate from the Basis Auth database      |
+| Application | Path | Technology | Responsibility |
+| --- | --- | --- | --- |
+| Public site | `apps/site` | Next.js App Router | Public SSR, SSG, ISR, streaming, public content only |
+| Workspace | `apps/workspace` | React, Vite, React Router 7 | Authenticated interaction and presentation |
+| API | `apps/api` | Fastify, TypeScript | Identity, sessions, authorization, business rules, persistence |
+| Identity | external | Basis Auth, Microsoft Entra | Authentication only; nethack owns authorization |
+| Database | external | PostgreSQL, Drizzle | Application state; separate from the Basis Auth database |
 
 - Fastify is the only authoritative application backend.
 - The public site renders in an isolated runtime with no application authority.
@@ -156,43 +156,43 @@ Nethack code must be human-readable, agent-readable, understandable, extensible,
 
 The following are review failures, not preferences.
 
-| Area             | Forbidden                                                                                                                                                                  |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Types            | `any` to silence a problem; `@ts-ignore`; `@ts-expect-error` used to hide a real error; non-null assertions used to avoid handling absence; unsafe `as` casts on untrusted data |
-| Tests            | Disabling, skipping, or weakening a failing test; deleting an assertion to make CI pass; claiming coverage without executing the suite                                      |
-| Architecture     | Private cross-capability imports; direct access to another capability's tables; circular dependencies; unregistered capability dependencies; global service locators        |
-| Abstractions     | Arbitrary abstractions; unnecessary packages; `common`, `misc`, `helpers`, or `everything` packages; wrapper classes around one function; interfaces for trivial functions    |
-| State            | Hidden global state; a state-management library without a demonstrated requirement; duplicating server state in a client store                                            |
-| Runtime          | Bun-only APIs in application logic; runtime-specific branches; runtime detection; module-loader monkey-patching; native dependencies that fail on either runtime             |
-| Data             | String-concatenated SQL; user-controlled table names, sort expressions, or SQL fragments; unbounded queries; unparameterized raw SQL                                         |
-| Security         | `dangerouslySetInnerHTML` with untrusted content; `innerHTML`; `eval`; dynamic script construction; raw HTML in Markdown; `unsafe-eval` in CSP; permissive CORS                 |
-| Next.js          | Server Actions for application mutations; middleware or `proxy.ts` as an authorization boundary; database access; Basis Auth secrets; user-specific server caching; arbitrary remote fetch |
-| UI               | All-caps text; `text-transform: uppercase`; fonts other than Noto Sans Mono; colors outside the palette; gradients, glow, or decorative clutter; fake data; hover-only actions |
-| Dependencies     | Adding a dependency for a few lines of code; mixing Radix with another primitive framework; a second router, form library, or table library; floating `latest` in production |
-| Operations       | Build-time network or database access during ordinary compilation; destructive migrations on API startup; retries that conceal race conditions; arbitrary delays that hide synchronization problems |
-| Honesty          | Leaving incomplete placeholders; claiming incomplete features are complete; refactoring unrelated capabilities without approval; weakening a security control for convenience       |
+| Area | Forbidden |
+| --- | --- |
+| Types | `any` to silence a problem; `@ts-ignore`; `@ts-expect-error` used to hide a real error; non-null assertions used to avoid handling absence; unsafe `as` casts on untrusted data |
+| Tests | Disabling, skipping, or weakening a failing test; deleting an assertion to make CI pass; claiming coverage without executing the suite |
+| Architecture | Private cross-capability imports; direct access to another capability's tables; circular dependencies; unregistered capability dependencies; global service locators |
+| Abstractions | Arbitrary abstractions; unnecessary packages; `common`, `misc`, `helpers`, or `everything` packages; wrapper classes around one function; interfaces for trivial functions |
+| State | Hidden global state; a state-management library without a demonstrated requirement; duplicating server state in a client store |
+| Runtime | Bun-only APIs in application logic; runtime-specific branches; runtime detection; module-loader monkey-patching; native dependencies that fail on either runtime |
+| Data | String-concatenated SQL; user-controlled table names, sort expressions, or SQL fragments; unbounded queries; unparameterized raw SQL |
+| Security | `dangerouslySetInnerHTML` with untrusted content; `innerHTML`; `eval`; dynamic script construction; raw HTML in Markdown; `unsafe-eval` in CSP; permissive CORS |
+| Next.js | Server Actions for application mutations; middleware or `proxy.ts` as an authorization boundary; database access; Basis Auth secrets; user-specific server caching; arbitrary remote fetch |
+| UI | All-caps text; `text-transform: uppercase`; fonts other than Noto Sans Mono; colors outside the palette; gradients, glow, or decorative clutter; fake data; hover-only actions |
+| Dependencies | Adding a dependency for a few lines of code; mixing Radix with another primitive framework; a second router, form library, or table library; floating `latest` in production |
+| Operations | Build-time network or database access during ordinary compilation; destructive migrations on API startup; retries that conceal race conditions; arbitrary delays that hide synchronization problems |
+| Honesty | Leaving incomplete placeholders; claiming incomplete features are complete; refactoring unrelated capabilities without approval; weakening a security control for convenience |
 
 ## Review checklist
 
 Passing tests alone does not make a change acceptable. Every review answers these questions.
 
-| Area            | Question                                                                                                       |
-| --------------- | -------------------------------------------------------------------------------------------------------------- |
-| Ownership       | Does the change live in the capability that owns the behavior and data? Are browser and server parts separated? |
-| Dependencies    | Are dependencies explicit, acyclic, and limited to public contracts, events, or infrastructure interfaces?      |
-| Abstraction     | Is every new abstraction necessary, smaller than the alternative, and understandable without a guide?           |
-| Permissions     | Are user identity, organization context, resource organization, membership, operation permission, eligibility, and ownership checked server-side? |
-| Validation      | Are all external inputs validated with shared schemas, including bodies, query, route params, identity responses, files, and configuration? |
-| Errors          | Are error categories consistent, recovery guidance clear, and internal details kept out of responses?           |
-| Tests           | Are domain rules, application operations, contracts, persistence, authorization, events, errors, and concurrency covered? |
-| Negative paths  | Are unauthorized, cross-organization, duplicate, expired, conflicting, and malformed requests tested?           |
-| Database        | Are queries parameterized, organization-scoped, indexed, bounded, and free of N+1 patterns?                     |
-| Performance     | Is the change within budgets, free of unnecessary JavaScript, and efficient on ordinary hardware and networks?  |
-| Accessibility   | Is the UI keyboard operable, labeled, focus-managed, contrast compliant, and usable on mobile?                  |
-| Runtime         | Does the change work under both Node.js and Bun without runtime-specific logic?                                 |
-| UI consistency  | Does it use Nethack UI tokens and components, sentence case, real data, and complete states?                    |
-| Documentation   | Are capability README, API contracts, ADRs, and this handbook updated when behavior or decisions change?        |
-| Scope           | Does the change avoid unrelated refactoring and unfinished placeholders?                                        |
+| Area | Question |
+| --- | --- |
+| Ownership | Does the change live in the capability that owns the behavior and data? Are browser and server parts separated? |
+| Dependencies | Are dependencies explicit, acyclic, and limited to public contracts, events, or infrastructure interfaces? |
+| Abstraction | Is every new abstraction necessary, smaller than the alternative, and understandable without a guide? |
+| Permissions | Are user identity, organization context, resource organization, membership, operation permission, eligibility, and ownership checked server-side? |
+| Validation | Are all external inputs validated with shared schemas, including bodies, query, route params, identity responses, files, and configuration? |
+| Errors | Are error categories consistent, recovery guidance clear, and internal details kept out of responses? |
+| Tests | Are domain rules, application operations, contracts, persistence, authorization, events, errors, and concurrency covered? |
+| Negative paths | Are unauthorized, cross-organization, duplicate, expired, conflicting, and malformed requests tested? |
+| Database | Are queries parameterized, organization-scoped, indexed, bounded, and free of N+1 patterns? |
+| Performance | Is the change within budgets, free of unnecessary JavaScript, and efficient on ordinary hardware and networks? |
+| Accessibility | Is the UI keyboard operable, labeled, focus-managed, contrast compliant, and usable on mobile? |
+| Runtime | Does the change work under both Node.js and Bun without runtime-specific logic? |
+| UI consistency | Does it use Nethack UI tokens and components, sentence case, real data, and complete states? |
+| Documentation | Are capability README, API contracts, ADRs, and this handbook updated when behavior or decisions change? |
+| Scope | Does the change avoid unrelated refactoring and unfinished placeholders? |
 
 ## Enforcement
 

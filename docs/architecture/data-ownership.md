@@ -17,28 +17,28 @@ Table ownership, organization isolation, transaction rules, and migration policy
 
 Each table is owned by exactly one capability. Ownership means the capability defines the table, writes it, and exposes any required read or write behavior through its public contract.
 
-| Capability       | Owned tables                                                                                   |
-| ---------------- | ---------------------------------------------------------------------------------------------- |
-| `identity`       | `users`, `external_identities`                                                                  |
-| `organizations`  | `organizations`, `organization_memberships`                                                     |
-| `competitions`   | `competition_series`, `competition_editions`, `divisions`                                       |
-| `participants`   | `registrations`, `participants`                                                                 |
-| `teams`          | `teams`, `team_members`, `team_invitations`                                                     |
-| `projects`       | `projects`, `project_members`                                                                   |
-| `submissions`    | `submissions`, `submission_versions`, `submission_files`                                        |
-| `judging`        | `judging_rubrics`, `judging_criteria`, `judge_assignments`, `evaluations`                       |
-| `voting`         | `voting_rounds`, `ballots`, `votes`                                                             |
-| `announcements`  | `announcements`                                                                                 |
-| `notifications`  | `notifications`                                                                                 |
-| `administration` | `audit_logs`                                                                                    |
-| `files`          | File records, upload state, scan status, and storage object metadata                            |
+| Capability       | Owned tables                                                              |
+| ---------------- | ------------------------------------------------------------------------- |
+| `identity`       | `users`, `external_identities`                                            |
+| `organizations`  | `organizations`, `organization_memberships`                               |
+| `competitions`   | `competition_series`, `competition_editions`, `divisions`                 |
+| `participants`   | `registrations`, `participants`                                           |
+| `teams`          | `teams`, `team_members`, `team_invitations`                               |
+| `projects`       | `projects`, `project_members`                                             |
+| `submissions`    | `submissions`, `submission_versions`, `submission_files`                  |
+| `judging`        | `judging_rubrics`, `judging_criteria`, `judge_assignments`, `evaluations` |
+| `voting`         | `voting_rounds`, `ballots`, `votes`                                       |
+| `announcements`  | `announcements`                                                           |
+| `notifications`  | `notifications`                                                           |
+| `administration` | `audit_logs`                                                              |
+| `files`          | File records, upload state, scan status, and storage object metadata      |
 
 Infrastructure-owned tables:
 
-| Owner            | Tables                                                                                     |
-| ---------------- | ------------------------------------------------------------------------------------------ |
-| Authentication   | Session records, authentication transactions, access-token revocation entries              |
-| Core             | Transactional outbox, consumer deduplication, idempotency records, background job leases     |
+| Owner | Tables |
+| --- | --- |
+| Authentication | Session records, authentication transactions, access-token revocation entries |
+| Core | Transactional outbox, consumer deduplication, idempotency records, background job leases |
 
 Authentication-owned tables are not part of the identity capability. The identity capability owns the durable user record and external identity links; the authentication runtime owns protocol state and sessions.
 
@@ -135,12 +135,12 @@ Administrative privileges are explicitly scoped. A user who administers one orga
 
 ## Sensitive data
 
-| Class    | Examples                                            | Handling                                                        |
-| -------- | --------------------------------------------------- | --------------------------------------------------------------- |
-| Public   | Published competition pages, published projects      | May be cached publicly with an explicit policy                   |
-| Internal | Draft state, operational metadata                    | Authenticated access; not publicly cached                        |
-| Personal | Names, email addresses, memberships, evaluations     | Least privilege, organization scope, no unnecessary logging      |
-| Secret   | Tokens, secrets, session identifiers, encryption keys | Never stored in plaintext where a hash or encryption is required |
+| Class | Examples | Handling |
+| --- | --- | --- |
+| Public | Published competition pages, published projects | May be cached publicly with an explicit policy |
+| Internal | Draft state, operational metadata | Authenticated access; not publicly cached |
+| Personal | Names, email addresses, memberships, evaluations | Least privilege, organization scope, no unnecessary logging |
+| Secret | Tokens, secrets, session identifiers, encryption keys | Never stored in plaintext where a hash or encryption is required |
 
 Additional rules:
 

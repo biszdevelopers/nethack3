@@ -127,31 +127,31 @@ Uploaded private files are served from a separate cookieless origin.
 
 ## Network matrix
 
-| Source            | Allowed destination                                                       |
-| ----------------- | ------------------------------------------------------------------------- |
-| Browser           | Public site, workspace, API, Basis Auth redirects, asset origin           |
-| Public site server| Public API read endpoints only                                            |
-| Workspace         | No server runtime; browser calls the API                                  |
-| API               | PostgreSQL, Basis Auth, mail service, object storage, worker coordination |
-| Workers           | Same as API; no public inbound listener                                   |
-| Migration job     | PostgreSQL with migration credentials                                     |
-| Basis Auth        | Its own database; backchannel callbacks to registered API URLs            |
-| Asset origin      | Object storage only                                                       |
+| Source             | Allowed destination                                                       |
+| ------------------ | ------------------------------------------------------------------------- |
+| Browser            | Public site, workspace, API, Basis Auth redirects, asset origin           |
+| Public site server | Public API read endpoints only                                            |
+| Workspace          | No server runtime; browser calls the API                                  |
+| API                | PostgreSQL, Basis Auth, mail service, object storage, worker coordination |
+| Workers            | Same as API; no public inbound listener                                   |
+| Migration job      | PostgreSQL with migration credentials                                     |
+| Basis Auth         | Its own database; backchannel callbacks to registered API URLs            |
+| Asset origin       | Object storage only                                                       |
 
 No component other than the API and workers may open a database connection. No internal port is publicly exposed.
 
 ## Credentials matrix
 
-| Credential                  | Allowed location                          | Never in                             |
-| --------------------------- | ----------------------------------------- | ------------------------------------ |
-| Database runtime password   | API and worker secret environment         | Site, workspace, browser, logs       |
-| Database migration password | Migration job secret environment           | API runtime, site, workspace         |
-| Basis Auth client secret     | API secret environment                    | Site, workspace, browser, logs       |
-| Basis Auth resource secret   | API secret environment and receiver       | Browser, public site, logs           |
-| Session cookie              | Browser, host-only, HttpOnly              | JavaScript, URLs, logs, referrers    |
-| Refresh and access tokens   | API database, encrypted at rest           | Browser, public site, logs           |
-| Token encryption key        | API secret manager                        | Database rows, repository, logs      |
-| Administrative credentials  | API secret environment, separate role     | Public site, workspace bundle        |
+| Credential | Allowed location | Never in |
+| --- | --- | --- |
+| Database runtime password | API and worker secret environment | Site, workspace, browser, logs |
+| Database migration password | Migration job secret environment | API runtime, site, workspace |
+| Basis Auth client secret | API secret environment | Site, workspace, browser, logs |
+| Basis Auth resource secret | API secret environment and receiver | Browser, public site, logs |
+| Session cookie | Browser, host-only, HttpOnly | JavaScript, URLs, logs, referrers |
+| Refresh and access tokens | API database, encrypted at rest | Browser, public site, logs |
+| Token encryption key | API secret manager | Database rows, repository, logs |
+| Administrative credentials | API secret environment, separate role | Public site, workspace bundle |
 
 Secret values are loaded from the environment or a secret manager, validated at startup, redacted in logs, and rotated through a documented procedure.
 

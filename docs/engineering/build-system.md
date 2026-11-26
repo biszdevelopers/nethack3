@@ -4,14 +4,14 @@ Workspace layout, build order, incremental builds, and root commands for the net
 
 ## Tooling
 
-| Application or package | Build system                    |
-| ---------------------- | ------------------------------- |
-| Public site            | Next.js with Turbopack          |
-| Workspace              | Vite                            |
-| API                    | TypeScript compiler             |
-| Shared UI              | TypeScript project build        |
-| Contracts              | TypeScript project build        |
-| API client             | TypeScript project build        |
+| Application or package | Build system             |
+| ---------------------- | ------------------------ |
+| Public site            | Next.js with Turbopack   |
+| Workspace              | Vite                     |
+| API                    | TypeScript compiler      |
+| Shared UI              | TypeScript project build |
+| Contracts              | TypeScript project build |
+| API client             | TypeScript project build |
 
 The repository uses Bun workspaces declared in the root `package.json` with `apps/*` and `packages/*`. `bun.lock` is the only lockfile and is committed. There is no pnpm, npm, or Yarn lockfile.
 
@@ -94,28 +94,28 @@ Runtime configuration is validated at process start, not embedded at build time.
 
 The root scripts are conventions; each workspace package owns its actual scripts.
 
-| Command                    | Behavior                                                                 |
-| -------------------------- | ------------------------------------------------------------------------ |
-| `bun run dev`              | Start required development processes and terminate them cleanly          |
-| `bun run dev:site`         | Start the public site                                                    |
-| `bun run dev:workspace`    | Start the workspace                                                      |
-| `bun run dev:api`          | Start the API                                                            |
-| `bun run dev:node`         | Start development under Node.js                                          |
-| `bun run build`            | Build contracts, UI, API, workspace, and site in dependency order        |
-| `bun run build:contracts`  | Build `packages/contracts`                                               |
-| `bun run build:ui`         | Build `packages/ui`                                                      |
-| `bun run build:api`        | Build `apps/api`                                                         |
-| `bun run build:workspace`  | Build `apps/workspace`                                                   |
-| `bun run build:site`       | Build `apps/site`                                                        |
-| `bun run typecheck`        | Typecheck every workspace in dependency order                            |
-| `bun run lint`             | Run Oxlint over the repository                                           |
-| `bun run format`           | Run Oxfmt over the repository                                            |
-| `bun run format:check`     | Verify formatting without writing                                        |
-| `bun run check`            | Format check, lint, typecheck, and test                                  |
-| `bun run verify:runtime`   | Verify Node.js and Bun runtime behavior                                  |
-| `bun run db:generate`      | Generate Drizzle migrations                                              |
-| `bun run db:migrate`       | Apply migrations with migration credentials                              |
-| `bun run db:seed`          | Seed development data                                                    |
+| Command                   | Behavior                                                          |
+| ------------------------- | ----------------------------------------------------------------- |
+| `bun run dev`             | Start required development processes and terminate them cleanly   |
+| `bun run dev:site`        | Start the public site                                             |
+| `bun run dev:workspace`   | Start the workspace                                               |
+| `bun run dev:api`         | Start the API                                                     |
+| `bun run dev:node`        | Start development under Node.js                                   |
+| `bun run build`           | Build contracts, UI, API, workspace, and site in dependency order |
+| `bun run build:contracts` | Build `packages/contracts`                                        |
+| `bun run build:ui`        | Build `packages/ui`                                               |
+| `bun run build:api`       | Build `apps/api`                                                  |
+| `bun run build:workspace` | Build `apps/workspace`                                            |
+| `bun run build:site`      | Build `apps/site`                                                 |
+| `bun run typecheck`       | Typecheck every workspace in dependency order                     |
+| `bun run lint`            | Run Oxlint over the repository                                    |
+| `bun run format`          | Run Oxfmt over the repository                                     |
+| `bun run format:check`    | Verify formatting without writing                                 |
+| `bun run check`           | Format check, lint, typecheck, and test                           |
+| `bun run verify:runtime`  | Verify Node.js and Bun runtime behavior                           |
+| `bun run db:generate`     | Generate Drizzle migrations                                       |
+| `bun run db:migrate`      | Apply migrations with migration credentials                       |
+| `bun run db:seed`         | Seed development data                                             |
 
 The root development command starts only the processes required for the selected task.
 

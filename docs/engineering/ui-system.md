@@ -10,31 +10,31 @@ Nethack UI is an original React implementation with Nuxt UI-level breadth and qu
 
 ## Layers
 
-| Layer                   | Responsibility                                                             | Location                          |
-| ----------------------- | -------------------------------------------------------------------------- | --------------------------------- |
-| Visual foundation       | Tokens, typography, color, spacing, radii, elevation                      | `packages/ui/src/tokens`, `packages/ui/styles.css` |
-| Interaction foundation  | Accessibility, keyboard behavior, focus management, states                 | `packages/ui/src/primitives`      |
-| Component library       | Inputs, tables, menus, overlays, feedback, display                        | `packages/ui/src/components`      |
-| Application patterns    | Forms, dashboards, shells, page composition                               | `packages/ui/src/layouts`, `packages/ui/src/components` |
-| Global provider         | Theme, toasts, overlays, tooltips, shortcuts, command palette, locale     | `packages/ui/src/providers`       |
+| Layer | Responsibility | Location |
+| --- | --- | --- |
+| Visual foundation | Tokens, typography, color, spacing, radii, elevation | `packages/ui/src/tokens`, `packages/ui/styles.css` |
+| Interaction foundation | Accessibility, keyboard behavior, focus management, states | `packages/ui/src/primitives` |
+| Component library | Inputs, tables, menus, overlays, feedback, display | `packages/ui/src/components` |
+| Application patterns | Forms, dashboards, shells, page composition | `packages/ui/src/layouts`, `packages/ui/src/components` |
+| Global provider | Theme, toasts, overlays, tooltips, shortcuts, command palette, locale | `packages/ui/src/providers` |
 
 ## Technology foundation
 
-| Concern                 | Choice                                          |
-| ----------------------- | ----------------------------------------------- |
-| UI framework            | React                                           |
-| Interaction primitives  | Radix UI                                        |
-| Styling                 | Tailwind CSS 4                                  |
-| Typed variants          | Tailwind Variants                               |
-| Class merging           | clsx plus tailwind-merge                        |
-| Icons                   | Lucide React                                    |
-| Tables                  | TanStack Table                                  |
-| Forms                   | React Hook Form                                 |
-| Validation              | Zod                                             |
-| Dates                   | React Day Picker plus date-fns                  |
-| Command palette         | cmdk                                            |
-| Animation               | CSS transitions plus GSAP 3.15 motion            |
-| Font                    | Noto Sans Mono, self-hosted                     |
+| Concern                | Choice                                |
+| ---------------------- | ------------------------------------- |
+| UI framework           | React                                 |
+| Interaction primitives | Radix UI                              |
+| Styling                | Tailwind CSS 4                        |
+| Typed variants         | Tailwind Variants                     |
+| Class merging          | clsx plus tailwind-merge              |
+| Icons                  | Lucide React                          |
+| Tables                 | TanStack Table                        |
+| Forms                  | React Hook Form                       |
+| Validation             | Zod                                   |
+| Dates                  | React Day Picker plus date-fns        |
+| Command palette        | cmdk                                  |
+| Animation              | CSS transitions plus GSAP 3.15 motion |
+| Font                   | Noto Sans Mono, self-hosted           |
 
 Radix is the only primitive framework. Do not add Base UI, Ariakit, React Aria Components, or a second overlapping primitive system. Components are owned in this repository; no third-party design framework is a runtime dependency.
 
@@ -57,11 +57,11 @@ Rules:
 
 ## Color
 
-| Token              | Value     | Use                                                    |
-| ------------------ | --------- | ------------------------------------------------------ |
-| Primary green      | `#00DC82` | Primary actions, focus, selected state, live status    |
-| Near black         | `#090909` | Default dark background and primary text on light      |
-| White              | `#FFFFFF` | Primary text on dark and light surfaces                |
+| Token         | Value     | Use                                                 |
+| ------------- | --------- | --------------------------------------------------- |
+| Primary green | `#00DC82` | Primary actions, focus, selected state, live status |
+| Near black    | `#090909` | Default dark background and primary text on light   |
+| White         | `#FFFFFF` | Primary text on dark and light surfaces             |
 
 Permitted derived colors are neutral grays derived from black and white, and darker or lighter shades of the same green. Every derived value belongs to a named token.
 
@@ -148,18 +148,18 @@ It is not a universal state container. It does not hold server data, form state,
 
 The shared hooks are ordinary `.ts` files in `packages/ui/src/hooks`.
 
-| Hook                   | Responsibility                      |
-| ---------------------- | ----------------------------------- |
-| `useToast`             | Consistent notifications            |
-| `useOverlay`           | Programmatic overlays               |
-| `useShortcuts`         | Keyboard shortcuts                  |
-| `useColorMode`         | Theme selection                     |
-| `useLocale`            | Locale preferences                  |
-| `useMediaQuery`        | Responsive behavior                 |
+| Hook                   | Responsibility                         |
+| ---------------------- | -------------------------------------- |
+| `useToast`             | Consistent notifications               |
+| `useOverlay`           | Programmatic overlays                  |
+| `useShortcuts`         | Keyboard shortcuts                     |
+| `useColorMode`         | Theme selection                        |
+| `useLocale`            | Locale preferences                     |
+| `useMediaQuery`        | Responsive behavior                    |
 | `useControllableState` | Controlled and uncontrolled components |
-| `useDebouncedValue`    | Appropriate input debouncing        |
-| `useDisclosure`        | Open and closed state               |
-| `useIsMobile`          | Responsive interaction decisions    |
+| `useDebouncedValue`    | Appropriate input debouncing           |
+| `useDisclosure`        | Open and closed state                  |
+| `useIsMobile`          | Responsive interaction decisions       |
 
 Do not create a custom hook for a two-line state operation. Do not create a hook that only renames a React built-in.
 
@@ -168,29 +168,23 @@ Do not create a custom hook for a two-line state operation. Do not create a hook
 Component APIs are designed once and documented in the component laboratory. They follow a predictable shape without forcing every property onto every component.
 
 ```tsx
-<Button
-    variant="solid"
-    color="primary"
-    size="md"
-    loading={isSubmitting}
-    disabled={!isValid}
->
+<Button variant="solid" color="primary" size="md" loading={isSubmitting} disabled={!isValid}>
     Save changes
 </Button>
 ```
 
 Common properties, where the component's responsibility supports them:
 
-| Property    | Meaning                                                              |
-| ----------- | -------------------------------------------------------------------- |
-| `variant`   | Visual treatment such as solid, soft, outline, ghost, or link        |
-| `color`     | Semantic intent such as primary, neutral, danger, or success         |
-| `size`      | A named size from the shared scale                                   |
-| `disabled`  | Prevents interaction and communicates the reason where needed        |
-| `loading`   | Preserves layout and announces busy state                            |
-| `className` | Consumer layout hook; merged last through `cn`                       |
-| `id`        | Stable element identifier for labels and descriptions                |
-| `aria-*`    | Accessibility attributes, forwarded to the meaningful element        |
+| Property    | Meaning                                                       |
+| ----------- | ------------------------------------------------------------- |
+| `variant`   | Visual treatment such as solid, soft, outline, ghost, or link |
+| `color`     | Semantic intent such as primary, neutral, danger, or success  |
+| `size`      | A named size from the shared scale                            |
+| `disabled`  | Prevents interaction and communicates the reason where needed |
+| `loading`   | Preserves layout and announces busy state                     |
+| `className` | Consumer layout hook; merged last through `cn`                |
+| `id`        | Stable element identifier for labels and descriptions         |
+| `aria-*`    | Accessibility attributes, forwarded to the meaningful element |
 
 Rules:
 
@@ -388,34 +382,34 @@ Specialized components for unrelated product features, such as AI-chat interface
 
 Every interactive component is verified in all applicable states.
 
-| State or check        | Requirement                                                                 |
-| --------------------- | --------------------------------------------------------------------------- |
-| Default               | Renders with real content and correct tokens                                |
-| Hover                 | Visible feedback; no action is available only on hover                      |
-| Focus-visible         | Visible focus ring; keyboard focus order is logical                         |
-| Active                | Pressed or selected state is distinct                                       |
-| Disabled              | Non-interactive, announced as disabled, reason available                    |
-| Loading               | Busy state announced; layout does not shift                                 |
-| Error                 | Error is described in text, associated with the field or region, recoverable where possible |
-| Keyboard              | All operations reachable and operable; Escape, Enter, Space, arrows as appropriate |
-| Screen reader         | Accessible name, role, value, state, and description are correct            |
-| Mobile                | Touch targets, overflow, gestures, and responsive layout work               |
-| Dark theme            | Contrast and token behavior verified                                        |
-| Light theme           | Contrast and token behavior verified                                        |
+| State or check | Requirement |
+| --- | --- |
+| Default | Renders with real content and correct tokens |
+| Hover | Visible feedback; no action is available only on hover |
+| Focus-visible | Visible focus ring; keyboard focus order is logical |
+| Active | Pressed or selected state is distinct |
+| Disabled | Non-interactive, announced as disabled, reason available |
+| Loading | Busy state announced; layout does not shift |
+| Error | Error is described in text, associated with the field or region, recoverable where possible |
+| Keyboard | All operations reachable and operable; Escape, Enter, Space, arrows as appropriate |
+| Screen reader | Accessible name, role, value, state, and description are correct |
+| Mobile | Touch targets, overflow, gestures, and responsive layout work |
+| Dark theme | Contrast and token behavior verified |
+| Light theme | Contrast and token behavior verified |
 
 Component group coverage:
 
-| Group                  | Required coverage                                                       |
-| ---------------------- | ----------------------------------------------------------------------- |
-| Layout                 | Responsive shells, overflow, landmarks, navigation state               |
-| Basic elements         | All states, both themes, long content, empty content                    |
-| Forms                  | Validation, error summary, disabled, loading, keyboard submission      |
-| Data                   | Empty, loading, error, sorting, pagination, long cells, mobile overflow |
-| Navigation             | Active route, keyboard, collapsed and expanded states                   |
-| Overlays               | Focus trap, Escape, outside interaction, scroll lock, return focus      |
-| Dashboard              | Resize, collapse, persistence, small viewport                           |
-| Page composition       | Content structure, anchors, responsive columns                          |
-| Advanced               | Real workflows, autosave or explicit save, permissions, previews        |
+| Group            | Required coverage                                                       |
+| ---------------- | ----------------------------------------------------------------------- |
+| Layout           | Responsive shells, overflow, landmarks, navigation state                |
+| Basic elements   | All states, both themes, long content, empty content                    |
+| Forms            | Validation, error summary, disabled, loading, keyboard submission       |
+| Data             | Empty, loading, error, sorting, pagination, long cells, mobile overflow |
+| Navigation       | Active route, keyboard, collapsed and expanded states                   |
+| Overlays         | Focus trap, Escape, outside interaction, scroll lock, return focus      |
+| Dashboard        | Resize, collapse, persistence, small viewport                           |
+| Page composition | Content structure, anchors, responsive columns                          |
+| Advanced         | Real workflows, autosave or explicit save, permissions, previews        |
 
 ## Component laboratory
 
@@ -457,7 +451,6 @@ The laboratory makes the complete design system inspectable without navigating t
 - Keyboard tests cover dialogs, menus, tabs, comboboxes, tables, and forms.
 - Mobile tests cover navigation, drawers, and touch targets.
 - No visual baseline is accepted with fake data or unfinished states.
-
 
 ## Visual direction
 

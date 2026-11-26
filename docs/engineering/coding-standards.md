@@ -34,10 +34,10 @@ A class is justified when it protects an invariant, owns state, or groups a cohe
 
 ## File separation
 
-| Extension | Contains                                                                                                                                              |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.tsx`    | Components, JSX, layout, visual composition, presentation state wiring, event-handler invocation                                                       |
-| `.ts`     | Domain logic, application operations, algorithms, API communication, hooks without JSX, validation, state logic, persistence, infrastructure, workers |
+| Extension | Contains |
+| --- | --- |
+| `.tsx` | Components, JSX, layout, visual composition, presentation state wiring, event-handler invocation |
+| `.ts` | Domain logic, application operations, algorithms, API communication, hooks without JSX, validation, state logic, persistence, infrastructure, workers |
 
 A `.tsx` file must not become the home of an entire business workflow. A component prepares data for display, renders it, and forwards user intent. Calculations, validation, permission decisions, and persistence belong in `.ts` modules.
 
@@ -45,18 +45,18 @@ Hooks that contain no JSX live in `.ts` files. Hooks that return JSX are compone
 
 ## Naming
 
-| Item                  | Convention       | Example                              |
-| --------------------- | ---------------- | ------------------------------------ |
-| Files                 | kebab-case       | `team-invitation-service.ts`         |
-| Classes               | PascalCase       | `TeamInvitationService`              |
-| Types                 | PascalCase       | `TeamMembership`                     |
-| Interfaces            | PascalCase       | `TeamRepository`                     |
-| Functions             | camelCase        | `createTeam`                         |
-| Variables             | camelCase        | `activeMembership`                   |
-| Components            | PascalCase       | `TeamMembers`                        |
-| Database tables       | snake_case       | `team_invitations`                   |
-| Database columns      | snake_case       | `organization_id`                    |
-| Environment variables | UPPER_SNAKE_CASE | `BASIS_AUTH_CLIENT_ID`               |
+| Item                  | Convention       | Example                      |
+| --------------------- | ---------------- | ---------------------------- |
+| Files                 | kebab-case       | `team-invitation-service.ts` |
+| Classes               | PascalCase       | `TeamInvitationService`      |
+| Types                 | PascalCase       | `TeamMembership`             |
+| Interfaces            | PascalCase       | `TeamRepository`             |
+| Functions             | camelCase        | `createTeam`                 |
+| Variables             | camelCase        | `activeMembership`           |
+| Components            | PascalCase       | `TeamMembers`                |
+| Database tables       | snake_case       | `team_invitations`           |
+| Database columns      | snake_case       | `organization_id`            |
+| Environment variables | UPPER_SNAKE_CASE | `BASIS_AUTH_CLIENT_ID`       |
 
 Additional rules:
 
@@ -107,16 +107,16 @@ Additional rules:
 
 Use one error taxonomy across the API.
 
-| Category                    | Meaning                                                      | HTTP status |
-| --------------------------- | ------------------------------------------------------------ | ----------- |
-| Validation                  | Input fails schema or domain validation                      | 400         |
-| Authentication              | Missing, expired, revoked, or malformed credentials          | 401         |
-| Authorization               | Authenticated but not permitted                              | 403         |
-| Not found                   | Resource absent or not visible to this caller                | 404         |
-| Conflict                    | State transition, uniqueness, deadline, or concurrency clash | 409         |
-| Rate limited                | Request budget exhausted                                     | 429         |
-| External dependency failure | Basis Auth, mail, storage, or another dependency failed      | 502 or 503  |
-| Internal failure            | Unexpected defect                                            | 500         |
+| Category | Meaning | HTTP status |
+| --- | --- | --- |
+| Validation | Input fails schema or domain validation | 400 |
+| Authentication | Missing, expired, revoked, or malformed credentials | 401 |
+| Authorization | Authenticated but not permitted | 403 |
+| Not found | Resource absent or not visible to this caller | 404 |
+| Conflict | State transition, uniqueness, deadline, or concurrency clash | 409 |
+| Rate limited | Request budget exhausted | 429 |
+| External dependency failure | Basis Auth, mail, storage, or another dependency failed | 502 or 503 |
+| Internal failure | Unexpected defect | 500 |
 
 Rules:
 
@@ -202,18 +202,18 @@ Use Conventional Commits in American English.
 
 Types:
 
-| Type       | Use                                                  |
-| ---------- | ---------------------------------------------------- |
-| `feat`     | New user-visible or API behavior                     |
-| `fix`      | Defect correction                                    |
-| `docs`     | Documentation only                                   |
-| `refactor` | Behavior-preserving restructuring                    |
-| `test`     | Tests or fixtures only                               |
-| `perf`     | Measured performance improvement                     |
-| `build`    | Build system, dependencies, or packaging             |
-| `ci`       | Continuous integration configuration                 |
-| `chore`    | Maintenance with no product behavior change          |
-| `security` | Security hardening or vulnerability remediation      |
+| Type       | Use                                             |
+| ---------- | ----------------------------------------------- |
+| `feat`     | New user-visible or API behavior                |
+| `fix`      | Defect correction                               |
+| `docs`     | Documentation only                              |
+| `refactor` | Behavior-preserving restructuring               |
+| `test`     | Tests or fixtures only                          |
+| `perf`     | Measured performance improvement                |
+| `build`    | Build system, dependencies, or packaging        |
+| `ci`       | Continuous integration configuration            |
+| `chore`    | Maintenance with no product behavior change     |
+| `security` | Security hardening or vulnerability remediation |
 
 Rules:
 

@@ -18,14 +18,14 @@ Component model, state ownership, data flow, performance, and accessibility rule
 
 State lives at the lowest level that needs it.
 
-| State kind                       | Owner                                                                 |
-| -------------------------------- | --------------------------------------------------------------------- |
-| Ephemeral UI state               | The component or nearest common parent                               |
-| Form values and validation       | React Hook Form, with a Zod resolver                                 |
-| Server state                     | TanStack Query in `apps/workspace`; server rendering in `apps/site`   |
-| URL-driven state                 | React Router search parameters in the workspace; route segments in the site |
-| Theme, locale, toasts, overlays  | `NethackProvider` and its dedicated hooks                            |
-| Cross-page client state          | A capability-level context or query cache, only with a documented need |
+| State kind | Owner |
+| --- | --- |
+| Ephemeral UI state | The component or nearest common parent |
+| Form values and validation | React Hook Form, with a Zod resolver |
+| Server state | TanStack Query in `apps/workspace`; server rendering in `apps/site` |
+| URL-driven state | React Router search parameters in the workspace; route segments in the site |
+| Theme, locale, toasts, overlays | `NethackProvider` and its dedicated hooks |
+| Cross-page client state | A capability-level context or query cache, only with a documented need |
 
 Rules:
 

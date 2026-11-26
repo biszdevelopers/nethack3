@@ -46,11 +46,11 @@ The Core validates unique identifiers, missing dependencies, cycles, initializat
 
 Capabilities use exactly three integration mechanisms.
 
-| Mechanism                | Use                                                              | Example                                              |
-| ------------------------ | ---------------------------------------------------------------- | ---------------------------------------------------- |
-| Public contract          | A synchronous operation that requires a result                   | Submissions asks files to authorize an upload        |
-| Domain event             | Notify other capabilities that something happened                | Submissions publishes `submissions.approved`         |
-| Infrastructure interface | Access a shared technical service without owning its implementation | Clock, mail, storage, database transaction, logger   |
+| Mechanism | Use | Example |
+| --- | --- | --- |
+| Public contract | A synchronous operation that requires a result | Submissions asks files to authorize an upload |
+| Domain event | Notify other capabilities that something happened | Submissions publishes `submissions.approved` |
+| Infrastructure interface | Access a shared technical service without owning its implementation | Clock, mail, storage, database transaction, logger |
 
 Rules:
 
@@ -94,21 +94,21 @@ A capability owns its tests in `apps/api/src/capabilities/<name>/tests`. A test 
 
 The API registers thirteen capabilities. `identity` covers local user records and account linking; the authentication runtime in `apps/api/src/authentication` owns OIDC, sessions, tokens, and backchannel handling.
 
-| Capability      | Responsibility                                                                                                     | Depends on                                                        |
-| --------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
-| `identity`      | Local users, external identity links, profile, account state, user preferences                                      | None                                                              |
-| `organizations` | Organizations, memberships, organization roles, organization settings                                              | identity                                                          |
-| `competitions`  | Competition series, editions, divisions, rules, schedules, registration configuration, eligibility definitions       | organizations                                                     |
-| `participants`  | Registrations, participant records, onboarding, eligibility status                                                  | identity, organizations, competitions                             |
-| `teams`         | Teams, team members, invitations, team roles, team status                                                           | organizations, competitions, participants                         |
-| `projects`      | Projects, project members, metadata, external repository links, team association                                    | organizations, competitions, participants, teams                  |
-| `submissions`   | Submission state machine, versions, deadlines, revisions, review status, submission file references                 | organizations, competitions, projects, teams, files               |
-| `judging`       | Rubrics, criteria, judge assignments, evaluations, conflicts of interest, calibration                               | organizations, competitions, participants, projects, submissions  |
-| `voting`        | Voting rounds, eligibility, ballots, votes, duplicate prevention, results and publication rules                     | organizations, competitions, participants, projects               |
-| `announcements` | Announcements, audience targeting, publication state, competition and organization notices                          | organizations, competitions                                       |
-| `notifications` | In-app notifications, delivery preferences, email coordination, retry and failure state                             | identity                                                          |
-| `administration`| Scoped administrative operations, administrative grants, audit records                                              | identity, organizations                                           |
-| `files`         | Upload authorization, file metadata, signature and MIME validation, quarantine, inspection, approved storage, download authorization | identity, organizations                                           |
+| Capability | Responsibility | Depends on |
+| --- | --- | --- |
+| `identity` | Local users, external identity links, profile, account state, user preferences | None |
+| `organizations` | Organizations, memberships, organization roles, organization settings | identity |
+| `competitions` | Competition series, editions, divisions, rules, schedules, registration configuration, eligibility definitions | organizations |
+| `participants` | Registrations, participant records, onboarding, eligibility status | identity, organizations, competitions |
+| `teams` | Teams, team members, invitations, team roles, team status | organizations, competitions, participants |
+| `projects` | Projects, project members, metadata, external repository links, team association | organizations, competitions, participants, teams |
+| `submissions` | Submission state machine, versions, deadlines, revisions, review status, submission file references | organizations, competitions, projects, teams, files |
+| `judging` | Rubrics, criteria, judge assignments, evaluations, conflicts of interest, calibration | organizations, competitions, participants, projects, submissions |
+| `voting` | Voting rounds, eligibility, ballots, votes, duplicate prevention, results and publication rules | organizations, competitions, participants, projects |
+| `announcements` | Announcements, audience targeting, publication state, competition and organization notices | organizations, competitions |
+| `notifications` | In-app notifications, delivery preferences, email coordination, retry and failure state | identity |
+| `administration` | Scoped administrative operations, administrative grants, audit records | identity, organizations |
+| `files` | Upload authorization, file metadata, signature and MIME validation, quarantine, inspection, approved storage, download authorization | identity, organizations |
 
 `notifications` and `announcements` consume events from other capabilities through the Core dispatcher. No capability depends on their implementation. `administration` records audited actions through an audit interface rather than importing another capability's internals.
 
@@ -116,21 +116,21 @@ The API registers thirteen capabilities. `identity` covers local user records an
 
 Each capability owns the tables that represent its responsibility. The complete mapping is in `docs/architecture/data-ownership.md`.
 
-| Capability      | Core tables                                                                                   |
-| --------------- | --------------------------------------------------------------------------------------------- |
-| `identity`      | `users`, `external_identities`                                                                |
-| `organizations` | `organizations`, `organization_memberships`                                                   |
-| `competitions`  | `competition_series`, `competition_editions`, `divisions`                                     |
-| `participants`  | `registrations`, `participants`                                                               |
-| `teams`         | `teams`, `team_members`, `team_invitations`                                                   |
-| `projects`      | `projects`, `project_members`                                                                 |
-| `submissions`   | `submissions`, `submission_versions`, `submission_files`                                      |
-| `judging`       | `judging_rubrics`, `judging_criteria`, `judge_assignments`, `evaluations`                     |
-| `voting`        | `voting_rounds`, `ballots`, `votes`                                                           |
-| `announcements` | `announcements`                                                                               |
-| `notifications` | `notifications`                                                                               |
-| `administration`| `audit_logs`                                                                                  |
-| `files`         | File records, upload state, scan status, and storage object metadata                          |
+| Capability       | Core tables                                                               |
+| ---------------- | ------------------------------------------------------------------------- |
+| `identity`       | `users`, `external_identities`                                            |
+| `organizations`  | `organizations`, `organization_memberships`                               |
+| `competitions`   | `competition_series`, `competition_editions`, `divisions`                 |
+| `participants`   | `registrations`, `participants`                                           |
+| `teams`          | `teams`, `team_members`, `team_invitations`                               |
+| `projects`       | `projects`, `project_members`                                             |
+| `submissions`    | `submissions`, `submission_versions`, `submission_files`                  |
+| `judging`        | `judging_rubrics`, `judging_criteria`, `judge_assignments`, `evaluations` |
+| `voting`         | `voting_rounds`, `ballots`, `votes`                                       |
+| `announcements`  | `announcements`                                                           |
+| `notifications`  | `notifications`                                                           |
+| `administration` | `audit_logs`                                                              |
+| `files`          | File records, upload state, scan status, and storage object metadata      |
 
 Exact relational structure must be validated against the audited old platform and actual workflows before it is treated as final.
 
@@ -138,21 +138,21 @@ Exact relational structure must be validated against the audited old platform an
 
 Event names use `<capability>.<fact>`. The following are the declared integration facts; a capability may add events only with contract and documentation updates.
 
-| Capability      | Events                                                                                             |
-| --------------- | -------------------------------------------------------------------------------------------------- |
-| `identity`      | `identity.user-created`, `identity.user-profile-updated`, `identity.user-disabled`                  |
-| `organizations` | `organizations.organization-created`, `organizations.membership-changed`                           |
-| `competitions`  | `competitions.published`, `competitions.schedule-updated`, `competitions.registration-opened`       |
-| `participants`  | `participants.registered`, `participants.withdrawn`                                                 |
-| `teams`         | `teams.created`, `teams.member-joined`, `teams.invitation-sent`                                     |
-| `projects`      | `projects.created`, `projects.updated`, `projects.published`                                        |
-| `submissions`   | `submissions.submitted`, `submissions.revised`, `submissions.approved`, `submissions.rejected`      |
-| `judging`       | `judging.judge-assigned`, `judging.evaluation-submitted`, `judging.evaluation-locked`               |
-| `voting`        | `voting.round-opened`, `voting.vote-cast`, `voting.round-closed`, `voting.results-published`        |
-| `announcements` | `announcements.published`                                                                           |
-| `notifications` | `notifications.queued`, `notifications.delivered`, `notifications.failed`                           |
-| `administration`| `administration.action-recorded`                                                                     |
-| `files`         | `files.uploaded`, `files.approved`, `files.rejected`                                                |
+| Capability | Events |
+| --- | --- |
+| `identity` | `identity.user-created`, `identity.user-profile-updated`, `identity.user-disabled` |
+| `organizations` | `organizations.organization-created`, `organizations.membership-changed` |
+| `competitions` | `competitions.published`, `competitions.schedule-updated`, `competitions.registration-opened` |
+| `participants` | `participants.registered`, `participants.withdrawn` |
+| `teams` | `teams.created`, `teams.member-joined`, `teams.invitation-sent` |
+| `projects` | `projects.created`, `projects.updated`, `projects.published` |
+| `submissions` | `submissions.submitted`, `submissions.revised`, `submissions.approved`, `submissions.rejected` |
+| `judging` | `judging.judge-assigned`, `judging.evaluation-submitted`, `judging.evaluation-locked` |
+| `voting` | `voting.round-opened`, `voting.vote-cast`, `voting.round-closed`, `voting.results-published` |
+| `announcements` | `announcements.published` |
+| `notifications` | `notifications.queued`, `notifications.delivered`, `notifications.failed` |
+| `administration` | `administration.action-recorded` |
+| `files` | `files.uploaded`, `files.approved`, `files.rejected` |
 
 Events are written to the outbox in the same transaction as the state change. A worker delivers them after commit. Handlers are idempotent, failures are recorded, and a consumer failure does not roll back the producer's committed business transaction.
 

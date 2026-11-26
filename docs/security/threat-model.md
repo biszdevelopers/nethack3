@@ -1,30 +1,20 @@
 # Threat model
 
-Status: security specification and review procedure. This document defines
-required properties. It does not assert that any control is implemented or
-verified. Verification evidence belongs in `docs/implementation/REQUIREMENT_TRACKER.md`
-and the release security review.
+Status: security specification and review procedure. This document defines required properties. It does not assert that any control is implemented or verified. Verification evidence belongs in `docs/implementation/REQUIREMENT_TRACKER.md` and the release security review.
 
 ## 1. Purpose and scope
 
-This threat model covers the nethack platform as specified in `FULL_PLAN.md`:
-the public Next.js site, the static React workspace, the Fastify API, the
-PostgreSQL database, uploaded files and the asset origin, the CI/CD and release
-path, and the Basis Auth and Microsoft Entra ID identity boundary.
+This threat model covers the nethack platform as specified in `FULL_PLAN.md`: the public Next.js site, the static React workspace, the Fastify API, the PostgreSQL database, uploaded files and the asset origin, the CI/CD and release path, and the Basis Auth and Microsoft Entra ID identity boundary.
 
-It is a design document. It identifies what must be protected, from whom,
-across which boundaries, and which controls are required to reduce each risk.
-It also records the risks that remain after those controls.
+It is a design document. It identifies what must be protected, from whom, across which boundaries, and which controls are required to reduce each risk. It also records the risks that remain after those controls.
 
 Out of scope, except where they affect nethack:
 
 - The internal security of Microsoft Entra ID and the Basis Auth service.
-- The internal security of the hosting provider, object storage provider, and
-  network provider.
+- The internal security of the hosting provider, object storage provider, and network provider.
 - Compromise of a user's device or browser by malware outside nethack.
 - Physical security of operator premises.
-- Legal and regulatory obligations beyond the security logging and disclosure
-  requirements referenced here.
+- Legal and regulatory obligations beyond the security logging and disclosure requirements referenced here.
 
 ## 2. Security objectives
 
@@ -38,11 +28,9 @@ The release objectives are:
 - No unprotected administrative action.
 - No unsafe execution of uploaded content.
 - No unnecessary runtime privilege.
-- No unresolved critical or high-severity vulnerability with a known
-  exploitation path.
+- No unresolved critical or high-severity vulnerability with a known exploitation path.
 
-These are objectives, not guarantees. A release is not secure merely because
-these controls are documented.
+These are objectives, not guarantees. A release is not secure merely because these controls are documented.
 
 ## 3. Assets
 
@@ -89,8 +77,7 @@ these controls are documented.
 
 ### 5.1 Three-origin boundary
 
-The browser, the application API, and the identity provider are separate
-origins with separate cookies and separate trust rules.
+The browser, the application API, and the identity provider are separate origins with separate cookies and separate trust rules.
 
 ```
 +------------------------------+          +------------------------------+
@@ -127,23 +114,13 @@ Adjacent origins, outside the three-origin core:
 
 The boundary rules are:
 
-- The workspace origin is untrusted input. It may render data and call the API,
-  but it has no authority to decide identity, role, organization, or permission.
-- The API origin is the authoritative security boundary. It accepts the
-  session cookie only from the configured workspace origin, validates CSRF and
-  Origin, and re-derives every authorization decision from the database.
-- The identity origin is used only for OIDC redirects and server-to-server
-  token exchange. The nethack API never reads, forwards, or shares the
-  `basis_sso` cookie. The browser never receives the client secret, access
-  token, refresh token, or encryption keys.
-- The public site origin has no session cookie and no private API authority.
-  It may use public API data and deliberately scoped caching only.
-- The asset origin has no cookies, no CORS credentials, and no dynamic
-  application behavior. It serves approved bytes only.
-- PostgreSQL is reachable only from the API and worker network. Runtime
-  credentials are not migration credentials and do not own the schema.
-- CI/CD and the secret store are a separate administrative trust boundary.
-  Compromise there is treated as a production compromise.
+- The workspace origin is untrusted input. It may render data and call the API, but it has no authority to decide identity, role, organization, or permission.
+- The API origin is the authoritative security boundary. It accepts the session cookie only from the configured workspace origin, validates CSRF and Origin, and re-derives every authorization decision from the database.
+- The identity origin is used only for OIDC redirects and server-to-server token exchange. The nethack API never reads, forwards, or shares the `basis_sso` cookie. The browser never receives the client secret, access token, refresh token, or encryption keys.
+- The public site origin has no session cookie and no private API authority. It may use public API data and deliberately scoped caching only.
+- The asset origin has no cookies, no CORS credentials, and no dynamic application behavior. It serves approved bytes only.
+- PostgreSQL is reachable only from the API and worker network. Runtime credentials are not migration credentials and do not own the schema.
+- CI/CD and the secret store are a separate administrative trust boundary. Compromise there is treated as a production compromise.
 
 ### 5.2 Other trust boundaries
 
@@ -162,9 +139,7 @@ The boundary rules are:
 
 ## 6. Threat table
 
-The categories use STRIDE: Spoofing, Tampering, Repudiation, Information
-disclosure, Denial of service, and Elevation of privilege. A threat may fit
-more than one category; the primary category is shown.
+The categories use STRIDE: Spoofing, Tampering, Repudiation, Information disclosure, Denial of service, and Elevation of privilege. A threat may fit more than one category; the primary category is shown.
 
 | ID | Category | Threat | Primary mitigations | Residual risk |
 | --- | --- | --- | --- | --- |
@@ -203,177 +178,99 @@ more than one category; the primary category is shown.
 
 ### 7.1 Cross-site scripting
 
-- Render all untrusted text through React text nodes. `dangerouslySetInnerHTML`,
-  `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`, and
-  `eval`-like constructs are prohibited unless a reviewed, allowlisted
-  sanitizer is the only path and the exception is recorded.
-- Markdown rendering must disable raw HTML by default. If rich HTML is
-  supported, it must pass an allowlist sanitizer that removes scripts, event
-  handlers, dangerous URL schemes, embedded objects, and style-based script
-  vectors.
-- Validate URL schemes for links and images. Permit only `https`, `http` where
-  explicitly allowed, and `mailto` where required. Reject `javascript:`,
-  `data:` for navigations, `vbscript:`, and control-character obfuscation.
-- Serve a strict Content Security Policy for both the public site and the
-  workspace. Use nonces or hashes for required inline scripts. Do not permit
-  `unsafe-eval`. `object-src 'none'`, `base-uri 'self'`, and
-  `frame-ancestors 'none'` are required.
-- User-uploaded SVG is rejected. User-uploaded HTML is rejected. PDFs are
-  served as attachments from the cookieless asset origin.
-- Stored, reflected, and DOM XSS payloads must exist as test fixtures in
-  `tests/security` and as browser checks in `tests/e2e`.
+- Render all untrusted text through React text nodes. `dangerouslySetInnerHTML`, `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`, and `eval`-like constructs are prohibited unless a reviewed, allowlisted sanitizer is the only path and the exception is recorded.
+- Markdown rendering must disable raw HTML by default. If rich HTML is supported, it must pass an allowlist sanitizer that removes scripts, event handlers, dangerous URL schemes, embedded objects, and style-based script vectors.
+- Validate URL schemes for links and images. Permit only `https`, `http` where explicitly allowed, and `mailto` where required. Reject `javascript:`, `data:` for navigations, `vbscript:`, and control-character obfuscation.
+- Serve a strict Content Security Policy for both the public site and the workspace. Use nonces or hashes for required inline scripts. Do not permit `unsafe-eval`. `object-src 'none'`, `base-uri 'self'`, and `frame-ancestors 'none'` are required.
+- User-uploaded SVG is rejected. User-uploaded HTML is rejected. PDFs are served as attachments from the cookieless asset origin.
+- Stored, reflected, and DOM XSS payloads must exist as test fixtures in `tests/security` and as browser checks in `tests/e2e`.
 
 ### 7.2 SQL injection
 
-- All SQL must use Drizzle's parameterized query builders or parameterized raw
-  SQL. User input must never be concatenated into a statement, identifier, or
-  clause.
-- Sort fields, filter operators, aggregate names, and table names must come
-  from explicit allowlists. Unknown values are rejected, not passed through.
-- The runtime database role has only the DML privileges it needs. It is not the
-  table owner, is not a superuser, and does not have `BYPASSRLS`.
-- RLS is an additional layer. It does not make an injection safe, because an
-  injected statement runs as the application role and can change the
-  transaction-local organization context.
-- SQL injection attempts and malformed filter input must be exercised in
-  `tests/security`.
+- All SQL must use Drizzle's parameterized query builders or parameterized raw SQL. User input must never be concatenated into a statement, identifier, or clause.
+- Sort fields, filter operators, aggregate names, and table names must come from explicit allowlists. Unknown values are rejected, not passed through.
+- The runtime database role has only the DML privileges it needs. It is not the table owner, is not a superuser, and does not have `BYPASSRLS`.
+- RLS is an additional layer. It does not make an injection safe, because an injected statement runs as the application role and can change the transaction-local organization context.
+- SQL injection attempts and malformed filter input must be exercised in `tests/security`.
 
 ### 7.3 Authorization and object-level access
 
-- Every protected request must verify identity, organization context, resource
-  organization, active membership, operation permission, and competition
-  eligibility, assignment, or ownership. See `docs/security/authorization.md`.
-- A resource identifier is never a capability. Knowing or guessing an ID does
-  not grant access. Every object lookup must be constrained by the
-  authenticated actor's organization and relationship to the object.
-- The frontend may hide actions for usability. Hiding is not a security
-  control, and the API must enforce the same decision on every request.
-- Cross-organization object access returns a not-found response where
-  appropriate to avoid confirming the existence of another organization's
-  resource.
+- Every protected request must verify identity, organization context, resource organization, active membership, operation permission, and competition eligibility, assignment, or ownership. See `docs/security/authorization.md`.
+- A resource identifier is never a capability. Knowing or guessing an ID does not grant access. Every object lookup must be constrained by the authenticated actor's organization and relationship to the object.
+- The frontend may hide actions for usability. Hiding is not a security control, and the API must enforce the same decision on every request.
+- Cross-organization object access returns a not-found response where appropriate to avoid confirming the existence of another organization's resource.
 
 ### 7.4 Cross-organization isolation
 
 - Every organization-owned row has a non-null organization identifier.
-- API repositories require an organization identifier and include it in every
-  tenant-table query, even when RLS is active.
-- PostgreSQL RLS uses a transaction-local `nethack.organization_id` setting, a
-  non-owner application role, no bypass privilege, and forced row security. See
-  `docs/security/tenant-isolation.md`.
-- Composite foreign keys and unique constraints must prevent a child row from
-  referencing a parent in another organization.
-- Caches, file storage prefixes, background jobs, exports, and audit queries
-  must carry the organization scope. No personalized response may be cached in
-  a shared cache.
+- API repositories require an organization identifier and include it in every tenant-table query, even when RLS is active.
+- PostgreSQL RLS uses a transaction-local `nethack.organization_id` setting, a non-owner application role, no bypass privilege, and forced row security. See `docs/security/tenant-isolation.md`.
+- Composite foreign keys and unique constraints must prevent a child row from referencing a parent in another organization.
+- Caches, file storage prefixes, background jobs, exports, and audit queries must carry the organization scope. No personalized response may be cached in a shared cache.
 
 ### 7.5 CSRF, session fixation, and open redirect
 
-- State-changing requests require a synchronizer token in addition to the
-  session cookie. The token is bound to the session, compared in constant time,
-  and required on `POST`, `PUT`, `PATCH`, and `DELETE`.
-- Exact `Origin` validation is required for browser-originated requests.
-  `Referer` validation is a secondary check, not a replacement.
+- State-changing requests require a synchronizer token in addition to the session cookie. The token is bound to the session, compared in constant time, and required on `POST`, `PUT`, `PATCH`, and `DELETE`.
+- Exact `Origin` validation is required for browser-originated requests. `Referer` validation is a secondary check, not a replacement.
 - No state-changing operation may be performed by `GET`.
-- A successful login creates a new session identifier. Pre-authentication
-  session identifiers are never promoted.
-- Login return paths are relative paths only. Absolute redirects require an
-  explicit allowlist. The authorization callback redirect URI must match the
-  registered value exactly.
+- A successful login creates a new session identifier. Pre-authentication session identifiers are never promoted.
+- Login return paths are relative paths only. Absolute redirects require an explicit allowlist. The authorization callback redirect URI must match the registered value exactly.
 
 ### 7.6 SSRF and server-side fetching
 
-- The application must not fetch arbitrary user-supplied URLs. URL previews,
-  imports, webhooks, and remote asset fetching require an explicit destination
-  allowlist.
-- Resolve the destination and reject loopback, link-local, private, multicast,
-  unspecified, and cloud metadata addresses. Revalidate after every redirect.
-  Limit redirects, response size, and total time.
-- Outbound network access from the API and workers is restricted at the
-  network layer. The file-inspection worker has no outbound network access.
+- The application must not fetch arbitrary user-supplied URLs. URL previews, imports, webhooks, and remote asset fetching require an explicit destination allowlist.
+- Resolve the destination and reject loopback, link-local, private, multicast, unspecified, and cloud metadata addresses. Revalidate after every redirect. Limit redirects, response size, and total time.
+- Outbound network access from the API and workers is restricted at the network layer. The file-inspection worker has no outbound network access.
 
 ### 7.7 File upload and download
 
-- The pipeline is quarantine, inspection, approval, then authorized download.
-  No uploaded file is downloadable before approval.
-- The upload limit is 25 MiB. Allowed types are an explicit allowlist. Magic
-  bytes and container structure are validated; the declared MIME type and
-  filename are not trusted.
+- The pipeline is quarantine, inspection, approval, then authorized download. No uploaded file is downloadable before approval.
+- The upload limit is 25 MiB. Allowed types are an explicit allowlist. Magic bytes and container structure are validated; the declared MIME type and filename are not trusted.
 - Storage names are generated. User filenames never become path components.
-- SVG, HTML, scripts, executables, encrypted archives, and active PDF content
-  are rejected. Archive central directories are inspected with entry, size,
-  ratio, depth, and path limits.
-- Uploaded content is never executed by the API. Inspection runs in an isolated
-  worker with CPU, memory, time, filesystem, and network limits.
-- Downloads are served from a separate cookieless asset origin with
-  `X-Content-Type-Options: nosniff`, a sandboxing CSP, and attachment
-  disposition except where a safe inline image policy is explicitly approved.
-  See `docs/security/file-security.md`.
+- SVG, HTML, scripts, executables, encrypted archives, and active PDF content are rejected. Archive central directories are inspected with entry, size, ratio, depth, and path limits.
+- Uploaded content is never executed by the API. Inspection runs in an isolated worker with CPU, memory, time, filesystem, and network limits.
+- Downloads are served from a separate cookieless asset origin with `X-Content-Type-Options: nosniff`, a sandboxing CSP, and attachment disposition except where a safe inline image policy is explicitly approved. See `docs/security/file-security.md`.
 
 ### 7.8 Cache isolation and cache poisoning
 
 - Authenticated responses use `Cache-Control: private, no-store`.
-- Personalized responses are never stored in a shared cache, CDN cache, or
-  Next.js data cache. Next.js Cache Components are disabled initially, and
-  experimental or complex shared caching is not used for sensitive data.
-- Cache keys for any permitted shared cache include the organization and the
-  authorization-relevant variant. Untrusted headers and query parameters must
-  not be able to collide with another tenant's key.
-- Public content may use static generation, incremental static regeneration,
-  or deliberately scoped caching only after review.
+- Personalized responses are never stored in a shared cache, CDN cache, or Next.js data cache. Next.js Cache Components are disabled initially, and experimental or complex shared caching is not used for sensitive data.
+- Cache keys for any permitted shared cache include the organization and the authorization-relevant variant. Untrusted headers and query parameters must not be able to collide with another tenant's key.
+- Public content may use static generation, incremental static regeneration, or deliberately scoped caching only after review.
 - Cache purge is part of incident response when tenant leakage is suspected.
 
 ### 7.9 Privilege escalation and administration
 
-- Roles are assigned explicitly and stored server-side. A user who administers
-  one organization does not automatically administer another.
-- Global administrator is a separate, rare, audited grant. It does not confer
-  judging or voting authority. Competition actions by a global administrator
-  require a break-glass grant and an audit record.
-- Administrative endpoints require the same six-step verification plus an
-  explicit administrative permission. They are rate-limited and audited.
-- No shared administrator accounts. No client-provided role, permission, or
-  organization claim is authoritative.
+- Roles are assigned explicitly and stored server-side. A user who administers one organization does not automatically administer another.
+- Global administrator is a separate, rare, audited grant. It does not confer judging or voting authority. Competition actions by a global administrator require a break-glass grant and an audit record.
+- Administrative endpoints require the same six-step verification plus an explicit administrative permission. They are rate-limited and audited.
+- No shared administrator accounts. No client-provided role, permission, or organization claim is authoritative.
 
 ### 7.10 Dependency and build compromise
 
-- Production dependencies are pinned to exact versions and installed from the
-  committed `bun.lock` with a frozen lockfile in CI.
-- New dependencies require justification and review. Lifecycle scripts are
-  reviewed or disabled where the dependency does not require them.
-- An SBOM is generated for every release. Direct and transitive dependencies,
-  container base images, and build tools are scanned. Critical and high
-  findings block release unless proven non-exploitable with recorded evidence.
-- Next.js is kept on the latest patched stable release. SVG image optimization
-  for untrusted content is disabled. Security advisories are monitored and
-  patched on an emergency schedule.
+- Production dependencies are pinned to exact versions and installed from the committed `bun.lock` with a frozen lockfile in CI.
+- New dependencies require justification and review. Lifecycle scripts are reviewed or disabled where the dependency does not require them.
+- An SBOM is generated for every release. Direct and transitive dependencies, container base images, and build tools are scanned. Critical and high findings block release unless proven non-exploitable with recorded evidence.
+- Next.js is kept on the latest patched stable release. SVG image optimization for untrusted content is disabled. Security advisories are monitored and patched on an emergency schedule.
 
 ### 7.11 Denial of service and resource exhaustion
 
-- Edge and API rate limits apply to authentication, uploads, searches, exports,
-  and other expensive operations.
-- Request body, upload, JSON depth, array length, page size, and query
-  complexity are bounded.
-- Database queries are bounded and indexed for organization-scoped access.
-  Unbounded result sets and unbounded background jobs are prohibited.
-- Per-user and per-organization quotas bound storage, submissions, votes, and
-  notification volume.
+- Edge and API rate limits apply to authentication, uploads, searches, exports, and other expensive operations.
+- Request body, upload, JSON depth, array length, page size, and query complexity are bounded.
+- Database queries are bounded and indexed for organization-scoped access. Unbounded result sets and unbounded background jobs are prohibited.
+- Per-user and per-organization quotas bound storage, submissions, votes, and notification volume.
 - Workers have bounded concurrency, retry limits, and dead-letter handling.
 
 ### 7.12 Backchannel and token revocation integrity
 
-- The backchannel endpoint handles `action=test`, `logout_token`, and
-  `action=revoke_access_token` on one endpoint.
-- The test challenge is proven with HMAC-SHA256 using the current resource
-  secret, within ten seconds, through the internal API.
-- Logout and revocation tokens are validated against the current JWKS with
-  exact issuer, resource audience, `typ`, expiry, and claim matching.
-- Revoked access-token JTIs are stored with the earliest valid-after time and
-  checked before any protected operation. Delivery retries are idempotent.
+- The backchannel endpoint handles `action=test`, `logout_token`, and `action=revoke_access_token` on one endpoint.
+- The test challenge is proven with HMAC-SHA256 using the current resource secret, within ten seconds, through the internal API.
+- Logout and revocation tokens are validated against the current JWKS with exact issuer, resource audience, `typ`, expiry, and claim matching.
+- Revoked access-token JTIs are stored with the earliest valid-after time and checked before any protected operation. Delivery retries are idempotent.
 
 ## 8. Residual risks
 
-Residual risk is accepted only with a named owner and a review date. It is
-reviewed at every release and after every security incident.
+Residual risk is accepted only with a named owner and a review date. It is reviewed at every release and after every security incident.
 
 | Residual risk | Why it remains | Required treatment |
 | --- | --- | --- |
@@ -393,20 +290,13 @@ reviewed at every release and after every security incident.
 
 ## 9. Assumptions
 
-- Basis Auth follows the contract in `SETUP_GUIDE.md`, including PKCE, token
-  lifetimes, refresh rotation, backchannel behavior, and error responses.
-- Basis Auth is operated with patched software, protected signing keys, and a
-  private internal listener.
-- TLS is terminated correctly for all public origins. HSTS is enabled in
-  production.
-- The workspace, API, public site, and asset origin are separate hostnames with
-  explicit CORS, cookie, CSP, and trust policies.
-- The database is not publicly reachable. Runtime and migration credentials are
-  separate.
-- Operators use individual accounts and a secret manager. Shared credentials
-  are prohibited.
-- The threat model is reviewed when a new capability, origin, file type,
-  identity flow, administrative power, or third-party integration is added.
+- Basis Auth follows the contract in `SETUP_GUIDE.md`, including PKCE, token lifetimes, refresh rotation, backchannel behavior, and error responses.
+- Basis Auth is operated with patched software, protected signing keys, and a private internal listener.
+- TLS is terminated correctly for all public origins. HSTS is enabled in production.
+- The workspace, API, public site, and asset origin are separate hostnames with explicit CORS, cookie, CSP, and trust policies.
+- The database is not publicly reachable. Runtime and migration credentials are separate.
+- Operators use individual accounts and a secret manager. Shared credentials are prohibited.
+- The threat model is reviewed when a new capability, origin, file type, identity flow, administrative power, or third-party integration is added.
 
 ## 10. Review triggers
 
@@ -417,11 +307,8 @@ Review and update this document when any of the following occurs:
 - Authentication, session, token, or account-linking behavior changes.
 - A new file type, archive format, parser, or inspection tool is introduced.
 - A new administrative role or break-glass procedure is added.
-- A dependency with native code, a lifecycle script, or broad privilege is
-  added.
-- A security incident, penetration-test finding, or critical advisory affects a
-  component in scope.
+- A dependency with native code, a lifecycle script, or broad privilege is added.
+- A security incident, penetration-test finding, or critical advisory affects a component in scope.
 - At least annually, even when no change is detected.
 
-The review must update the threat table, the residual-risk table, the security
-requirements, and the tests that verify the affected controls.
+The review must update the threat table, the residual-risk table, the security requirements, and the tests that verify the affected controls.
