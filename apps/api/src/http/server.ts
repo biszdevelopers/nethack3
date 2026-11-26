@@ -126,6 +126,7 @@ export async function configureServer(
         keyGenerator: (request) => request.ip,
         allowList: [],
         errorResponseBuilder: (request, context) => ({
+            statusCode: 429,
             error: {
                 code: "rate_limited",
                 message: "Too many requests. Try again shortly.",

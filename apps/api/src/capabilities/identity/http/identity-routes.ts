@@ -1,4 +1,3 @@
-import { z } from "zod";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import {
     csrfTokenSchema,
@@ -15,17 +14,7 @@ import { AuthGuard } from "../../../http/guards.js";
 import type { NethackServer } from "../../../http/types.js";
 import type { AuthContext, UserRow } from "../../../authentication/types.js";
 import { normalizeReturnTo } from "../../../authentication/login-service.js";
-
-const loginQuerySchema = z.object({
-    returnTo: z.string().max(2048).optional(),
-});
-
-const callbackQuerySchema = z.object({
-    code: z.string().max(4096).optional(),
-    state: z.string().max(512).optional(),
-    error: z.string().max(256).optional(),
-    error_description: z.string().max(1024).optional(),
-});
+import { callbackQuerySchema, loginQuerySchema } from "../domain/identity-schemas.js";
 
 export async function registerIdentityRoutes(
     app: NethackServer,

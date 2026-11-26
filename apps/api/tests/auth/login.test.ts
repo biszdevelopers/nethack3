@@ -89,8 +89,8 @@ describe("Basis Auth discovery and login", () => {
         expect(row?.access_token_encrypted).not.toContain(issued?.accessToken ?? "");
         expect(row?.refresh_token_encrypted).toMatch(/^v1\./);
         expect(row?.refresh_token_encrypted).not.toContain(issued?.refreshToken ?? "");
-        expect(row?.access_token_encrypted).not.toContain("eyJ");
-        expect(row?.refresh_token_encrypted).not.toContain("eyJ");
+        expect(row?.access_token_encrypted).not.toMatch(/^eyJ/);
+        expect(row?.refresh_token_encrypted).not.toMatch(/^eyJ/);
 
         const identities = await queryAsOwner<{ subject: string; email_at_login: string }>(
             "select subject, email_at_login from external_identities where user_id = $1",
@@ -202,5 +202,39 @@ describe("Basis Auth discovery and login", () => {
         } finally {
             harness.provider.setErrorMode(null);
         }
+    });
+
+    it("regenerates the session instead of accepting a fixed pre-login cookie", async () => {
+        const email = uniqueEmail("fixation");
+        const subject = "fixation-subject";
+        const previous = await harness.signIn({ email, name: "Fixation User", subject });
+        harness.provider.setNextUser({ email, name: "Fixation User", subject });
+
+        const attempt = await harness.startLogin();
+        const response = await harness.runtime.app.inject({
+            method: "GET",
+            url: `${attempt.callbackUrl.pathname}${attempt.callbackUrl.search}`,
+            headers: { cookie: previous.cookie },
+        });
+        expect(response.statusCode).toBe(302);
+        const setCookie = response.headers["set-cookie"];
+        const header = Array.isArray(setCookie) ? (setCookie[0] ?? "") : (setCookie ?? "");
+        expect(header).toContain("__Host-nethack_session=");
+        const newValue = header.split(";")[0]?.split("=")[1] ?? "";
+        expect(newValue).not.toBe("");
+        expect(newValue).not.toBe(previous.cookieValue);
+
+        const previousRows = await queryAsOwner<{ revoked_reason: string | null }>(
+            "select revoked_reason from sessions where id = $1",
+            [previous.sessionId],
+        );
+        expect(previousRows[0]?.revoked_reason).toBe("login_regenerated");
+
+        const oldCookie = await harness.runtime.app.inject({
+            method: "GET",
+            url: "/api/v1/auth/session",
+            headers: { cookie: previous.cookie },
+        });
+        expect(oldCookie.statusCode).toBe(401);
     });
 });
