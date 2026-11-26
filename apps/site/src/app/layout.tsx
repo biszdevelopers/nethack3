@@ -1,12 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import type { ReactNode } from "react";
 import "./globals.css";
 import { SiteHeader } from "../components/site-header";
 import { SiteFooter } from "../components/site-footer";
 import { SiteProviders } from "../components/site-providers";
-
-// CSP nonces are generated per request, so HTML must be rendered per request.
-export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
     title: {
@@ -26,12 +24,29 @@ export const metadata: Metadata = {
     },
 };
 
-export default function RootLayout({ children }: { readonly children: ReactNode }): ReactNode {
+export const viewport: Viewport = {
+    themeColor: "#090909",
+    colorScheme: "dark light",
+};
+
+// CSP nonces are generated per request, so HTML must be rendered per request.
+export const dynamic = "force-dynamic";
+
+export default async function RootLayout({
+    children,
+}: {
+    readonly children: ReactNode;
+}): Promise<ReactNode> {
+    const workspaceOrigin = process.env.WORKSPACE_ORIGIN ?? "http://localhost:5173";
+    const nonce = (await headers()).get("x-nonce") ?? undefined;
     return (
         <html lang="en" data-theme="dark">
-            <body className="flex min-h-dvh flex-col">
+            <head>
+                <script src="/theme-init.js" nonce={nonce} />
+            </head>
+            <body className="flex min-h-dvh flex-col overflow-x-clip">
                 <SiteProviders>
-                    <SiteHeader />
+                    <SiteHeader workspaceOrigin={workspaceOrigin} />
                     <main id="main" className="flex-1">
                         {children}
                     </main>

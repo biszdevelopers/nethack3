@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { HelpCircle } from "lucide-react";
+import { AnimatedDisclosure, Reveal } from "@nethack/ui/motion";
 
 export const metadata = {
     title: "FAQ",
@@ -34,7 +36,7 @@ const QUESTIONS = [
     {
         question: "How is judging kept fair?",
         answer:
-            "Judges receive specific assignments and score against a published rubric. Judges can declare a conflict of interest, which prevents them from evaluating that submission. All assignments and submitted evaluations are audited.",
+            "Judges receive specific assignments and score against a published rubric. Judges can declare a conflict of interest, which prevents them from evaluating that submission. Assignments and submitted evaluations are audited.",
     },
     {
         question: "How does voting prevent duplicate ballots?",
@@ -50,22 +52,30 @@ const QUESTIONS = [
 
 export default function FaqPage(): ReactNode {
     return (
-        <div className="mx-auto flex w-full max-w-[800px] flex-col gap-8 px-6 py-12">
-            <div className="flex flex-col gap-2">
-                <h1 className="text-3xl font-semibold tracking-tight">Frequently asked questions</h1>
-                <p className="text-sm text-ink-muted">
+        <div className="mx-auto flex w-full max-w-[900px] flex-col gap-8 px-4 py-10 sm:px-6 md:py-14">
+            <Reveal className="flex flex-col gap-3">
+                <span className="inline-flex items-center gap-1.5 text-xs text-primary">
+                    <HelpCircle className="size-3.5" aria-hidden="true" />
+                    help
+                </span>
+                <h1 className="text-3xl font-extrabold tracking-tight glow sm:text-4xl">
+                    Frequently asked questions
+                </h1>
+                <p className="text-base text-ink-muted">
                     Operational answers about accounts, registration, teams, submissions, review,
                     and voting.
                 </p>
-            </div>
-            <dl className="flex flex-col divide-y divide-line">
-                {QUESTIONS.map((item) => (
-                    <div key={item.question} className="flex flex-col gap-2 py-5 first:pt-0">
-                        <dt className="text-sm font-medium">{item.question}</dt>
-                        <dd className="text-sm text-ink-muted">{item.answer}</dd>
-                    </div>
+            </Reveal>
+
+            <div className="flex flex-col gap-2">
+                {QUESTIONS.map((item, index) => (
+                    <Reveal key={item.question} delay={index * 0.03}>
+                        <AnimatedDisclosure title={item.question}>
+                            <p className="text-sm leading-7 text-ink-muted">{item.answer}</p>
+                        </AnimatedDisclosure>
+                    </Reveal>
                 ))}
-            </dl>
+            </div>
         </div>
     );
 }

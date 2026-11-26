@@ -1,7 +1,16 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+    ArrowRight,
+    ArrowUpRight,
+    CalendarClock,
+    GitBranch,
+    Users,
+} from "lucide-react";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, EmptyState, Markdown } from "@nethack/ui/static";
+import { Reveal, StaggerReveal, Tilt } from "@nethack/ui/motion";
 import { PublicApiError, getCompetition } from "../../../lib/public-api";
 
 function formatDate(value: string | null): string {
@@ -12,6 +21,28 @@ function formatDate(value: string | null): string {
         dateStyle: "medium",
         timeStyle: "short",
     }).format(new Date(value));
+}
+
+export async function generateMetadata({
+    params,
+}: {
+    readonly params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+    const { slug } = await params;
+    try {
+        const competition = await getCompetition(slug);
+        return {
+            title: competition.name,
+            description: competition.description,
+            openGraph: {
+                title: competition.name,
+                description: competition.description,
+                type: "website",
+            },
+        };
+    } catch {
+        return { title: "Competition" };
+    }
 }
 
 export default async function CompetitionDetailPage({
@@ -30,163 +61,228 @@ export default async function CompetitionDetailPage({
         throw error;
     }
 
+    const workspaceOrigin = process.env.WORKSPACE_ORIGIN ?? "http://localhost:5173";
+
     return (
-        <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-10 px-6 py-12">
-            <div className="flex flex-col gap-4">
-                <Link href="/competitions" className="text-xs text-ink-muted hover:text-ink">
+        <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-12 px-4 py-10 sm:px-6 md:py-14 lg:px-8">
+            <Reveal className="flex flex-col gap-4">
+                <Link
+                    href="/competitions"
+                    className="text-xs text-ink-muted transition-colors hover:text-primary"
+                >
                     ← All competitions
                 </Link>
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs text-ink-subtle">{competition.organizationName}</span>
-                    <Badge tone="neutral" size="sm">
+                    <Badge variant="soft" color="primary" size="sm">
                         {competition.status.replaceAll("_", " ")}
                     </Badge>
                 </div>
-                <h1 className="text-balance text-3xl font-semibold tracking-tight">
+                <h1 className="text-balance text-3xl font-extrabold tracking-tight glow sm:text-4xl md:text-5xl">
                     {competition.name}
                 </h1>
-                <p className="max-w-3xl text-sm text-ink-muted">{competition.description}</p>
-            </div>
+                <p className="max-w-3xl text-base text-ink-muted">{competition.description}</p>
+                <div className="flex flex-wrap gap-3">
+                    <Button asChild>
+                        <a href={`${workspaceOrigin}/competitions/${competition.slug}`}>
+                            Open in workspace
+                            <ArrowUpRight className="size-4" aria-hidden="true" />
+                        </a>
+                    </Button>
+                    <Button asChild variant="outline" color="neutral">
+                        <Link href={`/competitions/${competition.slug}/rules`}>Rules</Link>
+                    </Button>
+                    <Button asChild variant="outline" color="neutral">
+                        <Link href={`/competitions/${competition.slug}/schedule`}>Schedule</Link>
+                    </Button>
+                    <Button asChild variant="subtle" color="neutral">
+                        <Link href={`/projects?competition=${competition.slug}`}>
+                            View projects
+                            <ArrowRight className="size-4" aria-hidden="true" />
+                        </Link>
+                    </Button>
+                </div>
+            </Reveal>
 
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Starts</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-sm">{formatDate(competition.startsAt)}</CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Ends</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-sm">{formatDate(competition.endsAt)}</CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Registration closes</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-sm">
-                        {formatDate(competition.registrationClosesAt)}
+            <StaggerReveal className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Card variant="soft">
+                    <CardContent className="flex flex-col gap-1 pt-5">
+                        <span className="inline-flex items-center gap-1.5 text-xs text-ink-subtle">
+                            <CalendarClock className="size-3.5 text-primary" aria-hidden="true" />
+                            Starts
+                        </span>
+                        <span className="text-sm">{formatDate(competition.startsAt)}</span>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Team size</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-sm">
-                        {competition.teamMinSize}–{competition.teamMaxSize} people
+                <Card variant="soft">
+                    <CardContent className="flex flex-col gap-1 pt-5">
+                        <span className="inline-flex items-center gap-1.5 text-xs text-ink-subtle">
+                            <CalendarClock className="size-3.5 text-primary" aria-hidden="true" />
+                            Ends
+                        </span>
+                        <span className="text-sm">{formatDate(competition.endsAt)}</span>
                     </CardContent>
                 </Card>
-            </div>
+                <Card variant="soft">
+                    <CardContent className="flex flex-col gap-1 pt-5">
+                        <span className="inline-flex items-center gap-1.5 text-xs text-ink-subtle">
+                            <CalendarClock className="size-3.5 text-primary" aria-hidden="true" />
+                            Registration closes
+                        </span>
+                        <span className="text-sm">{formatDate(competition.registrationClosesAt)}</span>
+                    </CardContent>
+                </Card>
+                <Card variant="soft">
+                    <CardContent className="flex flex-col gap-1 pt-5">
+                        <span className="inline-flex items-center gap-1.5 text-xs text-ink-subtle">
+                            <Users className="size-3.5 text-primary" aria-hidden="true" />
+                            Team size
+                        </span>
+                        <span className="text-sm">
+                            {competition.teamMinSize}–{competition.teamMaxSize} people
+                        </span>
+                    </CardContent>
+                </Card>
+            </StaggerReveal>
 
-            <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
-                <section className="flex flex-col gap-4" aria-labelledby="rules-heading">
-                    <h2 id="rules-heading" className="text-lg font-semibold">
-                        Rules
-                    </h2>
+            <div className="grid gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                <Reveal className="flex flex-col gap-4" y={20}>
+                    <h2 id="rules" className="text-2xl font-bold tracking-tight glow-sm">Rules</h2>
                     {competition.rulesMarkdown.trim().length === 0 ? (
                         <EmptyState
                             title="Rules not published"
                             description="The organizer has not published rules for this edition yet."
                         />
                     ) : (
-                        <Markdown source={competition.rulesMarkdown} />
+                        <div className="prose-nethack">
+                            <Markdown source={competition.rulesMarkdown} />
+                        </div>
                     )}
-                </section>
+                </Reveal>
 
                 <div className="flex flex-col gap-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Schedule</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {competition.milestones.length === 0 ? (
-                                <p className="text-sm text-ink-subtle">
-                                    No milestones have been published.
-                                </p>
-                            ) : (
-                                <ol className="flex flex-col gap-3">
-                                    {competition.milestones.map((milestone) => (
-                                        <li key={milestone.id} className="flex flex-col gap-1">
-                                            <span className="text-xs text-ink-subtle">
-                                                {formatDate(milestone.occursAt)}
-                                            </span>
-                                            <span className="text-sm">{milestone.title}</span>
-                                            {milestone.description.length === 0 ? null : (
-                                                <span className="text-xs text-ink-muted">
-                                                    {milestone.description}
+                    <Reveal>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Schedule</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {competition.milestones.length === 0 ? (
+                                    <p className="text-sm text-ink-subtle">
+                                        No milestones have been published.
+                                    </p>
+                                ) : (
+                                    <ol className="flex flex-col gap-4">
+                                        {competition.milestones.map((milestone) => (
+                                            <li key={milestone.id} className="relative border-l border-line pl-4">
+                                                <span
+                                                    aria-hidden="true"
+                                                    className="absolute -left-[5px] top-1.5 size-2.5 rounded-full border border-primary bg-app"
+                                                />
+                                                <span className="text-xs text-primary">
+                                                    {formatDate(milestone.occursAt)}
                                                 </span>
-                                            )}
-                                        </li>
-                                    ))}
-                                </ol>
-                            )}
-                        </CardContent>
-                    </Card>
+                                                <p className="text-sm">{milestone.title}</p>
+                                                {milestone.description.length === 0 ? null : (
+                                                    <p className="text-xs text-ink-muted">
+                                                        {milestone.description}
+                                                    </p>
+                                                )}
+                                            </li>
+                                        ))}
+                                    </ol>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </Reveal>
 
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Divisions</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {competition.divisions.length === 0 ? (
-                                <p className="text-sm text-ink-subtle">No divisions.</p>
-                            ) : (
-                                <ul className="flex flex-col gap-2">
-                                    {competition.divisions.map((division) => (
-                                        <li key={division.id} className="flex flex-col gap-1">
-                                            <span className="text-sm">{division.name}</span>
-                                            {division.description.length === 0 ? null : (
-                                                <span className="text-xs text-ink-muted">
-                                                    {division.description}
-                                                </span>
-                                            )}
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </CardContent>
-                    </Card>
+                    <Reveal delay={0.08}>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Divisions</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {competition.divisions.length === 0 ? (
+                                    <p className="text-sm text-ink-subtle">No divisions.</p>
+                                ) : (
+                                    <ul className="flex flex-col gap-2">
+                                        {competition.divisions.map((division) => (
+                                            <li key={division.id} className="flex flex-col gap-0.5">
+                                                <span className="text-sm">{division.name}</span>
+                                                {division.description.length === 0 ? null : (
+                                                    <span className="text-xs text-ink-muted">
+                                                        {division.description}
+                                                    </span>
+                                                )}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </Reveal>
                 </div>
             </div>
 
-            <section className="flex flex-col gap-4" aria-labelledby="projects-heading">
-                <div className="flex items-center justify-between gap-3">
-                    <h2 id="projects-heading" className="text-lg font-semibold">
+            <section className="flex flex-col gap-5" aria-labelledby="projects-heading">
+                <Reveal className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 id="projects-heading" className="text-2xl font-bold tracking-tight glow-sm">
                         Published projects
                     </h2>
-                    <Button asChild variant="ghost" size="sm">
-                        <Link href={`/projects?competition=${competition.slug}`}>View all</Link>
+                    <Button asChild variant="subtle" size="sm">
+                        <Link href={`/projects?competition=${competition.slug}`}>
+                            View all
+                            <ArrowRight className="size-3.5" aria-hidden="true" />
+                        </Link>
                     </Button>
-                </div>
+                </Reveal>
                 {competition.projects.length === 0 ? (
                     <EmptyState
                         title="No published projects"
                         description="Projects appear here after teams publish their work and organizers approve the showcase."
                     />
                 ) : (
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <StaggerReveal className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {competition.projects.map((project) => (
-                            <Card key={project.id}>
-                                <CardHeader>
-                                    <CardTitle>{project.title}</CardTitle>
-                                </CardHeader>
-                                <CardContent className="flex flex-col gap-3">
-                                    <p className="line-clamp-3 text-sm text-ink-muted">
-                                        {project.summary}
-                                    </p>
-                                    <Link
-                                        href={`/projects/${project.slug}`}
-                                        className="text-xs text-primary underline-offset-4 hover:underline"
-                                    >
-                                        View project
-                                    </Link>
-                                </CardContent>
-                            </Card>
+                            <Tilt key={project.id}>
+                                <Card hoverable className="h-full bg-panel/80">
+                                    <CardHeader>
+                                        <CardTitle className="text-lg">{project.title}</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="flex flex-col gap-3">
+                                        <p className="line-clamp-3 text-sm text-ink-muted">
+                                            {project.summary}
+                                        </p>
+                                        <Link
+                                            href={`/projects/${project.slug}`}
+                                            className="inline-flex items-center gap-1 text-sm text-primary transition-colors hover:text-primary-hover"
+                                        >
+                                            View project
+                                            <ArrowUpRight className="size-3.5" aria-hidden="true" />
+                                        </Link>
+                                    </CardContent>
+                                </Card>
+                            </Tilt>
                         ))}
-                    </div>
+                    </StaggerReveal>
                 )}
             </section>
+
+            <Reveal className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-primary/25 bg-primary/[0.06] p-6">
+                <div className="flex items-center gap-3">
+                    <GitBranch className="size-5 text-primary" aria-hidden="true" />
+                    <p className="text-sm text-ink-muted">
+                        Ready to take part? Registration, teams, and submissions live in the
+                        workspace.
+                    </p>
+                </div>
+                <Button asChild>
+                    <a href={`${workspaceOrigin}/sign-in`}>
+                        Sign in to nethack
+                        <ArrowUpRight className="size-4" aria-hidden="true" />
+                    </a>
+                </Button>
+            </Reveal>
         </div>
     );
 }

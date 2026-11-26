@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
+const standalone = process.env.NEXT_STANDALONE === "true";
+
 const nextConfig: NextConfig = {
-    output: "standalone",
+    ...(standalone ? { output: "standalone" as const } : {}),
     reactStrictMode: true,
     poweredByHeader: false,
     compress: true,

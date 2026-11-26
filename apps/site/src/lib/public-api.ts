@@ -27,7 +27,10 @@ async function publicRequest<T>(path: string, schema: z.ZodType<T>): Promise<T> 
     try {
         response = await fetch(new URL(path, API_ORIGIN), {
             headers: { Accept: "application/json" },
-            next: { revalidate: REVALIDATE_SECONDS },
+            // Dev renders on demand so fixture changes are visible without a rebuild.
+            ...(process.env.NODE_ENV === "production"
+                ? { next: { revalidate: REVALIDATE_SECONDS } }
+                : { cache: "no-store" }),
         });
     } catch (error) {
         throw new PublicApiError(

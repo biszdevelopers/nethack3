@@ -1,8 +1,33 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowUpRight, CalendarDays, Users } from "lucide-react";
 import { Badge, Card, CardContent, CardHeader, CardTitle, Markdown } from "@nethack/ui/static";
+import { Reveal } from "@nethack/ui/motion";
 import { PublicApiError, getProject } from "../../../lib/public-api";
+
+export async function generateMetadata({
+    params,
+}: {
+    readonly params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+    const { slug } = await params;
+    try {
+        const project = await getProject(slug);
+        return {
+            title: project.title,
+            description: project.summary,
+            openGraph: {
+                title: project.title,
+                description: project.summary,
+                type: "article",
+            },
+        };
+    } catch {
+        return { title: "Project" };
+    }
+}
 
 export default async function ProjectDetailPage({
     params,
@@ -28,83 +53,99 @@ export default async function ProjectDetailPage({
     ].filter((entry): entry is { label: string; href: string } => entry !== null);
 
     return (
-        <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-10 px-6 py-12">
-            <div className="flex flex-col gap-4">
-                <Link href="/projects" className="text-xs text-ink-muted hover:text-ink">
+        <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-10 px-4 py-10 sm:px-6 md:py-14 lg:px-8">
+            <Reveal className="relative flex flex-col gap-4">
+                <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -top-20 left-1/3 size-80 rounded-full bg-primary/10 blur-[110px]"
+                />
+                <Link
+                    href="/projects"
+                    className="text-xs text-ink-muted transition-colors hover:text-primary"
+                >
                     ← All projects
                 </Link>
-                <span className="text-xs text-ink-subtle">
-                    {project.organizationName} · {project.competitionName}
-                </span>
-                <h1 className="text-balance text-3xl font-semibold tracking-tight">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-ink-subtle">
+                    <span>{project.organizationName}</span>
+                    <span className="text-primary">/</span>
+                    <span>{project.competitionName}</span>
+                </div>
+                <h1 className="text-balance text-3xl font-extrabold tracking-tight glow sm:text-4xl md:text-5xl">
                     {project.title}
                 </h1>
-                <p className="max-w-3xl text-sm text-ink-muted">{project.summary}</p>
+                <p className="max-w-3xl text-base text-ink-muted">{project.summary}</p>
                 <div className="flex flex-wrap gap-1.5">
                     {project.tags.map((tag) => (
-                        <Badge key={tag} tone="outline" size="sm">
+                        <Badge key={tag} variant="outline" size="sm">
                             {tag}
                         </Badge>
                     ))}
                 </div>
                 {links.length > 0 ? (
-                    <div className="flex flex-wrap gap-4">
+                    <div className="flex flex-wrap gap-3">
                         {links.map((link) => (
                             <a
                                 key={link.label}
                                 href={link.href}
                                 target="_blank"
                                 rel="noopener noreferrer nofollow"
-                                className="text-xs text-primary underline-offset-4 hover:underline"
+                                className="inline-flex items-center gap-1 rounded-md border border-primary/30 bg-primary/[0.06] px-3 py-1.5 text-sm text-primary transition-colors hover:bg-primary/10"
                             >
                                 {link.label}
+                                <ArrowUpRight className="size-3.5" aria-hidden="true" />
                             </a>
                         ))}
                     </div>
                 ) : null}
-            </div>
+            </Reveal>
 
-            <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
-                <section className="flex flex-col gap-4" aria-labelledby="about-project">
-                    <h2 id="about-project" className="text-lg font-semibold">
-                        About the project
-                    </h2>
-                    <Markdown source={project.descriptionMarkdown} />
-                </section>
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                <Reveal className="flex flex-col gap-4" y={20}>
+                    <h2 className="text-2xl font-bold tracking-tight glow-sm">About the project</h2>
+                    <div className="prose-nethack">
+                        <Markdown source={project.descriptionMarkdown} />
+                    </div>
+                </Reveal>
+
                 <div className="flex flex-col gap-4">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Team</CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex flex-col gap-2">
-                            {project.teamName === null ? (
-                                <p className="text-sm text-ink-subtle">No team listed.</p>
-                            ) : (
-                                <p className="text-sm">{project.teamName}</p>
-                            )}
-                            {project.members.length === 0 ? null : (
-                                <ul className="flex flex-col gap-1 text-sm text-ink-muted">
-                                    {project.members.map((member, index) => (
-                                        <li key={`${member.displayName}-${index}`}>
-                                            {member.displayName}
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Publication</CardTitle>
-                        </CardHeader>
-                        <CardContent className="text-sm text-ink-muted">
-                            {project.publishedAt === null
-                                ? "Not published"
-                                : new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(
-                                      new Date(project.publishedAt),
-                                  )}
-                        </CardContent>
-                    </Card>
+                    <Reveal>
+                        <Card variant="soft">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <Users className="size-4 text-primary" aria-hidden="true" />
+                                    Team
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="flex flex-col gap-2">
+                                {project.teamName === null ? (
+                                    <p className="text-sm text-ink-subtle">No team listed.</p>
+                                ) : (
+                                    <p className="text-sm">{project.teamName}</p>
+                                )}
+                                {project.members.length === 0 ? null : (
+                                    <ul className="flex flex-col gap-1 text-sm text-ink-muted">
+                                        {project.members.map((member, index) => (
+                                            <li key={`${member.displayName}-${index}`}>
+                                                {member.displayName}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </Reveal>
+                    <Reveal delay={0.08}>
+                        <Card variant="soft">
+                            <CardContent className="flex items-center gap-2 pt-5 text-sm text-ink-muted">
+                                <CalendarDays className="size-4 text-primary" aria-hidden="true" />
+                                {project.publishedAt === null
+                                    ? "Not published"
+                                    : new Intl.DateTimeFormat("en", {
+                                          dateStyle: "long",
+                                      }).format(new Date(project.publishedAt))}
+                            </CardContent>
+                        </Card>
+                    </Reveal>
                 </div>
             </div>
         </div>
