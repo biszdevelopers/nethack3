@@ -104,7 +104,7 @@ export default async function CompetitionDetailPage({
                 </div>
             </Reveal>
 
-            <StaggerReveal className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StaggerReveal className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Card variant="soft">
                     <CardContent className="flex flex-col gap-1 pt-5">
                         <span className="inline-flex items-center gap-1.5 text-xs text-ink-subtle">
@@ -145,7 +145,7 @@ export default async function CompetitionDetailPage({
                 </Card>
             </StaggerReveal>
 
-            <div className="grid gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
                 <Reveal className="flex flex-col gap-4" y={20}>
                     <h2 id="rules" className="text-2xl font-bold tracking-tight glow-sm">Rules</h2>
                     {competition.rulesMarkdown.trim().length === 0 ? (
@@ -242,7 +242,7 @@ export default async function CompetitionDetailPage({
                         description="Projects appear here after teams publish their work and organizers approve the showcase."
                     />
                 ) : (
-                    <StaggerReveal className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <StaggerReveal className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {competition.projects.map((project) => (
                             <Tilt key={project.id}>
                                 <Card hoverable className="h-full bg-panel/80">

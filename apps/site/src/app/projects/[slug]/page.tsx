@@ -99,7 +99,7 @@ export default async function ProjectDetailPage({
                 ) : null}
             </Reveal>
 
-            <div className="grid gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
                 <Reveal className="flex flex-col gap-4" y={20}>
                     <h2 className="text-2xl font-bold tracking-tight glow-sm">About the project</h2>
                     <div className="prose-nethack">

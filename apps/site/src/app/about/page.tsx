@@ -26,7 +26,7 @@ export default function AboutPage(): ReactNode {
                 </p>
             </Reveal>
 
-            <StaggerReveal className="grid gap-4 md:grid-cols-2">
+            <StaggerReveal className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <Tilt>
                     <Card className="h-full">
                         <CardHeader>

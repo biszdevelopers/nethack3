@@ -58,7 +58,7 @@ export default async function CompetitionsPage(): Promise<ReactNode> {
                     }
                 />
             ) : (
-                <StaggerReveal className="grid gap-4 md:grid-cols-2">
+                <StaggerReveal className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     {competitions.items.map((competition) => (
                         <Tilt key={competition.editionId}>
                             <Card hoverable className="h-full bg-panel/80">

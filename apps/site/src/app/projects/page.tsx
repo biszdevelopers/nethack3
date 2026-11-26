@@ -89,7 +89,7 @@ export default async function ProjectsPage({
                     }
                 />
             ) : (
-                <StaggerReveal className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <StaggerReveal className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {projects.items.map((project) => (
                         <Tilt key={project.id}>
                             <Card hoverable className="h-full bg-panel/80">

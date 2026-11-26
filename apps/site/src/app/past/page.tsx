@@ -47,7 +47,7 @@ export default async function PastCompetitionsPage(): Promise<ReactNode> {
                     description="Editions appear here after an organizer marks them completed or archived."
                 />
             ) : (
-                <StaggerReveal className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <StaggerReveal className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {past.map((competition) => (
                         <Card key={competition.editionId} hoverable className="bg-panel/80">
                             <CardHeader>
