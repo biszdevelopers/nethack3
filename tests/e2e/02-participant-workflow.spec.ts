@@ -5,7 +5,6 @@ import {
 } from "../support/e2e/config.js";
 import {
     chooseOption,
-    expectToast,
     newAppContext,
     signIn,
 } from "../support/e2e/app.js";
