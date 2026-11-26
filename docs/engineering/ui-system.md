@@ -33,7 +33,7 @@ Nethack UI is an original React implementation with Nuxt UI-level breadth and qu
 | Validation              | Zod                                             |
 | Dates                   | React Day Picker plus date-fns                  |
 | Command palette         | cmdk                                            |
-| Animation               | CSS first; Motion only when justified           |
+| Animation               | CSS transitions plus GSAP 3.15 motion            |
 | Font                    | Noto Sans Mono, self-hosted                     |
 
 Radix is the only primitive framework. Do not add Base UI, Ariakit, React Aria Components, or a second overlapping primitive system. Components are owned in this repository; no third-party design framework is a runtime dependency.
@@ -419,7 +419,7 @@ Component group coverage:
 
 ## Component laboratory
 
-The component laboratory is a development-only route in `apps/workspace` at `apps/workspace/src/pages/lab`. It documents:
+The component laboratory is a development-only surface in `apps/workspace`, implemented at `apps/workspace/src/pages/lab-page.tsx` for the `/lab` route. It documents:
 
 - Component examples.
 - Variants and sizes.
@@ -457,3 +457,33 @@ The laboratory makes the complete design system inspectable without navigating t
 - Keyboard tests cover dialogs, menus, tabs, comboboxes, tables, and forms.
 - Mobile tests cover navigation, drawers, and touch targets.
 - No visual baseline is accepted with fake data or unfinished states.
+
+
+## Visual direction
+
+The component system follows the current nethack presentation language while remaining an original implementation:
+
+- Near-black application canvas with elevated panel and surface tones.
+- Neon green as the only accent, including glow typography for primary headings and brand marks.
+- Sticky, slightly translucent header with backdrop blur and a bottom hairline.
+- Pill-style active navigation with elevated backgrounds and green icons.
+- Soft tinted alerts, outlined inputs, and compact elevated cards with a 4-8px radius scale.
+- Monospace typography throughout, with hierarchy from size, weight, spacing, and glow rather than a second typeface.
+
+The reference product experience is the current nethack deployment. Visual parity work must preserve the palette, Noto Sans Mono, accessibility, and component contracts while matching its layout density, hierarchy, and interaction feel.
+
+## Motion
+
+Animation is part of the product language, implemented with GSAP and CSS. It must never delay access to content or ignore reduced-motion preferences.
+
+- Shared motion lives in `packages/ui/src/motion` and is exported as `@nethack/ui/motion`.
+- `MotionProvider` is mounted by `NethackProvider` and renders the scroll progress indicator.
+- `SplitTextReveal` animates headline characters once on mount; it renders screen-reader text separately.
+- `Reveal`, `StaggerReveal`, and `Tilt` provide scroll-triggered entrance and pointer-driven card depth.
+- `Magnetic` is reserved for primary calls to action.
+- `PageTransition` animates workspace route changes; `ScrollProgress` provides orientation on long public pages.
+- Overlays, drawers, dialogs, and toasts animate with short CSS keyframes so Radix focus management stays authoritative.
+- All GSAP effects are skipped when `prefers-reduced-motion: reduce` is set, and never animate layout-affecting properties on scroll.
+- GSAP timelines are reverted with their React effect to avoid duplicate listeners in Strict Mode and route changes.
+- Animate transform and opacity only; do not animate width, height, top, or left except inside Radix-managed disclosure content.
+- Target 60 FPS on representative hardware and verify with the performance measurements in `docs/engineering/performance.md`.

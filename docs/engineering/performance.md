@@ -139,3 +139,16 @@ Do not sacrifice clarity to save a negligible amount of computation. A linear sc
 - New algorithms include complexity documentation.
 - Performance regressions block merge when they exceed an accepted target or lack justification.
 - Targets are reviewed when production measurements show that an initial number is unrealistic. Changing a target requires an ADR, not a silent edit.
+
+
+## Motion budget
+
+GSAP motion is part of the reference-aligned interface and is measured like any other performance feature.
+
+- Animate transform and opacity only. Never animate layout properties during scroll.
+- One timeline per section; revert timelines on unmount and route changes.
+- SplitText is limited to primary headings and reverted after use.
+- ScrollTrigger work is scoped to visible sections; no continuous background animation loops.
+- Tilt and magnetic effects are pointer-only, bounded to a few pixels or degrees, and disabled on touch and reduced motion.
+- Entrance motion must not delay readable content by more than 800 ms.
+- Record a performance trace for the landing page and workspace dashboard on a mid-range profile; any long task over 50 ms caused by motion is a defect.

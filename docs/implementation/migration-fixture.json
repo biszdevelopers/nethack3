@@ -1,0 +1,233 @@
+{
+    "format": "nethack-legacy-export/1",
+    "sourceSystem": "fixture-only-no-real-data",
+    "generatedAt": "2026-01-15T12:00:00.000Z",
+    "users": [
+        {
+            "externalId": "fixture-user-owner",
+            "displayName": "Example Owner",
+            "email": "owner@example.invalid",
+            "locale": "en",
+            "status": "active",
+            "createdAt": "2024-01-01T09:00:00.000Z",
+            "updatedAt": "2025-06-01T09:00:00.000Z",
+            "identities": [
+                {
+                    "issuer": "https://auth.example.invalid",
+                    "subject": "fixture-owner-subject",
+                    "emailAtLogin": "owner@example.invalid",
+                    "createdAt": "2024-01-01T09:00:00.000Z",
+                    "lastLoginAt": "2025-06-01T09:00:00.000Z"
+                }
+            ]
+        },
+        {
+            "externalId": "fixture-user-participant",
+            "displayName": "Example Participant",
+            "email": "participant@example.invalid",
+            "locale": "en",
+            "status": "active",
+            "createdAt": "2024-02-01T09:00:00.000Z",
+            "updatedAt": "2025-06-02T09:00:00.000Z",
+            "identities": [
+                {
+                    "issuer": "https://auth.example.invalid",
+                    "subject": "fixture-participant-subject",
+                    "emailAtLogin": "participant@example.invalid",
+                    "createdAt": "2024-02-01T09:00:00.000Z",
+                    "lastLoginAt": "2025-06-02T09:00:00.000Z"
+                }
+            ]
+        }
+    ],
+    "organizations": [
+        {
+            "externalId": "fixture-org",
+            "name": "Fixture Example Organization",
+            "slug": "fixture-org",
+            "description": "Synthetic fixture data. This organization does not exist.",
+            "websiteUrl": null,
+            "settings": {
+                "registrationRequiresApproval": true,
+                "allowParticipantTeamCreation": true,
+                "publicShowcaseEnabled": true
+            },
+            "createdAt": "2024-01-01T08:00:00.000Z",
+            "updatedAt": "2025-06-03T08:00:00.000Z",
+            "memberships": [
+                {
+                    "externalId": "fixture-membership-owner",
+                    "userExternalId": "fixture-user-owner",
+                    "role": "owner",
+                    "status": "active",
+                    "createdAt": "2024-01-01T08:00:00.000Z"
+                },
+                {
+                    "externalId": "fixture-membership-participant",
+                    "userExternalId": "fixture-user-participant",
+                    "role": "participant",
+                    "status": "active",
+                    "createdAt": "2024-02-01T08:00:00.000Z"
+                }
+            ],
+            "series": [
+                {
+                    "externalId": "fixture-series",
+                    "name": "Fixture Example Series",
+                    "slug": "fixture-series",
+                    "description": "Synthetic series used only by migration tests.",
+                    "createdAt": "2024-01-01T08:30:00.000Z",
+                    "editions": [
+                        {
+                            "externalId": "fixture-edition-2026",
+                            "name": "Fixture Example Edition 2026",
+                            "slug": "fixture-edition-2026",
+                            "description": "Synthetic edition used only by migration tests.",
+                            "status": "completed",
+                            "timezone": "UTC",
+                            "registrationOpensAt": "2026-01-01T00:00:00.000Z",
+                            "registrationClosesAt": "2026-02-01T00:00:00.000Z",
+                            "startsAt": "2026-03-01T00:00:00.000Z",
+                            "endsAt": "2026-03-03T00:00:00.000Z",
+                            "teamMinSize": 1,
+                            "teamMaxSize": 4,
+                            "maxParticipants": 50,
+                            "rulesMarkdown": "Fixture rules only.",
+                            "publishedAt": "2026-01-01T00:00:00.000Z",
+                            "createdAt": "2025-12-01T00:00:00.000Z",
+                            "divisions": [
+                                {
+                                    "externalId": "fixture-division-open",
+                                    "name": "Fixture Open Division",
+                                    "slug": "fixture-open",
+                                    "description": "Synthetic division used only by migration tests.",
+                                    "minTeamSize": 1,
+                                    "maxTeamSize": 4,
+                                    "createdAt": "2025-12-01T00:00:00.000Z"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "registrations": [
+                {
+                    "externalId": "fixture-registration-owner",
+                    "editionExternalId": "fixture-edition-2026",
+                    "userExternalId": "fixture-user-owner",
+                    "divisionExternalId": "fixture-division-open",
+                    "status": "approved",
+                    "note": "Fixture registration.",
+                    "createdAt": "2026-01-05T10:00:00.000Z",
+                    "decidedAt": "2026-01-06T10:00:00.000Z"
+                },
+                {
+                    "externalId": "fixture-registration-participant",
+                    "editionExternalId": "fixture-edition-2026",
+                    "userExternalId": "fixture-user-participant",
+                    "divisionExternalId": "fixture-division-open",
+                    "status": "approved",
+                    "note": "Fixture registration.",
+                    "createdAt": "2026-01-05T11:00:00.000Z",
+                    "decidedAt": "2026-01-06T11:00:00.000Z"
+                }
+            ],
+            "teams": [
+                {
+                    "externalId": "fixture-team",
+                    "editionExternalId": "fixture-edition-2026",
+                    "divisionExternalId": "fixture-division-open",
+                    "name": "Fixture Team",
+                    "description": "Synthetic team used only by migration tests.",
+                    "status": "ready",
+                    "captainUserExternalId": "fixture-user-owner",
+                    "maxMembers": 4,
+                    "createdAt": "2026-01-07T10:00:00.000Z",
+                    "members": [
+                        {
+                            "userExternalId": "fixture-user-owner",
+                            "role": "captain",
+                            "joinedAt": "2026-01-07T10:00:00.000Z"
+                        },
+                        {
+                            "userExternalId": "fixture-user-participant",
+                            "role": "member",
+                            "joinedAt": "2026-01-07T10:05:00.000Z"
+                        }
+                    ]
+                }
+            ],
+            "projects": [
+                {
+                    "externalId": "fixture-project",
+                    "editionExternalId": "fixture-edition-2026",
+                    "teamExternalId": "fixture-team",
+                    "ownerUserExternalId": "fixture-user-owner",
+                    "title": "Fixture Example Project",
+                    "slug": "fixture-example-project",
+                    "summary": "Synthetic project summary used only by migration tests.",
+                    "descriptionMarkdown": "Synthetic project description.",
+                    "repositoryUrl": "https://example.invalid/fixture/repository",
+                    "demoUrl": null,
+                    "tags": ["fixture", "synthetic"],
+                    "status": "published",
+                    "publishedAt": "2026-03-02T12:00:00.000Z",
+                    "createdAt": "2026-02-10T09:00:00.000Z",
+                    "updatedAt": "2026-03-02T12:00:00.000Z",
+                    "members": [
+                        {
+                            "userExternalId": "fixture-user-owner",
+                            "role": "owner",
+                            "createdAt": "2026-02-10T09:00:00.000Z"
+                        },
+                        {
+                            "userExternalId": "fixture-user-participant",
+                            "role": "member",
+                            "createdAt": "2026-02-10T09:05:00.000Z"
+                        }
+                    ]
+                }
+            ],
+            "submissions": [
+                {
+                    "externalId": "fixture-submission",
+                    "projectExternalId": "fixture-project",
+                    "teamExternalId": "fixture-team",
+                    "status": "submitted",
+                    "submittedAt": "2026-03-02T12:30:00.000Z",
+                    "reviewNote": "Fixture review note.",
+                    "createdAt": "2026-03-02T12:00:00.000Z",
+                    "updatedAt": "2026-03-02T12:30:00.000Z",
+                    "versions": [
+                        {
+                            "version": 1,
+                            "title": "Fixture Example Project",
+                            "summary": "Synthetic submission version used only by migration tests.",
+                            "descriptionMarkdown": "Synthetic submission description.",
+                            "repositoryUrl": "https://example.invalid/fixture/repository",
+                            "demoUrl": null,
+                            "createdByUserExternalId": "fixture-user-owner",
+                            "createdAt": "2026-03-02T12:30:00.000Z"
+                        }
+                    ]
+                }
+            ],
+            "files": [
+                {
+                    "externalId": "fixture-file",
+                    "projectExternalId": "fixture-project",
+                    "submissionExternalId": "fixture-submission",
+                    "version": 1,
+                    "fileName": "fixture-readme.txt",
+                    "contentType": "text/plain",
+                    "byteSize": 18,
+                    "checksumSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+                    "storageKey": "fixture/legacy/fixture-project/fixture-readme.txt",
+                    "status": "quarantined",
+                    "uploadedByUserExternalId": "fixture-user-participant",
+                    "createdAt": "2026-03-02T12:20:00.000Z"
+                }
+            ]
+        }
+    ]
+}

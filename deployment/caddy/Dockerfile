@@ -25,6 +25,7 @@ COPY packages/api-client/tsconfig.json packages/api-client/tsconfig.json
 COPY packages/api-client/tsconfig.build.json packages/api-client/tsconfig.build.json
 COPY apps/workspace/src apps/workspace/src
 COPY apps/workspace/index.html apps/workspace/index.html
+COPY apps/workspace/public apps/workspace/public
 COPY apps/workspace/vite.config.ts apps/workspace/vite.config.ts
 COPY apps/workspace/tsconfig.json apps/workspace/tsconfig.json
 COPY apps/workspace/tsconfig.build.json apps/workspace/tsconfig.build.json

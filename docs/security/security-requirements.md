@@ -420,3 +420,13 @@ required evidence exists and the blocking conditions are false.
   launch.
 - The threat model, this document, and the test suites are reviewed together
   after every incident and at every release cycle.
+
+
+## Dependency audit status
+
+The release gate is a clean production audit with no known exploitable high or critical advisory.
+
+- React, React DOM, and Next.js are pinned to their latest patched stable releases. The audit covers the full dependency graph, including Next.js advisories.
+- The current graph has one moderate advisory in a development-only esbuild indirect dependency used by the migration generator. It is not shipped to production, not reachable from application runtime code, and cannot be fixed by an ordinary compatible update. It is accepted as a development-only finding and must be revisited when drizzle-kit updates its build tooling. Overrides that break the migration tool are not an acceptable fix.
+- CI runs `bun audit --audit-level=high` as a release-blocking check. A high or critical advisory from any dependency, including development tooling reachable from build artifacts, blocks release.
+- Any accepted development-only advisory is listed in the final implementation report with its package path and rationale.
