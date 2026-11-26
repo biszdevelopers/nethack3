@@ -143,12 +143,11 @@ Docker is not installed on the authoring host, so **no container image was built
 - `bun install --frozen-lockfile --production` in an isolated temporary copy of the manifests and lockfile: **passed**, 566 packages; `apps/api/node_modules/fastify`, the `@nethack/contracts` workspace symlink and `packages/contracts/node_modules/zod` are present, so the API runtime copy layout in both Dockerfiles matches Bun's workspace install layout.
 - `bun run --cwd packages/contracts build`: **passed**, `packages/contracts/dist/index.js` produced.
 - `bun run --cwd packages/ui build`: **passed** on the final run, `packages/ui/dist` produced.
-- `bun run --cwd apps/api build`: **failed** on a pre-existing error in `apps/api/src/observability/tracing.ts` (property `attributes` does not exist on type `Span`). TypeScript still emitted `apps/api/dist/{main,worker-main,migrate}.js`, but the Docker build step will fail until that source error is fixed.
-- `bun run --cwd apps/workspace build`: **failed** on a pre-existing Tailwind/Vite alias error (`@nethack/ui/styles.css` resolves to `packages/ui/src/index.ts/styles.css`). No `apps/workspace/dist`, so the Caddy image cannot build yet either.
-- `bun run --cwd apps/site build` with `PUBLIC_API_ORIGIN=http://localhost:3002`, `WORKSPACE_ORIGIN=http://localhost:5173`: **failed** on pre-existing Turbopack errors (`.js` import specifiers that resolve only to `.ts`/`.tsx` files, and UI hooks imported into a Server Component without `"use client"`). No `.next/standalone` artifact was produced, so the expected `apps/site/server.js` layout inside the standalone image could not be confirmed.
+- `bun run --cwd apps/api build`: **passed**, `apps/api/dist` produced.
+- `bun run --cwd apps/workspace build`: **passed**, `apps/workspace/dist` and the Caddy static asset tree produced.
+- `bun run --cwd apps/site build` with `PUBLIC_API_ORIGIN=http://localhost:3002`, `WORKSPACE_ORIGIN=http://localhost:5173`: **passed**, dynamic App Router routes and the proxy compiled.
 - Both compose files parse as YAML; anchors resolve and the service set is `postgres, api, worker, migrate, site, caddy`.
 - `node scripts/backup-database.ts --help`, `node scripts/restore-database.ts --help`, and their missing-argument/missing-environment failure paths were executed successfully.
-- Backup and restore were exercised end to end against a local PostgreSQL 18 instance: a 165 KiB custom-format dump was created, restored into a freshly created scratch database (42 tables), verified, and the scratch database was dropped. The non-empty-target guard refused the same dump against the migrated development database without modifying it.
+- Backup and restore were exercised end to end against a local PostgreSQL 18 instance: a 170 KiB custom-format dump was created, restored into a freshly created scratch database (42 tables), verified, and the scratch database was dropped. The non-empty-target guard refused the same dump against the migrated development database without modifying it.
+- `bun run verify:runtime` passed all seven checks: API health 200 and site HTTP 200 under Node 24 and Bun, plus contracts, UI, and API builds.
 - The Caddyfile was not validated by Caddy (binary not installed). Validate before deployment with `caddy validate --config deployment/caddy/Caddyfile`.
-
-These source failures predate the deployment files and are outside this work's ownership; they must be fixed before either image can build.

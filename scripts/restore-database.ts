@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import process from "node:process";
 
 const USAGE = `Usage: node scripts/restore-database.ts <dump-file> [--force]

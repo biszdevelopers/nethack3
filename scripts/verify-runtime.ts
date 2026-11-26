@@ -65,7 +65,7 @@ async function startServer(
     cwd: string,
     healthUrl: string,
     env: NodeJS.ProcessEnv,
-): Promise<{ stop: () => void }> {
+): Promise<{ stop: () => Promise<void> }> {
     const child = spawn(command, args, {
         cwd,
         env,
@@ -87,11 +87,30 @@ async function startServer(
             `${command} ${args.join(" ")} did not become healthy: ${error instanceof Error ? error.message : "unknown"}\n${output.slice(-2000)}`,
         );
     }
-    return {
-        stop: () => {
+    const stop = async (): Promise<void> => {
+        if (child.exitCode !== null) {
+            return;
+        }
+        if (process.platform === "win32" && child.pid !== undefined) {
+            const { spawnSync } = await import("node:child_process");
+            spawnSync("taskkill", ["/pid", String(child.pid), "/t", "/f"], {
+                stdio: "ignore",
+            });
+        } else {
             child.kill("SIGTERM");
-        },
+        }
+        await new Promise<void>((resolve) => {
+            const timer = setTimeout(() => {
+                child.kill("SIGKILL");
+                resolve();
+            }, 5000);
+            child.once("exit", () => {
+                clearTimeout(timer);
+                resolve();
+            });
+        });
     };
+    return { stop };
 }
 
 function apiEnvironment(port: number): NodeJS.ProcessEnv {
@@ -141,7 +160,7 @@ await record("api under node", async () => {
         if (!response.ok) throw new Error(`health ${response.status}`);
         return "health 200";
     } finally {
-        server.stop();
+        await server.stop();
     }
 });
 
@@ -158,7 +177,7 @@ await record("api under bun", async () => {
         if (!response.ok) throw new Error(`health ${response.status}`);
         return "health 200";
     } finally {
-        server.stop();
+        await server.stop();
     }
 });
 
@@ -192,7 +211,7 @@ await record("site under node", async () => {
         if (!response.ok) throw new Error(`site ${response.status}`);
         return "HTTP 200";
     } finally {
-        server.stop();
+        await server.stop();
     }
 });
 
@@ -214,7 +233,7 @@ await record("site under bun", async () => {
         if (!response.ok) throw new Error(`site ${response.status}`);
         return "HTTP 200";
     } finally {
-        server.stop();
+        await server.stop();
     }
 });
 
