@@ -1,4 +1,11 @@
-import { ApiClient, AuthApi, OrganizationsApi } from "@nethack/api-client";
+import {
+    AdministrationApi,
+    ApiClient,
+    AuthApi,
+    JudgingApi,
+    OrganizationsApi,
+    VotingApi,
+} from "@nethack/api-client";
 import { organizationSelectionStore } from "./organization-store.js";
 
 let csrfToken: string | null = null;
@@ -21,4 +28,7 @@ export const apiClient = new ApiClient({
 export const api = {
     auth: new AuthApi(apiClient),
     organizations: new OrganizationsApi(apiClient),
+    judging: new JudgingApi(apiClient),
+    voting: new VotingApi(apiClient),
+    administration: new AdministrationApi(apiClient),
 };

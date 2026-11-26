@@ -11,9 +11,16 @@ export function useSession() {
     const query = useQuery<Session>({
         queryKey: SESSION_QUERY_KEY,
         queryFn: async () => {
-            const session = await api.auth.session();
-            setCsrfToken(session.csrfToken);
-            return session;
+            try {
+                const session = await api.auth.session();
+                setCsrfToken(session.csrfToken);
+                return session;
+            } catch (error) {
+                if (import.meta.env.DEV) {
+                    console.error("Session query failed", error);
+                }
+                throw error;
+            }
         },
         retry: false,
         staleTime: 60_000,

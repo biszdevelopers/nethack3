@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, useSearchParams } from "react-router";
-import { Alert, Button, Card, CardContent, CardHeader, CardTitle } from "@nethack/ui";
+import { Alert, Button, Card, CardContent, CardHeader, CardTitle, Reveal } from "@nethack/ui";
 
 const REASONS: Record<string, { title: string; detail: string }> = {
     login_cancelled: {
@@ -35,15 +35,22 @@ export function AuthErrorPage(): ReactNode {
     const reason = params.get("reason") ?? "login_failed";
     const copy = REASONS[reason] ?? DEFAULT_REASON;
     return (
-        <div className="flex min-h-dvh items-center justify-center p-6">
-            <div className="w-full max-w-md">
-                <Card>
+        <div className="relative flex min-h-dvh items-center justify-center overflow-hidden p-6">
+            <div
+                aria-hidden="true"
+                className="pointer-events-none absolute -top-24 left-1/2 size-[28rem] -translate-x-1/2 rounded-full bg-primary/10 blur-[120px]"
+            />
+            <Reveal className="w-full max-w-md">
+                <Card className="bg-panel/80">
                     <CardHeader>
-                        <CardTitle>{copy.title}</CardTitle>
+                        <span className="text-xs text-primary">nethack</span>
+                        <CardTitle className="text-xl">{copy.title}</CardTitle>
                     </CardHeader>
                     <CardContent className="flex flex-col gap-4">
-                        <Alert tone="critical">{copy.detail}</Alert>
-                        <p className="text-xs text-ink-subtle">
+                        <Alert variant="soft" tone="critical">
+                            {copy.detail}
+                        </Alert>
+                        <p className="text-xs leading-6 text-ink-subtle">
                             Technical details are available in the browser developer console. Do
                             not share tokens, codes, or cookies.
                         </p>
@@ -52,7 +59,7 @@ export function AuthErrorPage(): ReactNode {
                         </Button>
                     </CardContent>
                 </Card>
-            </div>
+            </Reveal>
         </div>
     );
 }

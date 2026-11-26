@@ -1,4 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { Link } from "react-router";
+import { updateProfileRequestSchema } from "@nethack/contracts";
 import {
     Avatar,
     AvatarFallback,
@@ -9,25 +11,34 @@ import {
     CardHeader,
     CardTitle,
     EmptyState,
+    Input,
     useColorMode,
+    useLocale,
 } from "@nethack/ui";
 import { Sun, Moon, UserRound } from "lucide-react";
 import { useSession } from "../application/session.js";
 import { api } from "../application/api.js";
 import { useQueryClient } from "@tanstack/react-query";
+import { errorMessage } from "../lib/errors.js";
 
 export function SettingsPage(): ReactNode {
     const session = useSession();
     const queryClient = useQueryClient();
     const { colorMode, setColorMode } = useColorMode();
+    const { locale, setLocale } = useLocale();
     const [displayName, setDisplayName] = useState("");
+    const [localeDraft, setLocaleDraft] = useState<string | null>(null);
     const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+    const [localeStatus, setLocaleStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+    const [localeError, setLocaleError] = useState<string | null>(null);
+    const [profileError, setProfileError] = useState<string | null>(null);
     const user = session.data?.user ?? null;
 
     const dirty = useMemo(
         () => displayName.length > 0 && displayName !== user?.displayName,
         [displayName, user?.displayName],
     );
+    const localeValue = localeDraft ?? user?.locale ?? locale;
 
     if (user === null) {
         return null;
@@ -35,20 +46,44 @@ export function SettingsPage(): ReactNode {
 
     const saveProfile = async (): Promise<void> => {
         setStatus("saving");
+        setProfileError(null);
         try {
             await api.auth.updateProfile({ displayName });
             await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
             setStatus("saved");
             setDisplayName("");
-        } catch {
+        } catch (error) {
+            setProfileError(errorMessage(error));
             setStatus("error");
+        }
+    };
+
+    const saveLocale = async (): Promise<void> => {
+        const parsed = updateProfileRequestSchema.safeParse({ locale: localeValue });
+        if (!parsed.success) {
+            const issue = parsed.error.issues[0];
+            setLocaleError(issue?.message ?? "Use a locale such as en or pt-BR.");
+            setLocaleStatus("error");
+            return;
+        }
+        setLocaleStatus("saving");
+        setLocaleError(null);
+        try {
+            await api.auth.updateProfile({ locale: localeValue });
+            await queryClient.invalidateQueries({ queryKey: ["auth", "session"] });
+            setLocale(localeValue);
+            setLocaleDraft(null);
+            setLocaleStatus("saved");
+        } catch (error) {
+            setLocaleError(errorMessage(error));
+            setLocaleStatus("error");
         }
     };
 
     return (
         <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-semibold tracking-tight">Account settings</h1>
+                <h1 className="text-2xl font-extrabold tracking-tight glow-sm">Account settings</h1>
                 <p className="text-sm text-ink-muted">
                     Profile details come from Basis Auth and can be refined here.
                 </p>
@@ -79,16 +114,15 @@ export function SettingsPage(): ReactNode {
                             <label htmlFor="display-name" className="text-sm font-medium">
                                 Display name
                             </label>
-                            <input
+                            <Input
                                 id="display-name"
-                                className="h-10 rounded-md border border-line bg-app px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                                 value={displayName}
                                 placeholder={user.displayName}
                                 onChange={(event) => setDisplayName(event.target.value)}
                                 maxLength={80}
                             />
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                             <Button
                                 onClick={() => void saveProfile()}
                                 disabled={!dirty}
@@ -97,15 +131,13 @@ export function SettingsPage(): ReactNode {
                                 Save changes
                             </Button>
                             {status === "saved" ? (
-                                <span className="text-xs text-primary" role="status">
-                                    Profile saved
-                                </span>
+                                <output className="text-xs text-primary">Profile saved</output>
                             ) : null}
-                            {status === "error" ? (
+                            {profileError === null ? null : (
                                 <span className="text-xs text-ink" role="alert">
-                                    Profile could not be saved
+                                    {profileError}
                                 </span>
-                            ) : null}
+                            )}
                         </div>
                     </CardContent>
                 </Card>
@@ -137,6 +169,62 @@ export function SettingsPage(): ReactNode {
                                 Light
                             </Button>
                         </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Language</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-3">
+                        <div className="flex flex-col gap-1.5">
+                            <label htmlFor="locale" className="text-sm font-medium">
+                                Locale
+                            </label>
+                            <Input
+                                id="locale"
+                                value={localeValue}
+                                onChange={(event) => setLocaleDraft(event.target.value)}
+                                aria-describedby="locale-description"
+                                autoComplete="off"
+                            />
+                            <p id="locale-description" className="text-xs text-ink-muted">
+                                A language tag such as en, pt-BR, or fr. The workspace interface is
+                                currently written in English.
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                                onClick={() => void saveLocale()}
+                                loading={localeStatus === "saving"}
+                                disabled={localeValue === user.locale}
+                            >
+                                Save locale
+                            </Button>
+                            {localeStatus === "saved" ? (
+                                <output className="text-xs text-primary">Locale saved</output>
+                            ) : null}
+                            {localeError === null ? null : (
+                                <span className="text-xs text-ink" role="alert">
+                                    {localeError}
+                                </span>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Notifications</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-3">
+                        <p className="text-sm text-ink-muted">
+                            Choose email and in-app delivery for decisions, invitations, and
+                            announcements.
+                        </p>
+                        <Button asChild variant="outline" className="w-fit">
+                            <Link to="/notifications">Notification preferences</Link>
+                        </Button>
                     </CardContent>
                 </Card>
             </div>
