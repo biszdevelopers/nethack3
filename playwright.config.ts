@@ -1,0 +1,141 @@
+import { defineConfig, devices } from "@playwright/test";
+import {
+    API_ORIGIN,
+    API_PORT,
+    AUTH,
+    AUTH_ORIGIN,
+    AUTH_PORT,
+    DESKTOP_VIEWPORT,
+    OWNER_DATABASE_URL,
+    RUNTIME_DATABASE_URL,
+    SESSION_ENCRYPTION_KEYS,
+    SITE_ORIGIN,
+    SITE_PORT,
+    STORAGE_ROOT,
+    WORKER_HEALTH_URL,
+    WORKER_HEALTH_PORT,
+    WORKSPACE_ORIGIN,
+    WORKSPACE_PORT,
+} from "./tests/support/e2e/config.js";
+
+const isCi = process.env.CI === "true" || process.env.CI === "1";
+
+const sharedEnvironment: Record<string, string> = {
+    NODE_ENV: "test",
+    HOST: "127.0.0.1",
+    PORT: String(API_PORT),
+    API_ORIGIN,
+    WORKSPACE_ORIGIN,
+    SITE_ORIGIN,
+    ASSET_ORIGIN: API_ORIGIN,
+    TRUST_PROXY: "false",
+    DATABASE_URL: RUNTIME_DATABASE_URL,
+    DATABASE_MIGRATION_URL: OWNER_DATABASE_URL,
+    DATABASE_POOL_MAX: "10",
+    SESSION_ENCRYPTION_KEYS,
+    SESSION_COOKIE_NAME: "__Host-nethack_session",
+    SESSION_CSRF_HEADER: "x-csrf-token",
+    BASIS_AUTH_ISSUER: AUTH_ORIGIN,
+    BASIS_AUTH_CLIENT_ID: AUTH.clientId,
+    BASIS_AUTH_CLIENT_SECRET: AUTH.clientSecret,
+    BASIS_AUTH_RESOURCE: AUTH.resource,
+    BASIS_AUTH_RESOURCE_SECRET: AUTH.resourceSecret,
+    BASIS_AUTH_INTERNAL_URL: AUTH_ORIGIN,
+    BASIS_AUTH_REDIRECT_URI: AUTH.redirectUri,
+    BASIS_AUTH_POST_LOGOUT_REDIRECT_URI: AUTH.postLogoutRedirectUri,
+    BASIS_AUTH_ALLOW_INSECURE_HTTP: "true",
+    STORAGE_ROOT,
+    RATE_LIMIT_MAX: "100000",
+    RATE_LIMIT_WINDOW_MS: "60000",
+    API_DOCS_ENABLED: "false",
+    LOG_LEVEL: "info",
+};
+
+const serverEnvironment: Record<string, string> = {
+    ...sharedEnvironment,
+    E2E_API_PORT: String(API_PORT),
+    E2E_AUTH_PORT: String(AUTH_PORT),
+    E2E_WORKSPACE_PORT: String(WORKSPACE_PORT),
+    E2E_SITE_PORT: String(SITE_PORT),
+    E2E_WORKER_HEALTH_PORT: String(WORKER_HEALTH_PORT),
+};
+
+export default defineConfig({
+    testDir: "./tests/e2e",
+    outputDir: "test-results",
+    timeout: 60_000,
+    expect: { timeout: 10_000 },
+    fullyParallel: false,
+    workers: 1,
+    retries: isCi ? 1 : 0,
+    forbidOnly: isCi,
+    reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]],
+    globalSetup: "./tests/support/e2e/global-setup.ts",
+    globalTeardown: "./tests/support/e2e/global-teardown.ts",
+    use: {
+        baseURL: WORKSPACE_ORIGIN,
+        trace: "retain-on-failure",
+        screenshot: "only-on-failure",
+        video: "retain-on-failure",
+        actionTimeout: 15_000,
+        navigationTimeout: 45_000,
+        reducedMotion: "reduce",
+        locale: "en-US",
+    },
+    webServer: [
+        {
+            command: "bun tests/support/e2e/mock-oidc-server.ts",
+            url: `${AUTH_ORIGIN}/.well-known/openid-configuration`,
+            reuseExistingServer: false,
+            timeout: 120_000,
+            env: serverEnvironment,
+        },
+        {
+            command: "bun apps/api/src/main.ts",
+            url: `${API_ORIGIN}/health/ready`,
+            reuseExistingServer: false,
+            timeout: 120_000,
+            env: serverEnvironment,
+        },
+        {
+            command: "bun tests/support/e2e/worker-server.ts",
+            url: WORKER_HEALTH_URL,
+            reuseExistingServer: false,
+            timeout: 120_000,
+            env: serverEnvironment,
+        },
+        {
+            command: `bun run --cwd apps/workspace dev --host 127.0.0.1 --port ${String(WORKSPACE_PORT)}`,
+            url: WORKSPACE_ORIGIN,
+            reuseExistingServer: false,
+            timeout: 180_000,
+            env: { ...serverEnvironment, VITE_API_ORIGIN: API_ORIGIN },
+        },
+        {
+            command: `bun run --cwd apps/site dev --hostname 127.0.0.1 --port ${String(SITE_PORT)}`,
+            url: SITE_ORIGIN,
+            reuseExistingServer: false,
+            timeout: 240_000,
+            env: {
+                ...serverEnvironment,
+                PUBLIC_API_ORIGIN: API_ORIGIN,
+                NEXT_TELEMETRY_DISABLED: "1",
+            },
+        },
+    ],
+    projects: [
+        {
+            name: "desktop-chromium",
+            use: {
+                ...devices["Desktop Chrome"],
+                viewport: DESKTOP_VIEWPORT,
+            },
+        },
+        {
+            name: "mobile-chromium",
+            use: { ...devices["Pixel 7"] },
+            testMatch: ["**/*public-site.spec.ts"],
+        },
+    ],
+});
+

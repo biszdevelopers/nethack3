@@ -6,6 +6,7 @@ export default defineConfig({
             "tests/architecture/**/*.test.ts",
             "tests/security/**/*.test.ts",
             "tests/unit/**/*.test.ts",
+            "tests/migration/**/*.test.ts",
             "apps/api/src/**/tests/**/*.test.ts",
             "packages/ui/src/**/tests/**/*.test.ts",
         ],
