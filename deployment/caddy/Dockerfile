@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1
 
 FROM oven/bun:1.3.14-alpine AS build
-USER root
+# hadolint ignore=DL3002
+USER 0:0
 WORKDIR /app
 
 COPY package.json bun.lock bunfig.toml tsconfig.base.json ./

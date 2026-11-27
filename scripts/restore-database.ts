@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import process from "node:process";
 
@@ -74,6 +74,14 @@ function pgBinary(name: string): string {
         return name;
     }
     return join(directory, process.platform === "win32" ? `${name}.exe` : name);
+}
+
+function ageBinary(): string {
+    const directory = process.env.AGE_BIN?.trim();
+    if (directory === undefined || directory === "") {
+        return "age";
+    }
+    return join(directory, process.platform === "win32" ? "age.exe" : "age");
 }
 
 function run(
@@ -150,6 +158,29 @@ if (!existsSync(dumpFile)) {
     fail(`Dump file not found: ${dumpFile}`);
 }
 
+let restoreFile = dumpFile;
+let decryptedFile: string | null = null;
+if (dumpFile.endsWith(".age")) {
+    const identity = process.env.BACKUP_AGE_IDENTITY?.trim();
+    if (identity === undefined || identity === "") {
+        fail("BACKUP_AGE_IDENTITY is required to restore an age-encrypted dump.");
+    }
+    decryptedFile = `${dumpFile}.restore.dump`;
+    rmSync(decryptedFile, { force: true });
+    const decryptCode = await run(
+        ageBinary(),
+        ["--decrypt", "--identity", identity, "--output", decryptedFile, dumpFile],
+        process.env,
+    ).catch((error: unknown) => {
+        fail(error instanceof Error ? error.message : "age failed to start.");
+    });
+    if (decryptCode !== 0) {
+        rmSync(decryptedFile, { force: true });
+        fail(`age exited with code ${decryptCode}.`);
+    }
+    restoreFile = decryptedFile;
+}
+
 const connection = parseConnection(process.env.DATABASE_MIGRATION_URL);
 console.log(
     `Restoring ${dumpFile} into ${connection.host}:${connection.port}/${connection.database}`,
@@ -203,7 +234,7 @@ try {
             "--exit-on-error",
             "--dbname",
             connection.database,
-            dumpFile,
+            restoreFile,
         ],
         connection.environment,
     );
@@ -215,4 +246,7 @@ if (exitCode !== 0) {
     fail(`pg_restore exited with code ${exitCode}.`);
 }
 
+if (decryptedFile !== null) {
+    rmSync(decryptedFile, { force: true });
+}
 console.log("Restore complete. Run the migration job to confirm the schema is current.");

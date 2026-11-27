@@ -75,6 +75,14 @@ function pgBinary(name: string): string {
     return join(directory, process.platform === "win32" ? `${name}.exe` : name);
 }
 
+function ageBinary(): string {
+    const directory = process.env.AGE_BIN?.trim();
+    if (directory === undefined || directory === "") {
+        return "age";
+    }
+    return join(directory, process.platform === "win32" ? "age.exe" : "age");
+}
+
 function run(
     binary: string,
     args: readonly string[],
@@ -130,5 +138,25 @@ if (exitCode !== 0) {
 }
 
 renameSync(partial, target);
-const size = statSync(target).size;
-console.log(`Backup complete: ${target} (${Math.round(size / 1024)} KiB)`);
+const recipient = process.env.BACKUP_AGE_RECIPIENT?.trim();
+if (recipient !== undefined && recipient !== "") {
+    const encrypted = `${target}.age`;
+    rmSync(encrypted, { force: true });
+    const encryptionCode = await run(
+        ageBinary(),
+        ["--encrypt", "--recipient", recipient, "--output", encrypted, target],
+        connection.environment,
+    ).catch((error: unknown) => {
+        fail(error instanceof Error ? error.message : "age failed to start.");
+    });
+    if (encryptionCode !== 0) {
+        rmSync(encrypted, { force: true });
+        fail(`age exited with code ${encryptionCode}.`);
+    }
+    rmSync(target, { force: true });
+    console.log(
+        `Encrypted backup complete: ${encrypted} (${Math.round(statSync(encrypted).size / 1024)} KiB)`,
+    );
+} else {
+    console.log(`Backup complete: ${target} (${Math.round(statSync(target).size / 1024)} KiB)`);
+}

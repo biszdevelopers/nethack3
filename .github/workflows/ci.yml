@@ -30,6 +30,11 @@ jobs:
               with:
                   node-version: 24
             - run: bun install --frozen-lockfile
+            - name: Validate container definitions
+              run: |
+                  curl -fsSL -o /usr/local/bin/hadolint https://github.com/hadolint/hadolint/releases/download/v2.15.1/hadolint-Linux-x86_64
+                  chmod +x /usr/local/bin/hadolint
+                  find deployment -type f -name 'Dockerfile*' -print0 | xargs -0 -n1 hadolint
             - run: bun run format:check
             - run: bun run lint
             - run: bun run typecheck
@@ -204,3 +209,78 @@ jobs:
                   psql -h 127.0.0.1 -U nethack -d postgres -c "grant connect on database nethack_test to nethack_app;"
             - run: bun scripts/run-node.ts ./node_modules/@playwright/test/cli.js install --with-deps chromium
             - run: bun run test:e2e
+
+    performance:
+        runs-on: ubuntu-latest
+        env:
+            NETHACK_TEST_DB_PORT: "5432"
+            PUBLIC_API_ORIGIN: http://127.0.0.1:3002
+            WORKSPACE_ORIGIN: http://127.0.0.1:5273
+            SITE_ORIGIN: http://127.0.0.1:3100
+            API_ORIGIN: http://127.0.0.1:3002
+            PORT: "3002"
+            HOST: 127.0.0.1
+            LOG_LEVEL: error
+            RATE_LIMIT_MAX: "100000"
+            SESSION_ENCRYPTION_KEYS: ZlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlo=
+            DATABASE_URL: postgres://nethack_app:nethack_app_password@127.0.0.1:5432/nethack_test
+            DATABASE_MIGRATION_URL: postgres://nethack:nethack_dev_password@127.0.0.1:5432/nethack_test
+            BASIS_AUTH_ISSUER: http://127.0.0.1:4110
+            BASIS_AUTH_CLIENT_ID: nethack-performance
+            BASIS_AUTH_CLIENT_SECRET: nethack-performance-secret
+            BASIS_AUTH_RESOURCE: devconnect://nethack.test
+            BASIS_AUTH_RESOURCE_SECRET: nethack-performance-resource-secret
+            BASIS_AUTH_REDIRECT_URI: http://127.0.0.1:3002/api/v1/auth/callback
+            BASIS_AUTH_POST_LOGOUT_REDIRECT_URI: http://127.0.0.1:5273/
+            BASIS_AUTH_ALLOW_INSECURE_HTTP: "true"
+        services:
+            postgres:
+                image: postgres:18
+                env:
+                    POSTGRES_PASSWORD: nethack_dev_password
+                    POSTGRES_USER: nethack
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd "pg_isready -U nethack" --health-interval 5s --health-timeout 5s --health-retries 20
+        steps:
+            - uses: actions/checkout@v4
+            - uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: 1.3.14
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+            - run: bun install --frozen-lockfile
+            - name: Create database and runtime role
+              env:
+                  PGPASSWORD: nethack_dev_password
+              run: |
+                  psql -h 127.0.0.1 -U nethack -d postgres -c "create database nethack_test;"
+                  psql -h 127.0.0.1 -U nethack -d postgres -c "create role nethack_app login password 'nethack_app_password' nosuperuser nobypassrls nocreatedb nocreaterole;"
+                  psql -h 127.0.0.1 -U nethack -d postgres -c "grant connect on database nethack_test to nethack_app;"
+            - run: bun run --cwd apps/api db:migrate
+            - run: bun apps/api/src/seed.ts
+            - run: bun run build
+            - run: bun scripts/run-node.ts ./node_modules/@playwright/test/cli.js install --with-deps chromium
+            - name: Start API and site
+              run: |
+                  nohup bun apps/api/src/main.ts > api.log 2>&1 &
+                  nohup bun run --cwd apps/site start -- -p 3100 > site.log 2>&1 &
+                  for attempt in $(seq 1 60); do
+                    if curl -fsS http://127.0.0.1:3002/health/ready >/dev/null && curl -fsS http://127.0.0.1:3100/ >/dev/null; then
+                      exit 0
+                    fi
+                    sleep 2
+                  done
+                  cat api.log site.log
+                  exit 1
+            - name: Install k6
+              run: |
+                  mkdir -p "$RUNNER_TEMP/k6"
+                  curl -fsSL https://github.com/grafana/k6/releases/download/v2.4.0/k6-v2.4.0-linux-amd64.tar.gz |
+                    tar -xz -C "$RUNNER_TEMP/k6" --strip-components=1
+                  "$RUNNER_TEMP/k6/k6" version
+            - name: Load test
+              run: PATH="$RUNNER_TEMP/k6:$PATH" bun run test:load
+            - run: bun run test:performance

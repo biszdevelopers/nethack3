@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
@@ -40,7 +40,9 @@ async function record(name: string, work: () => Promise<string>): Promise<void> 
             status: "failed",
             detail: error instanceof Error ? error.message : "unknown failure",
         });
-        console.log(`failed  ${name}`);
+        console.log(
+            `failed  ${name}  ${error instanceof Error ? error.message.slice(-1200) : "unknown failure"}`,
+        );
     }
 }
 
@@ -57,6 +59,47 @@ async function waitFor(url: string, attempts = 40): Promise<void> {
         await new Promise((resolve) => setTimeout(resolve, 500));
     }
     throw new Error(`Timed out waiting for ${url}`);
+}
+
+async function runProcess(
+    command: string,
+    args: string[],
+    cwd: string,
+    env: NodeJS.ProcessEnv,
+    waitMs: number,
+): Promise<string> {
+    const child = spawn(command, args, {
+        cwd,
+        env,
+        stdio: ["ignore", "pipe", "pipe"],
+        shell: process.platform === "win32",
+    });
+    let output = "";
+    child.stdout?.on("data", (chunk: Buffer) => {
+        output += chunk.toString();
+    });
+    child.stderr?.on("data", (chunk: Buffer) => {
+        output += chunk.toString();
+    });
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
+    if (child.exitCode !== null) {
+        throw new Error(
+            `${command} ${args.join(" ")} exited early with ${String(child.exitCode)}:\n${output.slice(-2000)}`,
+        );
+    }
+    if (process.platform === "win32" && child.pid !== undefined) {
+        spawnSync("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore" });
+    } else {
+        child.kill("SIGTERM");
+    }
+    await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 5000);
+        child.once("exit", () => {
+            clearTimeout(timer);
+            resolve();
+        });
+    });
+    return "started";
 }
 
 async function startServer(
@@ -113,10 +156,25 @@ async function startServer(
     return { stop };
 }
 
+function migrationEnvironment(): NodeJS.ProcessEnv {
+    return {
+        ...apiEnvironment(3002),
+        DATABASE_URL:
+            process.env.DATABASE_MIGRATION_URL ??
+            "postgres://nethack:nethack_dev_password@127.0.0.1:55432/nethack_test",
+    };
+}
+
 function apiEnvironment(port: number): NodeJS.ProcessEnv {
     return {
         ...process.env,
         NODE_ENV: "test",
+        DATABASE_URL:
+            process.env.DATABASE_URL ??
+            "postgres://nethack_app:nethack_app_password@127.0.0.1:55432/nethack_test",
+        DATABASE_MIGRATION_URL:
+            process.env.DATABASE_MIGRATION_URL ??
+            "postgres://nethack:nethack_dev_password@127.0.0.1:55432/nethack_test",
         PORT: String(port),
         HOST: "127.0.0.1",
         API_ORIGIN: `http://127.0.0.1:${port}`,
@@ -145,6 +203,28 @@ await record("build api", async () => {
     const result = await run("bun", ["run", "--cwd", "apps/api", "build"], root);
     if (result.code !== 0) throw new Error(result.output.slice(-1000));
     return "tsc";
+});
+
+await record("migration under node", async () => {
+    const result = await run(
+        process.execPath,
+        ["../../node_modules/drizzle-kit/bin.cjs", "migrate"],
+        join(root, "apps/api"),
+        migrationEnvironment(),
+    );
+    if (result.code !== 0) throw new Error(result.output.slice(-1000));
+    return "schema current";
+});
+
+await record("migration under bun", async () => {
+    const result = await run(
+        "bun",
+        ["../../node_modules/drizzle-kit/bin.cjs", "migrate"],
+        join(root, "apps/api"),
+        migrationEnvironment(),
+    );
+    if (result.code !== 0) throw new Error(result.output.slice(-1000));
+    return "schema current";
 });
 
 await record("api under node", async () => {
@@ -180,6 +260,20 @@ await record("api under bun", async () => {
         await server.stop();
     }
 });
+
+await record("worker under node", async () =>
+    runProcess(
+        process.execPath,
+        ["dist/worker-main.js"],
+        join(root, "apps/api"),
+        apiEnvironment(3002),
+        2500,
+    ),
+);
+
+await record("worker under bun", async () =>
+    runProcess("bun", ["dist/worker-main.js"], join(root, "apps/api"), apiEnvironment(3002), 2500),
+);
 
 if (!existsSync(join(root, "apps/site/.next"))) {
     await record("build site", async () => {

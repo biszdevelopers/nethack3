@@ -124,7 +124,8 @@ node scripts/restore-database.ts /var/backups/nethack/nethack-2026-11-25T20-00-0
 - Backups are timestamped custom-format dumps (`--compress=9`) written through a `.partial` file and renamed on success.
 - Tables use `FORCE ROW LEVEL SECURITY`, so the backup role must be a superuser or have `BYPASSRLS`; otherwise `pg_dump` fails or omits rows. The compose bootstrap owner is a superuser.
 - Restore refuses a non-empty target unless `--force` is passed, then runs `pg_restore --clean --if-exists --no-owner --no-privileges --exit-on-error`.
-- Encrypt dumps at rest before copying them off the host (for example with `age` or GPG) and apply a retention policy; neither is built into the scripts.
+- Optional `age` encryption: set `BACKUP_AGE_RECIPIENT` and `AGE_BIN`; the plaintext dump is removed after encryption. Restore with `BACKUP_AGE_IDENTITY`. Tested end to end with age 1.3.2 (170 KiB encrypted dump, 42-table restore).
+- Retention is automated by `bun run db:prune-backups`, controlled by `BACKUP_RETENTION_DAYS` and `BACKUP_RETENTION_MINIMUM`.
 - The compose database is not published on the host. Run backups from a host or sidecar with network access to PostgreSQL. For a managed database, point `DATABASE_MIGRATION_URL` at it directly.
 - Test restores against a scratch database before relying on a dump.
 
@@ -150,4 +151,7 @@ Docker is not installed on the authoring host, so **no container image was built
 - `node scripts/backup-database.ts --help`, `node scripts/restore-database.ts --help`, and their missing-argument/missing-environment failure paths were executed successfully.
 - Backup and restore were exercised end to end against a local PostgreSQL 18 instance: a 170 KiB custom-format dump was created, restored into a freshly created scratch database (42 tables), verified, and the scratch database was dropped. The non-empty-target guard refused the same dump against the migrated development database without modifying it.
 - `bun run verify:runtime` passed all seven checks: API health 200 and site HTTP 200 under Node 24 and Bun, plus contracts, UI, and API builds.
-- The Caddyfile was not validated by Caddy (binary not installed). Validate before deployment with `caddy validate --config deployment/caddy/Caddyfile`.
+- Caddy 2.11.9 validated the configuration: `caddy validate --config deployment/caddy/Caddyfile --adapter caddyfile` returned `Valid configuration`.
+- k6 passed the checked-in load scenarios against the API with 0% failed requests and p95 96 ms for public reads.
+- Lighthouse 13.6.0 reported 100 for performance, accessibility, best practices, and SEO on mobile and desktop production builds.
+- `bun run db:prune-backups` applies `BACKUP_RETENTION_DAYS` and `BACKUP_RETENTION_MINIMUM`; it was exercised against synthetic dumps.
