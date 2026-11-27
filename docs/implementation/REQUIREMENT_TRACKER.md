@@ -4,7 +4,7 @@ Source of truth: `FULL_PLAN.md` (sections 1-24) and `SETUP_GUIDE.md` (Basis Auth
 
 Verification snapshot: 2026-11-27, after the completion pass. Executed on this host: `bun run format:check`, `bun run lint` (0 errors), `bun run typecheck`, `bun run check`, `bun run test` (29 files / 288 tests plus 17 UI files / 35 tests), `bun run test:integration` (18 files / 83 tests), `bun run test:security`, `bun run build`, `bun run verify:runtime` (11/11), `bun run test:e2e` (36 cases), `bun run test:visual` (18/18), `bun run test:performance` (Lighthouse 100/100/100/100 mobile and desktop), k6 load thresholds (p95 96 ms, 0% failures), `bun audit --audit-level=high`, `bun run security:scan`, Caddy validation, and a 42-table backup/restore with retention pruning. Not executed: Docker images/Compose, live Basis Auth/Entra, or an independent penetration test.
 
-Current distribution across 226 tracked requirements: 140 Verified, 75 Implemented, 0 In progress, 0 Not started, 11 Blocked.
+Current distribution across 228 tracked requirements: 145 Verified, 72 Implemented, 0 In progress, 0 Not started, 11 Blocked.
 
 ## 1. Product identity and principles
 
@@ -47,11 +47,11 @@ Current distribution across 226 tracked requirements: 140 Verified, 75 Implement
 
 | ID | Requirement | Plan section | Implementation | Verification | Status |
 | --- | --- | --- | --- | --- | --- |
-| V-001 | Noto Sans Mono everywhere, no other typeface | 3.1 | packages/ui/styles.css, @fontsource/noto-sans-mono | `code-standards.test.ts` checks CSS and source font families; no computed-style E2E assertion | Verified |
-| V-002 | Font self-hosted with license | 3.1 | @fontsource/noto-sans-mono | Dependency and build output include self-hosted font assets; package license not audited | Implemented |
-| V-003 | Controlled font weights; hierarchy via size/weight/spacing | 3.1 | styles.css | Source inspection; no visual review record | Implemented |
+| V-001 | Noto Sans Mono everywhere, no other typeface | 3.1 | packages/ui/styles.css, @fontsource/noto-sans-mono | `code-standards.test.ts` checks CSS and source font families; both apps serve only self-hosted Noto Sans Mono weights. | Verified |
+| V-002 | Font self-hosted with license | 3.1 | @fontsource/noto-sans-mono | Both applications serve self-hosted WOFF2 files with the SIL Open Font License 1.1 included beside the assets. | Verified |
+| V-003 | Controlled font weights; hierarchy via size/weight/spacing | 3.1 | styles.css | Four controlled weights are self-hosted; hierarchy is verified by desktop, tablet, mobile, light, and dark visual baselines. | Verified |
 | V-004 | Palette: #00DC82, #090909, #FFFFFF plus derived neutrals and greens only | 3.2 | packages/ui/styles.css | `code-standards.test.ts` palette allowlist passes | Verified |
-| V-005 | Dark theme default; light theme same palette | 3.2 | theme store, theme-init scripts, tokens | Both token sets exist; no theme-specific E2E or screenshot | Implemented |
+| V-005 | Dark theme default; light theme same palette | 3.2 | theme store, theme-init scripts, tokens | Dark is the default and light uses the same palette; component-lab dark/light and public light screenshots pass. | Verified |
 | V-006 | Status communicated with color and text | 3.2 | StatusIndicator, badges | Source inspection; no dedicated accessibility test | Implemented |
 | V-007 | No all-caps UI text; no uppercase headings/buttons; no text-transform uppercase | 3.3 | all apps | `code-standards.test.ts` uppercase scan passes; full Playwright suite passes | Verified |
 | V-008 | Product name always `nethack`; no abbreviations, fake stats, placeholder content, Lorem Ipsum | 3.3 | all apps | Codename scan passes; E2E uses labeled fixtures; no automated content audit | Implemented |
@@ -59,7 +59,7 @@ Current distribution across 226 tracked requirements: 140 Verified, 75 Implement
 | V-010 | Geometry tokens (5px/3px/8px radii, 36-44px controls, 1px borders, 4px unit, 1280px content, 24px padding) | 3.5 | tokens | Token inspection; no token unit test | Implemented |
 | V-011 | Interaction: immediate feedback, focus, no hidden/hover-only actions, clear errors, no layout shift | 3.6 | components | Playwright axe, keyboard command palette, loading/empty/error screenshots, and component tests pass; an exhaustive hover/active matrix is still partial. | Implemented |
 | V-007b | No invented competition metrics, names, deadlines, scores, results, announcements | 3.7 | site + workspace | Playwright fixtures are explicitly labeled development data; no production seed audit | Implemented |
-| V-007c | Meaningful empty states when data absent | 3.7 | EmptyState, query states | EmptyState components exist; no empty-state E2E | Implemented |
+| V-007c | Meaningful empty states when data absent | 3.7 | EmptyState, query states, visual baselines | The empty archive visual baseline and the no-organization negative path render real empty states. | Verified |
 
 ## 4. Application architecture
 
@@ -69,7 +69,7 @@ Current distribution across 226 tracked requirements: 140 Verified, 75 Implement
 | A-002 | Authenticated frontend React + Vite, static build | 4.1, 4.5 | apps/workspace | `bun run build` emits static assets; Playwright workspace cases pass | Verified |
 | A-003 | Fastify authoritative API | 4.1, 4.6 | apps/api | Integration and E2E suites pass | Verified |
 | A-004 | PostgreSQL + Drizzle | 4.1 | apps/api/src/infrastructure/database | 5 migrations, 42 tables; integration suite passes against PostgreSQL 18 | Verified |
-| A-005 | React Router 7 only routing library in workspace | 4.5 | apps/workspace/src/application/router.tsx | React Router 8.5.3 is installed and is the only router; version differs from the plan | Implemented |
+| A-005 | React Router 7 only routing library in workspace | 4.5 | apps/workspace/src/application/router.tsx | React Router 7.18.7 is the only routing library; workspace typecheck and E2E pass. | Verified |
 | A-006 | Public site does not use Next.js as API, Server Actions for mutations, middleware auth, DB access, private credentials, user-specific caching, arbitrary remote fetch | 4.4 | apps/site | `runtime-parity.test.ts` checks DB/secrets/imports; `proxy.ts` only sets security headers; no Server Actions found | Verified |
 | A-007 | Public site consumes only public API data | 4.4 | apps/site/src/lib/public-api.ts | Site calls only `/api/v1/public/*`; Playwright public-site cases pass | Verified |
 | A-008 | Fastify owns identity, sessions, authorization, org membership, business rules, DB, files, audit, submissions, judging, voting, admin | 4.6 | apps/api | Integration and security suites pass | Verified |

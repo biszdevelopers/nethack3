@@ -1,6 +1,6 @@
 # Final implementation report
 
-Status: implementation is complete for the repository scope. The tracker records 140 Verified, 75 Implemented, 0 In progress, 0 Not started, and 11 Blocked requirements; every blocked item requires external infrastructure, credentials, data, or an independent assessor. Production launch is not verified. External blockers are listed in section 5.
+Status: implementation is complete for the repository scope. The tracker records 228 requirements: 145 Verified, 72 Implemented, 0 In progress, 0 Not started, and 11 Blocked; every blocked item requires external infrastructure, credentials, data, or an independent assessor. Production launch is not verified. External blockers are listed in section 5.
 
 Verification date: 2026-11-27, after the completion pass. The final working tree was checked with formatting, lint, type checking, unit/UI tests, integration/security/fuzz tests, the production build, 11 runtime checks under Node and Bun, 36 Playwright cases, 18 visual/axe checks, Lighthouse mobile and desktop, a k6 load run, Caddy validation, the dependency audit, the secret scan/SBOM generator, and a backup/restore plus retention drill. The requirement-by-requirement status is in `docs/implementation/REQUIREMENT_TRACKER.md`.
 
