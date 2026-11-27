@@ -1,12 +1,13 @@
 # Judging capability
 
-Owns judging rubrics, criteria, judge assignments, evaluations, evaluation scores, and immutable evaluation version snapshots. It decides who judges which submission, how a rubric produces a weighted score, and when an evaluation is a draft or submitted.
+Owns judging rubrics, criteria, judge assignments, evaluations, evaluation scores, immutable evaluation version snapshots, and the organizer-facing ranked results for an edition. It decides who judges which submission, how a rubric produces a weighted score, when an evaluation is a draft or submitted, and how submitted evaluations aggregate into a ranking.
 
 ## Dependencies
 
 - `submissions` (`submissions.v1`) for submission existence, project title, team id, and edition membership.
 - `competitions` (`competitions.v1`) for edition existence inside the organization.
 - `organizations` (`organizations.v1`) for the organization name in assignment events.
+- `teams` (`teams.v1`) for team names in edition results.
 - Core services: database transactions, clock, audit log, transactional outbox.
 
 ## Public contract
@@ -28,7 +29,7 @@ Owned writes: `judging_rubrics`, `judging_criteria`, `judge_assignments`, `evalu
 Read-only joins outside the capability:
 
 - `users` and `organization_memberships` resolve a judge by email and verify that the judge is an active owner, organizer, or judge in the organization. This is directory and membership data. Move it to an identity or organizations contract when one exposes those lookups.
-- Submissions, projects, and teams are never read directly. Submission data comes from `submissions.v1`. The assignment detail exposes `teamId`; resolving a team display name would require the `teams` contract, which is not a judging dependency.
+- Submissions, projects, and teams are never read directly. Submission data comes from `submissions.v1`; team names come from `teams.v1`. The assignment detail exposes `teamId`.
 
 ## Routes and permissions
 
@@ -39,6 +40,7 @@ All routes require authentication. Routes without an organization in the path us
 | GET | `/api/v1/competitions/:editionId/rubrics` | Active organization member |
 | POST | `/api/v1/competitions/:editionId/rubrics` | Owner or organizer |
 | GET | `/api/v1/competitions/:editionId/assignments` | Owner or organizer |
+| GET | `/api/v1/competitions/:editionId/judging-results` | Owner or organizer; ranked mean of submitted evaluations |
 | POST | `/api/v1/competitions/:editionId/assignments` | Owner or organizer |
 | GET | `/api/v1/judging/assignments?status=` | Active organization member; returns only the caller's assignments |
 | GET | `/api/v1/assignments/:assignmentId` | Assigned judge or owner/organizer |
@@ -68,6 +70,7 @@ The assignment is the scoring authority. An organizer who is not the assigned ju
 - Submitting requires a draft evaluation, a complete scorecard, and an open assignment. It sets the evaluation and assignment to `submitted`, records `submittedAt`, and publishes `judging.evaluation.submitted` with `{ assignmentId, submissionId, projectId, judgeUserId, organizationId, editionId, weightedScore }`.
 - Every successful draft save and submission inserts an `evaluation_versions` snapshot in the same transaction. The snapshot contains the full scorecard, status, overall comment, weighted score, and submission timestamp. Revision `n` is built from the previous maximum revision plus one; existing snapshots are never mutated.
 - `GET /history` returns `{ evaluation, versions }`: the current single-row evaluation and up to 50 snapshots ordered newest revision first. The evaluation table remains the current state; `evaluation_versions` is the revision history.
+- `GET /judging-results` groups active assignments by submission, averages only submitted weighted scores, excludes drafts and revoked assignments, ranks ties equally, and places unscored submissions last with a null rank. Each row includes the assignment count, submitted count, average score, rank, and per-judge status and score.
 
 ## Audit
 
@@ -79,7 +82,7 @@ The assignment is the scoring authority. An organizer who is not the assigned ju
 
 ## Tests
 
-`tests/judging-rules.test.ts` covers scoring math, weight and maximum-score handling, rounding, missing/duplicate/extra criteria, score bounds, deadline checks, assignment state transitions, and judge eligibility. `tests/evaluation-history.test.ts` covers revision numbering and snapshot mapping. The tests are pure and do not require a database.
+`tests/judging-rules.test.ts` covers scoring math, weight and maximum-score handling, rounding, missing/duplicate/extra criteria, score bounds, deadline checks, assignment state transitions, and judge eligibility. `tests/evaluation-history.test.ts` covers revision numbering and snapshot mapping. `tests/judging-results.test.ts` covers submitted-only averaging, draft exclusion, tie ranking, and unscored submissions. `tests/e2e/04-judge-workflow.spec.ts` verifies that an organizer sees the submitted score and rank in the edition results. The unit tests are pure and do not require a database.
 
 ## Extraction
 

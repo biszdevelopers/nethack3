@@ -38,6 +38,16 @@ export const teamsCapability: CapabilityDefinition = {
                     return toSummary(toTeam(team, memberCount));
                 });
             },
+            async listEditionTeams(organizationId, editionId) {
+                return context.database.transaction({ organizationId }, async (session) => {
+                    const rows = await repository.listByEdition(
+                        session.db,
+                        organizationId,
+                        editionId,
+                    );
+                    return rows.map((row) => toSummary(toTeam(row, row.memberCount)));
+                });
+            },
             async isTeamMember(organizationId, teamId, userId) {
                 return context.database.transaction({ organizationId }, async (session) => {
                     const member = await repository.findMember(session.db, teamId, userId);

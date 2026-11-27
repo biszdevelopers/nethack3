@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import type { JudgeAssignmentStatus, OrganizationRole } from "@nethack/contracts";
 import type { DatabaseExecutor, DatabaseSession } from "../../../infrastructure/database/client.js";
 import {
@@ -42,6 +42,16 @@ export interface JudgeCandidate {
 export interface EvaluationWithScores {
     readonly evaluation: EvaluationRow;
     readonly scores: readonly EvaluationScoreRow[];
+}
+
+export interface EditionEvaluationRow {
+    readonly assignmentId: string;
+    readonly submissionId: string;
+    readonly judgeUserId: string;
+    readonly judgeDisplayName: string;
+    readonly evaluationStatus: "draft" | "submitted" | null;
+    readonly weightedScore: number | null;
+    readonly submittedAt: string | null;
 }
 
 export interface NewCriterionValues {
@@ -156,6 +166,50 @@ export class JudgingRepository {
         return rubrics.map((rubric) => ({
             rubric,
             criteria: byRubric.get(rubric.id) ?? [],
+        }));
+    }
+
+    async listEditionEvaluationRows(
+        db: DatabaseExecutor,
+        organizationId: string,
+        editionId: string,
+    ): Promise<readonly EditionEvaluationRow[]> {
+        const rows = await db
+            .select({
+                assignmentId: judgeAssignments.id,
+                submissionId: judgeAssignments.submissionId,
+                judgeUserId: judgeAssignments.judgeUserId,
+                judgeDisplayName: users.displayName,
+                evaluationStatus: evaluations.status,
+                weightedScore: evaluations.weightedScore,
+                submittedAt: evaluations.submittedAt,
+            })
+            .from(judgeAssignments)
+            .innerJoin(users, eq(users.id, judgeAssignments.judgeUserId))
+            .leftJoin(
+                evaluations,
+                and(
+                    eq(evaluations.assignmentId, judgeAssignments.id),
+                    eq(evaluations.organizationId, organizationId),
+                ),
+            )
+            .where(
+                and(
+                    eq(judgeAssignments.organizationId, organizationId),
+                    eq(judgeAssignments.editionId, editionId),
+                    ne(judgeAssignments.status, "revoked"),
+                ),
+            )
+            .orderBy(asc(judgeAssignments.submissionId), asc(judgeAssignments.id));
+
+        return rows.map((row) => ({
+            assignmentId: row.assignmentId,
+            submissionId: row.submissionId,
+            judgeUserId: row.judgeUserId,
+            judgeDisplayName: row.judgeDisplayName,
+            evaluationStatus: row.evaluationStatus,
+            weightedScore: row.weightedScore === null ? null : Number(row.weightedScore),
+            submittedAt: row.submittedAt === null ? null : row.submittedAt.toISOString(),
         }));
     }
 

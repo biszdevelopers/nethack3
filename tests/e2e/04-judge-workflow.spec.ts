@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { FIXTURE, USERS } from "../support/e2e/config.js";
-import { expectToast, signIn } from "../support/e2e/app.js";
+import { expectToast, newAppContext, signIn } from "../support/e2e/app.js";
 
 test.describe("judge workflow", () => {
     test("opens an assignment from the judging list", async ({ page }) => {
@@ -23,6 +23,7 @@ test.describe("judge workflow", () => {
 
     test("avoids a conflict, scores the rubric, saves a draft, and submits the evaluation", async ({
         page,
+        browser,
     }) => {
         test.setTimeout(180_000);
         await signIn(page, USERS.judge);
@@ -66,6 +67,25 @@ test.describe("judge workflow", () => {
             await expect(page.getByText("9 / 10")).toBeVisible();
             await expect(page.getByText("85%").first()).toBeVisible();
             await expect(page.getByText("Submitted", { exact: true }).first()).toBeVisible();
+        });
+
+        await test.step("organizer sees the evaluated submission in the edition results", async () => {
+            const organizerContext = await newAppContext(browser);
+            try {
+                const organizerPage = await organizerContext.newPage();
+                await signIn(organizerPage, USERS.organizer);
+                await organizerPage.goto(`/judging?edition=${FIXTURE.editionId}`);
+                const results = organizerPage.getByRole("region", { name: "Results" });
+                await expect(results).toBeVisible();
+                const row = results.getByRole("row", {
+                    name: new RegExp(FIXTURE.labProjectTitle),
+                });
+                await expect(row).toBeVisible();
+                await expect(row.getByText("85.00 / 100").first()).toBeVisible();
+                await expect(row.getByText("1 of 1 submitted")).toBeVisible();
+            } finally {
+                await organizerContext.close();
+            }
         });
     });
 });

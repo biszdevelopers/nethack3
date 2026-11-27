@@ -15,6 +15,7 @@ export interface TeamSummary {
 
 export interface TeamsContract {
     getTeam(organizationId: string, teamId: string): Promise<TeamSummary | null>;
+    listEditionTeams(organizationId: string, editionId: string): Promise<readonly TeamSummary[]>;
     isTeamMember(organizationId: string, teamId: string, userId: string): Promise<boolean>;
     getTeamForUser(
         organizationId: string,

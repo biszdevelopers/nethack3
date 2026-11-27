@@ -49,6 +49,23 @@ export function useEditionAssignments(organizationId: string | null, editionId: 
     });
 }
 
+export function useEditionJudgingResults(
+    organizationId: string | null,
+    editionId: string | null,
+    enabled = true,
+) {
+    return useQuery({
+        queryKey: queryKeys.editionJudgingResults(editionId ?? "none"),
+        queryFn: async () => {
+            if (organizationId === null || editionId === null) {
+                return { items: [], nextCursor: null };
+            }
+            return api.judging.results(organizationId, editionId);
+        },
+        enabled: organizationId !== null && editionId !== null && enabled,
+    });
+}
+
 export function useEditionSubmissions(
     organizationId: string | null,
     editionId: string | null,

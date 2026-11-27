@@ -6,6 +6,7 @@ import {
     createRubricRequestSchema,
     evaluationSchema,
     judgeAssignmentSchema,
+    judgingResultSchema,
     judgingRubricSchema,
     listResponseSchema,
     saveEvaluationRequestSchema,
@@ -17,6 +18,7 @@ import {
     type Evaluation,
     type JudgeAssignment,
     type JudgeAssignmentStatus,
+    type JudgingResult,
     type JudgingRubric,
     type ListResponse,
     type SaveEvaluationRequest,
@@ -25,6 +27,7 @@ import type { ApiClient } from "./client.js";
 
 const rubricListSchema = listResponseSchema(judgingRubricSchema);
 const assignmentListSchema = listResponseSchema(judgeAssignmentSchema);
+const resultListSchema = listResponseSchema(judgingResultSchema);
 
 function organizationHeader(organizationId: string): Record<string, string> {
     return { "X-Nethack-Organization-Id": organizationId };
@@ -62,6 +65,13 @@ export class JudgingApi {
     ): Promise<ListResponse<JudgeAssignment>> {
         return this.client.request("GET", `/api/v1/competitions/${editionId}/assignments`, {
             schema: assignmentListSchema,
+            headers: organizationHeader(organizationId),
+        });
+    }
+
+    async results(organizationId: string, editionId: string): Promise<ListResponse<JudgingResult>> {
+        return this.client.request("GET", `/api/v1/competitions/${editionId}/judging-results`, {
+            schema: resultListSchema,
             headers: organizationHeader(organizationId),
         });
     }

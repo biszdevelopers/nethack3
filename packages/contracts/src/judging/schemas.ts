@@ -152,3 +152,27 @@ export const assignmentHistorySchema = z.object({
     versions: z.array(evaluationVersionSchema),
 });
 export type AssignmentHistory = z.infer<typeof assignmentHistorySchema>;
+
+export const judgingResultEvaluationSchema = z.object({
+    assignmentId: idSchema,
+    judgeUserId: idSchema,
+    judgeDisplayName: z.string(),
+    status: evaluationStatusSchema.nullable(),
+    weightedScore: z.number().nullable(),
+    submittedAt: isoDateTimeSchema.nullable(),
+});
+export type JudgingResultEvaluation = z.infer<typeof judgingResultEvaluationSchema>;
+
+export const judgingResultSchema = z.object({
+    submissionId: idSchema,
+    projectId: idSchema,
+    projectTitle: z.string(),
+    teamId: idSchema.nullable(),
+    teamName: z.string().nullable(),
+    assignmentCount: z.number().int().nonnegative(),
+    submittedCount: z.number().int().nonnegative(),
+    averageScore: z.number().nullable(),
+    rank: z.number().int().positive().nullable(),
+    evaluations: z.array(judgingResultEvaluationSchema),
+});
+export type JudgingResult = z.infer<typeof judgingResultSchema>;

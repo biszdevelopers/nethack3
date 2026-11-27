@@ -16,6 +16,15 @@ test.describe("negative access paths", () => {
         await expect(page.getByText("No active organization", { exact: true })).toBeVisible();
     });
 
+    test("does not expose ranked judging results to participants", async ({ page }) => {
+        await signIn(page, USERS.participant);
+        const response = await page.request.get(
+            `${API_ORIGIN}/api/v1/competitions/${FIXTURE.editionId}/judging-results`,
+            { headers: { "x-nethack-organization-id": FIXTURE.organizationId } },
+        );
+        expect(response.status()).toBe(403);
+    });
+
     test("does not expose another organization's data", async ({ page }) => {
         await signIn(page, USERS.outsider);
         await expectOrganizationSelected(page, FIXTURE.otherOrganizationName);

@@ -35,6 +35,7 @@ import { describeError } from "../capabilities/shared/errors.js";
 import { humanizeToken } from "../capabilities/shared/format.js";
 import { RequestError } from "../capabilities/shared/states.jsx";
 import { assignmentSchema, type AssignmentForm } from "../capabilities/judging/forms.js";
+import { JudgingResultsPanel } from "../capabilities/judging/components/judging-results-panel.js";
 import { RubricBuilder } from "../capabilities/judging/components/rubric-builder.js";
 import { useOrganizerEditions } from "../capabilities/competitions/hooks.js";
 import {
@@ -311,6 +312,10 @@ export function JudgingPage(): ReactNode {
                     </Card>
                 )}
             </section>
+
+            {isOrganizer && editionId !== null ? (
+                <JudgingResultsPanel organizationId={organizationId} editionId={editionId} />
+            ) : null}
 
             {isOrganizer ? (
                 <section

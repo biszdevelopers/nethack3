@@ -20,6 +20,7 @@ export const queryKeys = {
     judgingAssignment: (assignmentId: string) => ["judging", "assignment", assignmentId] as const,
     editionRubrics: (editionId: string) => ["judging", editionId, "rubrics"] as const,
     editionAssignments: (editionId: string) => ["judging", editionId, "assignments"] as const,
+    editionJudgingResults: (editionId: string) => ["judging", editionId, "results"] as const,
     editionSubmissions: (editionId: string) => ["competitions", editionId, "submissions"] as const,
     votingRounds: (editionId: string) => ["voting", editionId, "rounds"] as const,
     ballot: (roundId: string) => ["voting", roundId, "ballot"] as const,

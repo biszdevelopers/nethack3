@@ -8,6 +8,7 @@ import {
     evaluationSchema,
     judgeAssignmentSchema,
     judgeAssignmentStatusSchema,
+    judgingResultSchema,
     judgingRubricSchema,
     listResponseSchema,
     saveEvaluationRequestSchema,
@@ -85,6 +86,27 @@ export async function registerJudgingRoutes(
             const access = await guard.requireOrganization(request, auth);
             guard.requireOrganizer(access);
             const items = await service.listEditionAssignments(
+                auth,
+                access.organizationId,
+                request.params.editionId,
+            );
+            return { items: [...items], nextCursor: null };
+        },
+    );
+
+    app.get(
+        "/api/v1/competitions/:editionId/judging-results",
+        {
+            schema: {
+                params: editionParams,
+                response: { 200: listResponseSchema(judgingResultSchema) },
+            },
+        },
+        async (request) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            guard.requireOrganizer(access);
+            const items = await service.editionResults(
                 auth,
                 access.organizationId,
                 request.params.editionId,

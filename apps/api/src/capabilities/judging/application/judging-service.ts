@@ -5,6 +5,7 @@ import type {
     CreateRubricRequest,
     Criterion,
     Evaluation,
+    JudgingResult,
     JudgingRubric,
     JudgeAssignment,
     JudgeAssignmentStatus,
@@ -30,7 +31,9 @@ import type {
 import type { CompetitionsContract, EditionSummary } from "../../competitions/contracts.js";
 import type { OrganizationSummary, OrganizationsContract } from "../../organizations/contracts.js";
 import type { SubmissionSummary, SubmissionsContract } from "../../submissions/contracts.js";
+import type { TeamsContract } from "../../teams/contracts.js";
 import { nextEvaluationRevision, toEvaluationVersion } from "../domain/evaluation-history.js";
+import { aggregateJudgingResults } from "../domain/judging-results.js";
 import { JudgingRules, type ScorableCriterion } from "../domain/judging-rules.js";
 import type { JudgingSummary } from "../contracts.js";
 import type {
@@ -45,6 +48,7 @@ export interface JudgingContracts {
     readonly submissions: SubmissionsContract;
     readonly competitions: CompetitionsContract;
     readonly organizations: OrganizationsContract;
+    readonly teams: TeamsContract;
 }
 
 export class JudgingService {
@@ -140,6 +144,43 @@ export class JudgingService {
             this.repository.listAssignmentsForEdition(session.db, organizationId, editionId),
         );
         return this.toAssignments(organizationId, views);
+    }
+
+    async editionResults(
+        auth: AuthContext,
+        organizationId: string,
+        editionId: string,
+    ): Promise<readonly JudgingResult[]> {
+        this.assertOrganizer(auth, organizationId);
+        await this.requireEdition(organizationId, editionId);
+        const [evaluationRows, submissionRows, teamRows] = await Promise.all([
+            this.database.transaction({ organizationId }, async (session) =>
+                this.repository.listEditionEvaluationRows(session.db, organizationId, editionId),
+            ),
+            this.contracts.submissions.listEditionSubmissions(organizationId, editionId),
+            this.contracts.teams.listEditionTeams(organizationId, editionId),
+        ]);
+        const submissionsById = new Map(
+            submissionRows.map((submission) => [submission.id, submission] as const),
+        );
+        const teamsById = new Map(teamRows.map((team) => [team.id, team] as const));
+        const rows = evaluationRows.map((row) => {
+            const submission = submissionsById.get(row.submissionId);
+            if (submission === undefined) {
+                throw new InternalError("A judging assignment references a missing submission.");
+            }
+            return {
+                ...row,
+                projectId: submission.projectId,
+                projectTitle: submission.title,
+                teamId: submission.teamId,
+                teamName:
+                    submission.teamId === null
+                        ? null
+                        : (teamsById.get(submission.teamId)?.name ?? null),
+            };
+        });
+        return aggregateJudgingResults(rows);
     }
 
     async createAssignment(
