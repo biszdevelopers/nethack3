@@ -65,6 +65,45 @@ test.describe("accessibility and visual layout", () => {
         await expect(page).toHaveURL(/\/competitions$/);
     });
 
+    test("workspace loading state matches the visual baseline", async ({ page }) => {
+        test.setTimeout(180_000);
+        await signIn(page, USERS.participant);
+        await page.route("**/api/v1/**", async (route) => {
+            await new Promise((resolve) => setTimeout(resolve, 1_500));
+            await route.continue();
+        });
+        await page.goto("/teams");
+        await expect(page.getByText("Loading your teams")).toBeVisible({ timeout: 10_000 });
+        await expect(page).toHaveScreenshot("workspace-loading.png", {
+            animations: "disabled",
+            caret: "hide",
+            maxDiffPixelRatio: 0.03,
+        });
+        await page.unroute("**/api/v1/**");
+    });
+
+    test("component laboratory has no serious accessibility violations", async ({ page }) => {
+        test.setTimeout(180_000);
+        await signIn(page, USERS.participant);
+        await page.goto("/lab");
+        await expect(page.getByRole("heading", { name: "Component laboratory" })).toBeVisible({
+            timeout: 30_000,
+        });
+        await expectNoSeriousViolations(page, "component laboratory");
+        await expect(page).toHaveScreenshot("component-lab-dark.png", {
+            animations: "disabled",
+            caret: "hide",
+            maxDiffPixelRatio: 0.03,
+        });
+        await page.getByRole("button", { name: "Switch to light mode" }).click();
+        await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+        await expect(page).toHaveScreenshot("component-lab-light.png", {
+            animations: "disabled",
+            caret: "hide",
+            maxDiffPixelRatio: 0.03,
+        });
+    });
+
     test("public home matches the visual baseline", async ({ page }) => {
         test.setTimeout(180_000);
         await page.goto(siteUrl("/"));

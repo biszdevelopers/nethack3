@@ -166,6 +166,25 @@ describe("code standards", () => {
         expect(violations).toEqual([]);
     });
 
+    it("keeps API communication and server-state orchestration out of tsx files", () => {
+        const violations: string[] = [];
+        for (const file of productSources().filter((path) => path.endsWith(".tsx"))) {
+            const content = readFileSync(file, "utf8");
+            for (const pattern of [
+                /from\s+"@nethack\/api-client"/,
+                /\bfetch\s*\(/,
+                /\buseQuery\s*\(/,
+                /\buseMutation\s*\(/,
+                /\b(?:select|insert|update|delete)\s+from\s+/i,
+            ]) {
+                if (pattern.test(content)) {
+                    violations.push(`${relative(ROOT, file)} matches ${pattern}`);
+                }
+            }
+        }
+        expect(violations).toEqual([]);
+    });
+
     it("does not display the internal codename in the interface", () => {
         const violations: string[] = [];
         for (const app of ["apps/site/src", "apps/workspace/src"]) {

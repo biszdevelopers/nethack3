@@ -42,8 +42,16 @@ describe("runtime parity", () => {
         ]) {
             for (const file of textFiles(directory)) {
                 const content = readFileSync(file, "utf8");
-                if (/\bBun\.[A-Za-z]/.test(content)) {
-                    violations.push(relative(ROOT, file));
+                for (const pattern of [
+                    /\bBun\.[A-Za-z]/,
+                    /process\.versions\.bun/,
+                    /typeof\s+Bun\b/,
+                    /\bDeno\.[A-Za-z]/,
+                    /import\.meta\.env\.BUN\b/,
+                ]) {
+                    if (pattern.test(content)) {
+                        violations.push(`${relative(ROOT, file)} matches ${pattern}`);
+                    }
                 }
             }
         }
