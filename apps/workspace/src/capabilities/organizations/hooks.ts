@@ -1,11 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
     AddOrganizationMemberRequest,
+    CreateOrganizationRequest,
     UpdateOrganizationMemberRequest,
     UpdateOrganizationSettingsRequest,
 } from "@nethack/contracts";
 import { api } from "../../application/api.js";
+import { organizationSelectionStore } from "../../application/organization-store.js";
+import { SESSION_QUERY_KEY } from "../../application/session.js";
 import { queryKeys } from "../shared/query-keys.js";
+
+export function useCreateOrganization() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (input: CreateOrganizationRequest) => api.organizations.create(input),
+        onSuccess: async (organization) => {
+            organizationSelectionStore.select(organization.id);
+            await queryClient.invalidateQueries({ queryKey: SESSION_QUERY_KEY });
+        },
+    });
+}
 
 export interface AuditFilters {
     readonly action?: string;

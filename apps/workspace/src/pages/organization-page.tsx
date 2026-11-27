@@ -45,6 +45,7 @@ import {
 } from "@nethack/ui";
 import { useActiveMembership } from "../application/session.js";
 import { AnnouncementsPanel } from "../capabilities/announcements/components/announcements-panel.js";
+import { CreateOrganizationDialog } from "../capabilities/organizations/components/create-organization-dialog.js";
 import { useOrganizerEditions } from "../capabilities/competitions/hooks.js";
 import {
     useAddMember,
@@ -120,6 +121,7 @@ export function OrganizationPage(): ReactNode {
     const updateSettings = useUpdateSettings(organizationId);
 
     const [pendingRemoval, setPendingRemoval] = useState<OrganizationMembership | null>(null);
+    const [createOpen, setCreateOpen] = useState(false);
     const [cursorStack, setCursorStack] = useState<readonly string[]>([]);
     const [auditFilters, setAuditFilters] = useState<{ action: string; entityType: string }>({
         action: "",
@@ -183,8 +185,14 @@ export function OrganizationPage(): ReactNode {
                 />
                 <EmptyState
                     title="No active organization"
-                    description="Select an active organization membership in the workspace navigation to manage it."
+                    description="Create an organization to run competitions, or ask an organizer to invite your account."
+                    action={
+                        <Button type="button" onClick={() => setCreateOpen(true)}>
+                            Create organization
+                        </Button>
+                    }
                 />
+                <CreateOrganizationDialog open={createOpen} onOpenChange={setCreateOpen} />
             </div>
         );
     }

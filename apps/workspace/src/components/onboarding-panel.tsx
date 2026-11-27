@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import {
     Button,
@@ -9,12 +9,15 @@ import {
     CardTitle,
     EmptyState,
 } from "@nethack/ui";
+import { CreateOrganizationDialog } from "../capabilities/organizations/components/create-organization-dialog.js";
 
 export function OnboardingPanel({
     hasMemberships,
 }: {
     readonly hasMemberships: boolean;
 }): ReactNode {
+    const [createOpen, setCreateOpen] = useState(false);
+
     if (hasMemberships) {
         return (
             <EmptyState
@@ -42,8 +45,9 @@ export function OnboardingPanel({
                     <li className="flex gap-3">
                         <span className="font-semibold text-primary">01</span>
                         <span>
-                            Ask an organizer to invite your account to their organization. The
-                            invitation appears in Notifications.
+                            Create an organization if you are running the competition, or ask an
+                            organizer to invite your account to theirs. Invitations appear in
+                            Notifications.
                         </span>
                     </li>
                     <li className="flex gap-3">
@@ -61,6 +65,9 @@ export function OnboardingPanel({
                     </li>
                 </ol>
                 <div className="flex flex-wrap gap-2">
+                    <Button type="button" onClick={() => setCreateOpen(true)}>
+                        Create organization
+                    </Button>
                     <Button asChild variant="outline">
                         <Link to="/notifications">Open notifications</Link>
                     </Button>
@@ -69,6 +76,7 @@ export function OnboardingPanel({
                     </Button>
                 </div>
             </CardContent>
+            <CreateOrganizationDialog open={createOpen} onOpenChange={setCreateOpen} />
         </Card>
     );
 }
