@@ -1,4 +1,4 @@
-import type { Evaluation, JudgeAssignment } from "@nethack/contracts";
+import type { Evaluation, JudgeAssignment, JudgingResult } from "@nethack/contracts";
 
 export interface JudgingSummary {
     readonly assignmentId: string;
@@ -10,6 +10,10 @@ export interface JudgingSummary {
 
 export interface JudgingContract {
     getAssignment(organizationId: string, assignmentId: string): Promise<JudgingSummary | null>;
+    listEditionResults(
+        organizationId: string,
+        editionId: string,
+    ): Promise<readonly JudgingResult[]>;
     countSubmittedEvaluations(organizationId: string, editionId: string): Promise<number>;
     getEvaluation(organizationId: string, assignmentId: string): Promise<Evaluation | null>;
 }

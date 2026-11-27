@@ -152,6 +152,13 @@ export class JudgingService {
         editionId: string,
     ): Promise<readonly JudgingResult[]> {
         this.assertOrganizer(auth, organizationId);
+        return this.editionResultsForOrganization(organizationId, editionId);
+    }
+
+    async editionResultsForOrganization(
+        organizationId: string,
+        editionId: string,
+    ): Promise<readonly JudgingResult[]> {
         await this.requireEdition(organizationId, editionId);
         const [evaluationRows, submissionRows, teamRows] = await Promise.all([
             this.database.transaction({ organizationId }, async (session) =>
