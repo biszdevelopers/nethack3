@@ -1,8 +1,8 @@
 # Final implementation report
 
-Status: implementation is complete for the repository scope. The tracker records 228 requirements: 145 Verified, 72 Implemented, 0 In progress, 0 Not started, and 11 Blocked; every blocked item requires external infrastructure, credentials, data, or an independent assessor. Production launch is not verified. External blockers are listed in section 5.
+Status: implementation is complete for the repository scope. The tracker records 228 requirements: 146 Verified, 71 Implemented, 0 In progress, 0 Not started, and 11 Blocked; every blocked item requires external infrastructure, credentials, data, or an independent assessor. Production launch is not verified. External blockers are listed in section 5.
 
-Verification date: 2026-11-27, after the completion pass. The final working tree was checked with formatting, lint, type checking, unit/UI tests, integration/security/fuzz tests, the production build, 11 runtime checks under Node and Bun, 36 Playwright cases, 18 visual/axe checks, Lighthouse mobile and desktop, a k6 load run, Caddy validation, the dependency audit, the secret scan/SBOM generator, and a backup/restore plus retention drill. The requirement-by-requirement status is in `docs/implementation/REQUIREMENT_TRACKER.md`.
+Verification date: 2026-11-27, after the completion pass. The final working tree was checked with formatting, lint, type checking, unit/UI tests, integration/security/fuzz tests, the production build, 11 runtime checks under Node and Bun, 38 Playwright cases, 18 visual/axe checks, Lighthouse mobile and desktop, a k6 load run, Caddy validation, the dependency audit, the secret scan/SBOM generator, and a backup/restore plus retention drill. The requirement-by-requirement status is in `docs/implementation/REQUIREMENT_TRACKER.md`.
 
 ## 1. Implemented system
 
@@ -10,9 +10,9 @@ Verification date: 2026-11-27, after the completion pass. The final working tree
 
 | Application | Implementation |
 | --- | --- |
-| `apps/api` | Fastify 5 authoritative API. Nethack3 Core with static capability registration, DAG validation, configuration, error handling, request IDs, structured logging, health endpoints, transactional outbox, PostgreSQL-backed job queue, and an OpenTelemetry-compatible tracing hook. 13 capabilities: identity, organizations, competitions, participants, teams, projects, files, submissions, judging, voting, announcements, notifications, administration. 85 unique `/api/v1` paths across 118 route registrations. OpenAPI 3.1 at `/api/v1/openapi.json` with Swagger UI gated by `API_DOCS_ENABLED`. |
+| `apps/api` | Fastify 5 authoritative API. Nethack3 Core with static capability registration, DAG validation, configuration, error handling, request IDs, structured logging, health endpoints, transactional outbox, PostgreSQL-backed job queue, and an OpenTelemetry-compatible tracing hook. 13 capabilities: identity, organizations, competitions, participants, teams, projects, files, submissions, judging, voting, announcements, notifications, administration. Versioned `/api/v1` routes generated from shared contracts, including organizer-ranked judging results. OpenAPI 3.1 at `/api/v1/openapi.json` with Swagger UI gated by `API_DOCS_ENABLED`. |
 | `apps/site` | Next.js 16 App Router public site. Landing, competition directory, competition detail, rules, schedule, project showcase, project detail, past competitions, about, FAQ, announcements, sitemap, robots, error, loading, and not-found routes. Server-rendered from the public API only, with a nonce-based CSP and `private, no-store` HTML caching. |
-| `apps/workspace` | React 19 + Vite 8 static authenticated workspace. Sign-in, auth error, dashboard, competitions, competition detail, competition administration, teams, team detail, projects, project detail, submissions, submission detail, judging, assignment detail, voting, organization, administration, notifications, settings, and component lab. React Router 7 with lazy route modules and nested layouts; TanStack Query for server state. |
+| `apps/workspace` | React 19 + Vite 8 static authenticated workspace. Sign-in, auth error, dashboard, competitions, competition detail, competition administration, teams, team detail, projects, project detail, submissions, submission detail, judging with ranked results, assignment detail, voting, organization with first-run creation, administration, notifications, settings, and component lab. React Router 7 with lazy route modules and nested layouts; TanStack Query for server state. |
 
 ### Packages
 
@@ -60,10 +60,10 @@ All results below were executed on this host unless marked otherwise.
 | Linting | `bun run lint` | Pass, 0 errors; warnings only |
 | Type checking | `bun run typecheck` | Pass for contracts, UI, API, workspace, and site |
 | Combined quality gate | `bun run check` | Pass (format, lint, typecheck, Vitest) |
-| Unit, architecture, security, migration, UI | `bun run test` | 29 root files / 288 tests and 17 UI files / 35 tests passed |
+| Unit, architecture, security, migration, UI | `bun run test` | 30 root files / 289 tests and 17 UI files / 35 tests passed |
 | Integration, API security, fuzzing, and worker | `bun run test:integration`; `bun run test:security` | 18 files / 83 API/auth/security/fuzz/worker tests and 15 static security tests passed against local PostgreSQL 18 |
 | Production build | `bun run build` | Pass: contracts, UI, API, workspace, site |
-| End-to-end | `bun run test:e2e` | 36 cases in 9 files, 1 desktop skip, 35 passed; accessibility/visual spec 18/18 |
+| End-to-end | `bun run test:e2e` | 38 cases in 10 files, 1 desktop skip, 37 passed; accessibility/visual spec 18/18 |
 | Runtime matrix | `bun run verify:runtime` | 11/11 checks passed and exited 0: API health, site HTTP, migrations, and worker startup under Node 24 and Bun 1.3.14, plus package builds |
 | Dependency audit | `bun audit --audit-level=high` | Pass, no high-severity advisory reported |
 | Secret scan and SBOM | `bun run security:scan` | Pass; 70-component CycloneDX SBOM written and uploaded by CI, plus a daily scheduled audit workflow |
@@ -116,7 +116,7 @@ Not verified:
 6. Motion uses GSAP 3.15 (ScrollTrigger, SplitText) under ADR-009. The plan's technology table says CSS plus selective Motion. ADR-009 records the owner-directed GSAP choice; glow, gradients, glass blur, and floating decorative shapes were removed to keep the visual rules intact.
 7. Seventeen UI test files and 35 cases now run under `bun run test`, with component-lab axe and dark/light screenshots; an exhaustive hover/active state matrix is still partial.
 8. Visual regression now covers public pages, loading, empty, error, 404, all viewport sizes, light/dark, and the component laboratory. Per-component screenshots outside the lab remain partial.
-9. A first-run onboarding panel explains membership and invitation steps; organization creation remains an organizer/admin action rather than a self-service flow.
+9. A first-run onboarding panel explains membership and invitation steps and lets an authenticated user create an organization, becoming its owner.
 10. The command palette and keyboard shortcuts are wired into the workspace and E2E-tested. Calibration is policy-driven and no calibration policy is configured, so no calibration workflow is exposed.
 11. `identity` has domain schemas, tests, and a README, while `organizations` has a README and rule tests. `identity` intentionally remains a thin HTTP/domain adapter over core authentication with no private persistence layer.
 12. An outbound-request architecture test restricts `fetch` to the configured OIDC client; no arbitrary server-side URL fetching exists.
@@ -135,6 +135,6 @@ Not verified:
 
 ## 6. Readiness statement
 
-The repository contains a working, tested implementation of the product surface described in `FULL_PLAN.md`: the capability-based Fastify API, organization-aware PostgreSQL schema with RLS, Basis Auth OIDC integration, Nethack UI catalog, public Next.js site, authenticated React workspace, background worker, deployment definitions, and engineering documentation. The current tree passes formatting, linting, type checking, the combined quality gate, 323 unit/architecture/security/UI tests, 83 integration/API-security/fuzz/worker tests, the production build, 11 runtime checks under Node and Bun, 36 Playwright cases, 18 visual/axe checks, Lighthouse 100/100/100/100 mobile and desktop, k6 load thresholds, Caddy validation, the high-severity dependency audit, the secret scan/SBOM generator, and a backup/restore plus retention drill.
+The repository contains a working, tested implementation of the product surface described in `FULL_PLAN.md`: the capability-based Fastify API, organization-aware PostgreSQL schema with RLS, Basis Auth OIDC integration, Nethack UI catalog, public Next.js site, authenticated React workspace, background worker, deployment definitions, and engineering documentation. The current tree passes formatting, linting, type checking, the combined quality gate, 324 unit/architecture/security/UI tests, 83 integration/API-security/fuzz/worker tests, the production build, 11 runtime checks under Node and Bun, 38 Playwright cases, 18 visual/axe checks, Lighthouse 100/100/100/100 mobile and desktop, k6 load thresholds, Caddy validation, the high-severity dependency audit, the secret scan/SBOM generator, and a backup/restore plus retention drill.
 
-It is not a verified production release. Production launch is blocked by the absence of Docker-based deployment verification and a live Basis Auth conformance run. The remaining gaps are tracked explicitly: partial per-component hover/active coverage, no self-service organization creation, no DAST or independent security assessment, and production deployment/auth conformance that require external infrastructure. The legacy migration is a tested tool with a synthetic fixture, not a completed data migration.
+It is not a verified production release. Production launch is blocked by the absence of Docker-based deployment verification and a live Basis Auth conformance run. The remaining gaps are tracked explicitly: partial per-component hover/active coverage, no DAST or independent security assessment, and production deployment/auth conformance that require external infrastructure. The legacy migration is a tested tool with a synthetic fixture, not a completed data migration.
