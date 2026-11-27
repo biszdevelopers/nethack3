@@ -28,7 +28,6 @@ import {
 import {
     AnimatedDisclosure,
     Magnetic,
-    Parallax,
     Reveal,
     SplitTextReveal,
     StaggerReveal,
@@ -102,12 +101,6 @@ export default async function HomePage(): Promise<ReactNode> {
     return (
         <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-20 overflow-x-clip px-4 py-10 sm:px-6 md:py-16 lg:px-8">
             <section className="relative flex max-w-4xl flex-col gap-6">
-                <Parallax strength={28} className="pointer-events-none absolute -top-24 left-1/4">
-                    <div
-                        aria-hidden="true"
-                        className="size-[28rem] rounded-full bg-primary/10 blur-[120px]"
-                    />
-                </Parallax>
                 <Reveal y={-10} duration={0.6}>
                     <Badge variant="soft" color="primary" dot>
                         hackathon platform
@@ -119,7 +112,7 @@ export default async function HomePage(): Promise<ReactNode> {
                     className="text-balance text-4xl font-extrabold leading-[1.08] tracking-tight sm:text-5xl md:text-6xl"
                 >
                     <span>Welcome to </span>
-                    <span className="text-primary glow">nethack</span>
+                    <span className="text-primary">nethack</span>
                     <span className="text-primary">.</span>
                 </SplitTextReveal>
                 <Reveal delay={0.1}>
@@ -204,7 +197,7 @@ export default async function HomePage(): Promise<ReactNode> {
                     <div className="flex flex-col gap-1">
                         <h2
                             id="competitions-heading"
-                            className="text-2xl font-bold tracking-tight glow-sm sm:text-3xl"
+                            className="text-2xl font-bold tracking-tight sm:text-3xl"
                         >
                             Competitions
                         </h2>
@@ -316,7 +309,7 @@ export default async function HomePage(): Promise<ReactNode> {
                 <Reveal className="flex flex-col gap-1">
                     <h2
                         id="features-heading"
-                        className="text-2xl font-bold tracking-tight glow-sm sm:text-3xl"
+                        className="text-2xl font-bold tracking-tight sm:text-3xl"
                     >
                         Built for the whole competition
                     </h2>
@@ -347,7 +340,7 @@ export default async function HomePage(): Promise<ReactNode> {
                     <div className="flex flex-col gap-1">
                         <h2
                             id="projects-heading"
-                            className="text-2xl font-bold tracking-tight glow-sm sm:text-3xl"
+                            className="text-2xl font-bold tracking-tight sm:text-3xl"
                         >
                             Project showcase
                         </h2>

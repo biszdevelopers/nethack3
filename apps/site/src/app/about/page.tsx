@@ -16,7 +16,7 @@ export default function AboutPage(): ReactNode {
                 <Badge variant="soft" color="primary" dot>
                     platform
                 </Badge>
-                <h1 className="text-3xl font-extrabold tracking-tight glow sm:text-4xl md:text-5xl">
+                <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">
                     About nethack
                 </h1>
                 <p className="max-w-3xl text-base text-ink-muted">

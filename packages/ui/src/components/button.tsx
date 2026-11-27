@@ -44,7 +44,7 @@ export const buttonVariants = tv({
         {
             variant: "solid",
             color: "primary",
-            class: "bg-primary text-primary-ink hover:bg-primary-hover box-glow",
+            class: "bg-primary text-primary-ink hover:bg-primary-hover",
         },
         {
             variant: "solid",

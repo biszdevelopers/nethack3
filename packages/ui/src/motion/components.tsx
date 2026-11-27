@@ -305,12 +305,11 @@ export function PageTransition({
         }
         const isNewRoute = previousKey.current !== routeKey;
         previousKey.current = routeKey;
+        if (!isNewRoute) {
+            return;
+        }
         const context = gsap.context(() => {
-            gsap.fromTo(
-                element,
-                { autoAlpha: 0, y: isNewRoute ? 16 : 8 },
-                { autoAlpha: 1, y: 0, duration: 0.55, ease: "power3.out" },
-            );
+            gsap.fromTo(element, { y: 16 }, { y: 0, duration: 0.55, ease: "power3.out" });
         }, element);
         return () => context.revert();
     }, [routeKey]);

@@ -319,7 +319,7 @@ export function CompetitionsPage(): ReactNode {
 function PageHeading(): ReactNode {
     return (
         <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-extrabold tracking-tight glow-sm">Competitions</h1>
+            <h1 className="text-2xl font-extrabold tracking-tight">Competitions</h1>
             <p className="text-sm text-ink-muted">
                 Series, editions, divisions, and schedules for this organization.
             </p>

@@ -28,7 +28,7 @@ export default async function AnnouncementsPage(): Promise<ReactNode> {
                     <Megaphone className="size-3.5" aria-hidden="true" />
                     updates
                 </span>
-                <h1 className="text-3xl font-extrabold tracking-tight glow sm:text-4xl">
+                <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
                     Announcements
                 </h1>
                 <p className="text-base text-ink-muted">

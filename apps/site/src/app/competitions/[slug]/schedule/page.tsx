@@ -43,7 +43,7 @@ export default async function CompetitionSchedulePage({
                     <CalendarClock className="size-3.5" aria-hidden="true" />
                     schedule
                 </span>
-                <h1 className="text-3xl font-extrabold tracking-tight glow sm:text-4xl">
+                <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
                     {competition.name} schedule
                 </h1>
                 <p className="text-sm text-ink-muted">

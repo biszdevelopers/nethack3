@@ -42,6 +42,20 @@ export default async function RootLayout({
     return (
         <html lang="en" data-theme="dark">
             <head>
+                <link
+                    rel="preload"
+                    href="/fonts/noto-sans-mono-latin-400-normal.woff2"
+                    as="font"
+                    type="font/woff2"
+                    crossOrigin="anonymous"
+                />
+                <link
+                    rel="preload"
+                    href="/fonts/noto-sans-mono-latin-700-normal.woff2"
+                    as="font"
+                    type="font/woff2"
+                    crossOrigin="anonymous"
+                />
                 <script src="/theme-init.js" nonce={nonce} />
             </head>
             <body className="flex min-h-dvh flex-col overflow-x-clip">

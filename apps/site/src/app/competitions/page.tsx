@@ -41,9 +41,7 @@ export default async function CompetitionsPage(): Promise<ReactNode> {
         <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-8 px-4 py-10 sm:px-6 md:py-14 lg:px-8">
             <Reveal className="flex flex-col gap-3">
                 <span className="text-xs text-primary">directory</span>
-                <h1 className="text-3xl font-extrabold tracking-tight glow sm:text-4xl">
-                    Competitions
-                </h1>
+                <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Competitions</h1>
                 <p className="max-w-3xl text-base text-ink-muted">
                     Each edition lists its rules, schedule, divisions, and published projects.
                     Registration and team management happen in the workspace.

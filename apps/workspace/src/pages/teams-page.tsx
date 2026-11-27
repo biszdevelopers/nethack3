@@ -336,7 +336,7 @@ export function TeamsPage(): ReactNode {
 function PageHeading(): ReactNode {
     return (
         <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-extrabold tracking-tight glow-sm">Teams</h1>
+            <h1 className="text-2xl font-extrabold tracking-tight">Teams</h1>
             <p className="text-sm text-ink-muted">
                 Form a team, invite participants, and prepare your submission together.
             </p>

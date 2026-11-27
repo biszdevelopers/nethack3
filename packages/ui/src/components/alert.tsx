@@ -3,7 +3,7 @@ import { tv, type VariantProps } from "tailwind-variants";
 import { cn } from "../lib/cn.js";
 
 export const alertVariants = tv({
-    base: "relative flex gap-3 rounded-lg border p-4 text-sm backdrop-blur-sm",
+    base: "relative flex gap-3 rounded-lg border p-4 text-sm",
     variants: {
         variant: {
             solid: "",

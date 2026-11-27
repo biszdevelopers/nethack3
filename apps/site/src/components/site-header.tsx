@@ -72,10 +72,7 @@ export function SiteHeader({ workspaceOrigin }: { readonly workspaceOrigin: stri
         href === "/" ? pathname === "/" : pathname.startsWith(href);
 
     return (
-        <header
-            ref={headerRef}
-            className="sticky top-0 z-50 border-b border-line bg-app/80 backdrop-blur-xl"
-        >
+        <header ref={headerRef} className="sticky top-0 z-50 border-b border-line bg-app/80">
             <a
                 href="#main"
                 className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-panel focus:px-3 focus:py-2 focus:text-sm"
@@ -88,7 +85,7 @@ export function SiteHeader({ workspaceOrigin }: { readonly workspaceOrigin: stri
                     aria-label="nethack home"
                     className="group flex shrink-0 items-center gap-2 rounded-md text-xl font-extrabold tracking-tight"
                 >
-                    <span className="text-primary glow">nethack</span>
+                    <span className="text-primary">nethack</span>
                     <span
                         aria-hidden="true"
                         className="inline-block h-4 w-1.5 animate-pulse rounded-[2px] bg-primary/80"

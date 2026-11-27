@@ -331,7 +331,7 @@ function participationIsActive(
 function PageHeading({ name }: { readonly name: string | null }): ReactNode {
     return (
         <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-extrabold tracking-tight glow-sm">
+            <h1 className="text-2xl font-extrabold tracking-tight">
                 {name === null ? "Overview" : `Welcome, ${name}`}
             </h1>
             <p className="text-sm text-ink-muted">

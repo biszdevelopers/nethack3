@@ -198,7 +198,7 @@ export function AppShell(): ReactNode {
                         to="/"
                         className="flex items-center gap-2 text-lg font-extrabold tracking-tight"
                     >
-                        <span className="text-primary glow">nethack</span>
+                        <span className="text-primary">nethack</span>
                         <span
                             aria-hidden="true"
                             className="inline-block h-3.5 w-1.5 animate-pulse rounded-[2px] bg-primary/80"
@@ -216,7 +216,7 @@ export function AppShell(): ReactNode {
                     className="bg-panel"
                 >
                     <div className="mb-4 flex items-center justify-between">
-                        <span className="text-primary glow text-lg font-extrabold">nethack</span>
+                        <span className="text-primary text-lg font-extrabold">nethack</span>
                         <DrawerClose asChild>
                             <Button variant="ghost" size="icon" aria-label="Close navigation">
                                 <X className="size-4" aria-hidden="true" />
@@ -230,7 +230,7 @@ export function AppShell(): ReactNode {
             <div className="flex min-w-0 flex-1 flex-col">
                 <header
                     ref={headerRef}
-                    className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-line bg-app/80 px-4 backdrop-blur-xl sm:px-6"
+                    className="sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-line bg-app/80 px-4 sm:px-6"
                 >
                     <Button
                         variant="ghost"
@@ -242,7 +242,7 @@ export function AppShell(): ReactNode {
                         <MenuIcon className="size-4" aria-hidden="true" />
                     </Button>
                     <Link to="/" className="text-sm font-extrabold tracking-tight lg:hidden">
-                        <span className="text-primary glow-sm">nethack</span>
+                        <span className="text-primary">nethack</span>
                     </Link>
                     <Separator orientation="vertical" className="hidden h-5 lg:block" />
                     <div className="min-w-0 flex-1">

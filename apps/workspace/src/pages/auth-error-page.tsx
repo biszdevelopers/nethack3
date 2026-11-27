@@ -36,10 +36,6 @@ export function AuthErrorPage(): ReactNode {
     const copy = REASONS[reason] ?? DEFAULT_REASON;
     return (
         <div className="relative flex min-h-dvh items-center justify-center overflow-hidden p-6">
-            <div
-                aria-hidden="true"
-                className="pointer-events-none absolute -top-24 left-1/2 size-[28rem] -translate-x-1/2 rounded-full bg-primary/10 blur-[120px]"
-            />
             <Reveal className="w-full max-w-md">
                 <Card className="bg-panel/80">
                     <CardHeader>

@@ -81,7 +81,7 @@ export default async function CompetitionDetailPage({
                         {competition.status.replaceAll("_", " ")}
                     </Badge>
                 </div>
-                <h1 className="text-balance text-3xl font-extrabold tracking-tight glow sm:text-4xl md:text-5xl">
+                <h1 className="text-balance text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">
                     {competition.name}
                 </h1>
                 <p className="max-w-3xl text-base text-ink-muted">{competition.description}</p>
@@ -152,7 +152,7 @@ export default async function CompetitionDetailPage({
 
             <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
                 <Reveal className="flex flex-col gap-4" y={20}>
-                    <h2 id="rules" className="text-2xl font-bold tracking-tight glow-sm">
+                    <h2 id="rules" className="text-2xl font-bold tracking-tight">
                         Rules
                     </h2>
                     {competition.rulesMarkdown.trim().length === 0 ? (
@@ -236,7 +236,7 @@ export default async function CompetitionDetailPage({
 
             <section className="flex flex-col gap-5" aria-labelledby="projects-heading">
                 <Reveal className="flex flex-wrap items-center justify-between gap-3">
-                    <h2 id="projects-heading" className="text-2xl font-bold tracking-tight glow-sm">
+                    <h2 id="projects-heading" className="text-2xl font-bold tracking-tight">
                         Published projects
                     </h2>
                     <Button asChild variant="subtle" size="sm">

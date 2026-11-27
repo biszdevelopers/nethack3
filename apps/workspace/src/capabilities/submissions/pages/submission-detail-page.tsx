@@ -75,7 +75,7 @@ export function SubmissionDetailPage(): ReactNode {
                 </Link>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex max-w-2xl flex-col gap-1">
-                        <h1 className="text-2xl font-extrabold tracking-tight glow-sm">
+                        <h1 className="text-2xl font-extrabold tracking-tight">
                             {detail.projectTitle}
                         </h1>
                         <p className="text-sm text-ink-muted">

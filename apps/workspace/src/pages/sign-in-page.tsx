@@ -17,13 +17,13 @@ export function SignInPage(): ReactNode {
             <Reveal className="flex w-full max-w-md flex-col gap-6">
                 <div className="flex flex-col gap-3">
                     <span className="inline-flex items-center gap-2 text-xl font-extrabold tracking-tight">
-                        <span className="text-primary glow">nethack</span>
+                        <span className="text-primary">nethack</span>
                         <span
                             aria-hidden="true"
                             className="inline-block h-4 w-1.5 animate-pulse rounded-[2px] bg-primary/80"
                         />
                     </span>
-                    <h1 className="text-3xl font-extrabold tracking-tight glow">Sign in</h1>
+                    <h1 className="text-3xl font-extrabold tracking-tight">Sign in</h1>
                     <p className="text-sm text-ink-muted">
                         Authentication is handled by Basis Auth and your organization account.
                     </p>

@@ -5,13 +5,9 @@ import { Reveal } from "@nethack/ui/motion";
 
 export default function NotFound(): ReactNode {
     return (
-        <div className="relative mx-auto flex w-full max-w-[800px] flex-col gap-6 overflow-hidden px-4 py-20 sm:px-6">
-            <div
-                aria-hidden="true"
-                className="pointer-events-none absolute -top-24 left-1/2 size-96 -translate-x-1/2 rounded-full bg-primary/10 blur-[120px]"
-            />
+        <div className="mx-auto flex w-full max-w-[800px] flex-col gap-6 px-4 py-20 sm:px-6">
             <Reveal>
-                <p className="text-center text-5xl font-extrabold tracking-tight text-primary glow">
+                <p className="text-center text-5xl font-extrabold tracking-tight text-primary">
                     404
                 </p>
             </Reveal>

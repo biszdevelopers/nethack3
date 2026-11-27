@@ -70,7 +70,7 @@ export default async function ProjectDetailPage({
                     <span className="text-primary">/</span>
                     <span>{project.competitionName}</span>
                 </div>
-                <h1 className="text-balance text-3xl font-extrabold tracking-tight glow sm:text-4xl md:text-5xl">
+                <h1 className="text-balance text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">
                     {project.title}
                 </h1>
                 <p className="max-w-3xl text-base text-ink-muted">{project.summary}</p>
@@ -101,7 +101,7 @@ export default async function ProjectDetailPage({
 
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
                 <Reveal className="flex flex-col gap-4" y={20}>
-                    <h2 className="text-2xl font-bold tracking-tight glow-sm">About the project</h2>
+                    <h2 className="text-2xl font-bold tracking-tight">About the project</h2>
                     <div className="prose-nethack">
                         <Markdown source={project.descriptionMarkdown} />
                     </div>

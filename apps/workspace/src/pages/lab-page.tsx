@@ -341,7 +341,7 @@ function MotionGroup(): ReactNode {
                 <SplitTextReveal
                     as="h2"
                     label="nethack builds competitions"
-                    className="text-2xl font-extrabold tracking-tight glow-sm"
+                    className="text-2xl font-extrabold tracking-tight"
                 >
                     nethack builds competitions
                 </SplitTextReveal>

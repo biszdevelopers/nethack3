@@ -1,13 +1,65 @@
 @import "tailwindcss";
 
-@import "@fontsource/noto-sans-mono/400.css";
-@import "@fontsource/noto-sans-mono/500.css";
-@import "@fontsource/noto-sans-mono/600.css";
-@import "@fontsource/noto-sans-mono/700.css";
+@font-face {
+    font-family: "Noto Sans Mono";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 400;
+    src: url("/fonts/noto-sans-mono-latin-400-normal.woff2") format("woff2");
+    unicode-range:
+        U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+        U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: "Noto Sans Mono";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 500;
+    src: url("/fonts/noto-sans-mono-latin-500-normal.woff2") format("woff2");
+    unicode-range:
+        U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+        U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: "Noto Sans Mono";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 600;
+    src: url("/fonts/noto-sans-mono-latin-600-normal.woff2") format("woff2");
+    unicode-range:
+        U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+        U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: "Noto Sans Mono";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 700;
+    src: url("/fonts/noto-sans-mono-latin-700-normal.woff2") format("woff2");
+    unicode-range:
+        U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308,
+        U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: "Noto Sans Mono Fallback";
+    src: local("Consolas"), local("Menlo"), local("DejaVu Sans Mono");
+    size-adjust: 109%;
+    ascent-override: 106%;
+    descent-override: 29%;
+    line-gap-override: 0%;
+}
 
 @theme {
-    --font-sans: "Noto Sans Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    --font-mono: "Noto Sans Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --font-sans:
+        "Noto Sans Mono", "Noto Sans Mono Fallback", ui-monospace, SFMono-Regular, Menlo, Consolas,
+        monospace;
+    --font-mono:
+        "Noto Sans Mono", "Noto Sans Mono Fallback", ui-monospace, SFMono-Regular, Menlo, Consolas,
+        monospace;
 
     --color-app: #090909;
     --color-panel: #111111;
@@ -22,7 +74,6 @@
     --color-primary-hover: #2ee59a;
     --color-primary-soft: #062d1d;
     --color-primary-ink: #04140b;
-    --color-glow: #00dc82;
 
     --radius-sm: 4px;
     --radius-md: 6px;
@@ -35,7 +86,6 @@
 
 :root {
     color-scheme: dark;
-    --nethack-glow-strength: 1;
 }
 
 [data-theme="light"] {
@@ -53,7 +103,6 @@
     --color-primary-hover: #008f53;
     --color-primary-soft: #e3f8ee;
     --color-primary-ink: #04140b;
-    --color-glow: #00a862;
 }
 
 @layer base {
@@ -170,22 +219,6 @@
 }
 
 @layer utilities {
-    .glow {
-        text-shadow:
-            0 0 0.05em color-mix(in srgb, currentColor 75%, var(--color-app) 25%),
-            0 0 0.1em color-mix(in srgb, currentColor 55%, transparent);
-    }
-
-    .glow-sm {
-        text-shadow:
-            0 0 0.03em color-mix(in srgb, currentColor 70%, var(--color-app) 30%),
-            0 0 0.07em color-mix(in srgb, currentColor 40%, transparent);
-    }
-
-    .box-glow {
-        box-shadow: 0 0 32px -12px color-mix(in srgb, var(--color-primary) 45%, transparent);
-    }
-
     .hover-lift {
         transition:
             transform 200ms ease,
@@ -196,7 +229,7 @@
     .hover-lift:hover {
         transform: translateY(-2px);
         border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-line));
-        box-shadow: 0 12px 40px -24px color-mix(in srgb, var(--color-primary) 55%, transparent);
+        box-shadow: 0 4px 12px -8px rgb(0 0 0 / 0.45);
     }
 
     .text-balance {
@@ -214,11 +247,7 @@
         z-index: 9999;
         height: 2px;
         transform-origin: 0 50%;
-        background: linear-gradient(
-            90deg,
-            var(--color-primary),
-            color-mix(in srgb, var(--color-primary) 55%, white)
-        );
+        background: var(--color-primary);
     }
 
     .prose-nethack {

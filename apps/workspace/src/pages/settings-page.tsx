@@ -83,7 +83,7 @@ export function SettingsPage(): ReactNode {
     return (
         <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-1">
-                <h1 className="text-2xl font-extrabold tracking-tight glow-sm">Account settings</h1>
+                <h1 className="text-2xl font-extrabold tracking-tight">Account settings</h1>
                 <p className="text-sm text-ink-muted">
                     Profile details come from Basis Auth and can be refined here.
                 </p>

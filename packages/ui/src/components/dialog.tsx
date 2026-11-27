@@ -18,7 +18,7 @@ export const DialogContent = forwardRef<
         <DialogPrimitive.Portal>
             <DialogPrimitive.Overlay
                 className={cn(
-                    "fixed inset-0 z-50 animate-[ui-fade-in_180ms_ease-out] bg-black/70 backdrop-blur-[1px]",
+                    "fixed inset-0 z-50 animate-[ui-fade-in_180ms_ease-out] bg-black/70",
                     "data-[state=open]:animate-in data-[state=closed]:animate-out",
                 )}
             />

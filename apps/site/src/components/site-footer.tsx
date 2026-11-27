@@ -16,7 +16,7 @@ export function SiteFooter(): ReactNode {
                         className="flex items-center gap-2 text-lg font-extrabold tracking-tight"
                     >
                         <TerminalSquare className="size-4 text-primary" aria-hidden="true" />
-                        <span className="text-primary glow-sm">nethack</span>
+                        <span className="text-primary">nethack</span>
                     </Link>
                     <p className="max-w-sm text-sm text-ink-muted">
                         Competition infrastructure for organizers and participants. Rules,

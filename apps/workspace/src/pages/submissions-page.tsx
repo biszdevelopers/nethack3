@@ -203,7 +203,7 @@ export function SubmissionsPage(): ReactNode {
 function PageHeading(): ReactNode {
     return (
         <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-extrabold tracking-tight glow-sm">Submissions</h1>
+            <h1 className="text-2xl font-extrabold tracking-tight">Submissions</h1>
             <p className="text-sm text-ink-muted">
                 Submit a project version and track organizer review.
             </p>

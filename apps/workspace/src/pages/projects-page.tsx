@@ -147,7 +147,7 @@ export function ProjectsPage(): ReactNode {
 function PageHeading(): ReactNode {
     return (
         <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-extrabold tracking-tight glow-sm">Projects</h1>
+            <h1 className="text-2xl font-extrabold tracking-tight">Projects</h1>
             <p className="text-sm text-ink-muted">
                 Describe your work, attach files, and publish a showcase entry.
             </p>

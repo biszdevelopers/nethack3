@@ -33,7 +33,7 @@ export default async function CompetitionRulesPage({
                     Back to {competition.name}
                 </Link>
                 <span className="text-xs text-primary">rules</span>
-                <h1 className="text-3xl font-extrabold tracking-tight glow sm:text-4xl">
+                <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
                     {competition.name} rules
                 </h1>
                 <p className="text-sm text-ink-muted">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
-import { gsap, prefersReducedMotion } from "../motion/register.js";
+import { gsap, prefersReducedMotion, SplitText } from "../motion/register.js";
 
 export const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
@@ -37,9 +37,8 @@ export function useGsapReveal<T extends HTMLElement>(
         const context = gsap.context(() => {
             gsap.fromTo(
                 element,
-                { autoAlpha: 0, y, x, scale },
+                { y, x, scale },
                 {
-                    autoAlpha: 1,
                     y: 0,
                     x: 0,
                     scale: 1,
@@ -88,9 +87,8 @@ export function useGsapStagger<T extends HTMLElement>(
         const context = gsap.context(() => {
             gsap.fromTo(
                 targets,
-                { autoAlpha: 0, y },
+                { y },
                 {
-                    autoAlpha: 1,
                     y: 0,
                     duration,
                     delay,
@@ -142,9 +140,8 @@ export function useGsapTextReveal<T extends HTMLElement>(): RefObject<T | null> 
             split = SplitText.create(element, { type: "chars,words", charsClass: "split-char" });
             gsap.fromTo(
                 split.chars,
-                { autoAlpha: 0, yPercent: 60, rotateX: -30 },
+                { yPercent: 60, rotateX: -30 },
                 {
-                    autoAlpha: 1,
                     yPercent: 0,
                     rotateX: 0,
                     duration: 0.65,
