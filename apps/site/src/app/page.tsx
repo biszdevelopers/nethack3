@@ -271,9 +271,9 @@ export default async function HomePage(): Promise<ReactNode> {
                         <Card variant="soft">
                             <CardHeader>
                                 <div className="flex flex-wrap items-center justify-between gap-2">
-                                    <CardTitle className="text-lg">
+                                    <h2 className="text-lg font-semibold text-ink">
                                         {latestAnnouncement.title}
-                                    </CardTitle>
+                                    </h2>
                                     <Link
                                         href="/announcements"
                                         className="text-xs text-primary transition-colors hover:text-primary-hover"
