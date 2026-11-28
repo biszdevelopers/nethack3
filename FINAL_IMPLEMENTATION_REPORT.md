@@ -34,7 +34,7 @@ The implementation now covers the event surfaces the BIBS-C reference deployment
 - Ten-star peer voting: exact total, five-star per-project cap, transactional recasting, ranked results, and People's Choice.
 - Full showcase experience: showcase index, Signal scroll experience with featured winners and an interactive project marquee, Beneath the Surface data-driven six-winner experience with keyboard project modals, and season archives with results-aware rankings.
 - Project media parity: demonstration video links and the required AI-use disclosure are stored, validated, carried through public projects, and shown in the workspace, public project pages, showcase cards/modals, judging, and voting.
-- Edition parity: theme name/description, public score visibility, and public ranking visibility settings, with track-grouped results, podium ordering, certificates, project links, and hidden-ranking behavior.
+- Edition parity: theme name/description, public score visibility, and public ranking visibility settings, with track-grouped results, podium ordering, certificates, project preview dialogs, and hidden-ranking behavior.
 - Rules parity: the binding Code of Conduct and Competition Rules are included verbatim from the reference, with the version and effective date preserved.
 - Rubric parity: division/track rubrics, min/max criteria, comment guidance and templates, immutable rubric versions pinned to assignments, a reusable template library, and edition score curves with judge-facing display scores.
 - Team and profile parity: withdrawn, disqualified, and no-show team states with terminal transition rules and blocked submissions; validated PNG/JPEG/WebP profile theme images.
