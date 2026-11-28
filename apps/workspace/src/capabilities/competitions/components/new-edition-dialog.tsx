@@ -16,11 +16,13 @@ import {
     Input,
     Select,
     Textarea,
+    useToast,
 } from "@nethack/ui";
 import type { CompetitionSeries } from "@nethack/contracts";
 import { errorMessage } from "../../../lib/errors.js";
 import { toIsoOrNull } from "../../../lib/format.js";
 import { useCreateEdition, useOrganizationEditions } from "../hooks/use-competitions.js";
+import { useCopyRubric } from "../../judging/hooks.js";
 
 const integerText = (min: number, max: number) =>
     z
@@ -109,6 +111,8 @@ export function NewEditionDialog({
     readonly onCreated?: (editionId: string) => void;
 }): ReactNode {
     const createEdition = useCreateEdition(organizationId);
+    const copyRubric = useCopyRubric(organizationId);
+    const { toast } = useToast();
     const [startMode, setStartMode] = useState<"new" | "blank" | "copy">("new");
     const [copyFromEditionId, setCopyFromEditionId] = useState("");
     const existingEditions = useOrganizationEditions(
@@ -175,6 +179,25 @@ export function NewEditionDialog({
                     isBlankStart: startMode === "blank",
                 },
             });
+            if (startMode === "copy" && copyFromEditionId.length > 0) {
+                try {
+                    await copyRubric.mutateAsync({
+                        targetEditionId: edition.id,
+                        sourceEditionId: copyFromEditionId,
+                    });
+                    toast({
+                        title: "Edition and rubric copied",
+                        description: `${edition.name} is ready with the source rubric.`,
+                        tone: "success",
+                    });
+                } catch (error) {
+                    toast({
+                        title: "Edition created, but the rubric was not copied",
+                        description: errorMessage(error),
+                        tone: "critical",
+                    });
+                }
+            }
             close(false);
             onCreated?.(edition.id);
         } catch {

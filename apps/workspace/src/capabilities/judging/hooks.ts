@@ -486,6 +486,28 @@ export function useCreateRubric(organizationId: string | null, editionId: string
     });
 }
 
+export function useCopyRubric(organizationId: string | null) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (input: {
+            readonly targetEditionId: string;
+            readonly sourceEditionId: string;
+        }) => {
+            if (organizationId === null) {
+                throw new Error("Select an organization first.");
+            }
+            return api.judging.copyRubric(organizationId, input.targetEditionId, {
+                sourceEditionId: input.sourceEditionId,
+            });
+        },
+        onSuccess: async (_result, input) => {
+            await queryClient.invalidateQueries({
+                queryKey: queryKeys.editionRubrics(input.targetEditionId),
+            });
+        },
+    });
+}
+
 export function useUpdateRubric(organizationId: string | null, editionId: string | null) {
     const queryClient = useQueryClient();
     return useMutation({

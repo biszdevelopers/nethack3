@@ -8,6 +8,7 @@ import {
     createBulkAssignmentRequestSchema,
     createJudgeFlagRequestSchema,
     createRubricRequestSchema,
+    copyRubricRequestSchema,
     createRubricTemplateRequestSchema,
     evaluationSchema,
     judgeAssignmentSchema,
@@ -106,6 +107,18 @@ export class JudgingApi {
         return this.client.request("POST", `/api/v1/competitions/${editionId}/rubrics`, {
             body: createRubricRequestSchema.parse(input),
             schema: judgingRubricSchema,
+            headers: organizationHeader(organizationId),
+        });
+    }
+
+    async copyRubric(
+        organizationId: string,
+        editionId: string,
+        input: { readonly sourceEditionId: string },
+    ): Promise<readonly JudgingRubric[]> {
+        return this.client.request("POST", `/api/v1/competitions/${editionId}/rubrics/copy`, {
+            body: copyRubricRequestSchema.parse(input),
+            schema: judgingRubricSchema.array(),
             headers: organizationHeader(organizationId),
         });
     }

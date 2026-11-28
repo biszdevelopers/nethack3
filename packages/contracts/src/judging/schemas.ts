@@ -118,6 +118,13 @@ export const createRubricRequestSchema = z
     .strict();
 export type CreateRubricRequest = z.infer<typeof createRubricRequestSchema>;
 
+export const copyRubricRequestSchema = z
+    .object({
+        sourceEditionId: idSchema,
+    })
+    .strict();
+export type CopyRubricRequest = z.infer<typeof copyRubricRequestSchema>;
+
 export const updateRubricRequestSchema = z
     .object({
         name: z.string().trim().min(2).max(120).optional(),

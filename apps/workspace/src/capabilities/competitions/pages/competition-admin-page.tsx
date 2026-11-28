@@ -38,6 +38,7 @@ import {
     useToast,
 } from "@nethack/ui";
 import { useActiveMembership } from "../../../application/session.js";
+import { useCopyRubric } from "../../judging/hooks.js";
 import { PreflightWarnings } from "../../administration/components/preflight-warnings.js";
 import { FormSwitch } from "../../../components/form-switch.js";
 import { EditionSelect } from "../../shared/edition-select.js";
@@ -271,6 +272,7 @@ export function CompetitionAdminPage(): ReactNode {
 
     const createSeries = useCreateSeries(organizationId);
     const createEdition = useCreateEdition(organizationId);
+    const copyRubric = useCopyRubric(organizationId);
     const updateEdition = useUpdateEdition(organizationId);
     const publishEdition = usePublishEdition(organizationId);
     const setEditionApproval = useSetEditionApproval(organizationId);
@@ -472,6 +474,25 @@ export function CompetitionAdminPage(): ReactNode {
                     isBlankStart: createStartMode === "blank",
                 },
             });
+            if (createStartMode === "copy" && copyFromEditionId.length > 0) {
+                try {
+                    await copyRubric.mutateAsync({
+                        targetEditionId: created.id,
+                        sourceEditionId: copyFromEditionId,
+                    });
+                    toast({
+                        title: "Edition and rubric copied",
+                        description: `${created.name} is ready with the source rubric.`,
+                        tone: "success",
+                    });
+                } catch (error) {
+                    toast({
+                        title: "Edition created, but the rubric was not copied",
+                        description: describeError(error),
+                        tone: "critical",
+                    });
+                }
+            }
             setEdition(created.id);
             setCreateStartMode("new");
             setCopyFromEditionId("");

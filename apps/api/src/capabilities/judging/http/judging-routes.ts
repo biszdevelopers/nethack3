@@ -9,6 +9,7 @@ import {
     createBulkAssignmentRequestSchema,
     createJudgeFlagRequestSchema,
     createRubricRequestSchema,
+    copyRubricRequestSchema,
     createRubricTemplateRequestSchema,
     evaluationSchema,
     judgeAssignmentSchema,
@@ -106,6 +107,30 @@ export async function registerJudgingRoutes(
                 request.ip,
             );
             return reply.status(201).send(rubric);
+        },
+    );
+
+    app.post(
+        "/api/v1/competitions/:editionId/rubrics/copy",
+        {
+            schema: {
+                params: editionParams,
+                body: copyRubricRequestSchema,
+                response: { 201: z.array(judgingRubricSchema) },
+            },
+        },
+        async (request, reply) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            guard.requireOrganizer(access);
+            const rubrics = await service.copyRubricFromEdition(
+                auth,
+                access.organizationId,
+                request.params.editionId,
+                request.body.sourceEditionId,
+                request.ip,
+            );
+            return reply.status(201).send([...rubrics]);
         },
     );
 

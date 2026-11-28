@@ -280,6 +280,71 @@ export class JudgingService {
         return toRubric(created);
     }
 
+    async copyRubricFromEdition(
+        auth: AuthContext,
+        organizationId: string,
+        targetEditionId: string,
+        sourceEditionId: string,
+        ip: string | null,
+    ): Promise<readonly JudgingRubric[]> {
+        this.assertOrganizer(auth, organizationId);
+        await Promise.all([
+            this.requireEdition(organizationId, targetEditionId),
+            this.requireEdition(organizationId, sourceEditionId),
+        ]);
+        const [sourceRows, targetRows, sourceDivisions, targetDivisions] = await Promise.all([
+            this.database.transaction({ organizationId }, (session) =>
+                this.repository.listRubrics(session.db, organizationId, sourceEditionId, false),
+            ),
+            this.database.transaction({ organizationId }, (session) =>
+                this.repository.listRubrics(session.db, organizationId, targetEditionId, false),
+            ),
+            this.contracts.competitions.listDivisions(organizationId, sourceEditionId),
+            this.contracts.competitions.listDivisions(organizationId, targetEditionId),
+        ]);
+        if (targetRows.length > 0) {
+            return targetRows.map(toRubric);
+        }
+        const targetDivisionByName = new Map(
+            targetDivisions.map((division) => [division.name, division.id] as const),
+        );
+        const sourceDivisionName = new Map(
+            sourceDivisions.map((division) => [division.id, division.name] as const),
+        );
+        const created: JudgingRubric[] = [];
+        for (const row of sourceRows) {
+            const rubric = toRubric(row);
+            const divisionName =
+                rubric.divisionId === null ? null : sourceDivisionName.get(rubric.divisionId);
+            const divisionId =
+                divisionName === undefined || divisionName === null
+                    ? null
+                    : (targetDivisionByName.get(divisionName) ?? null);
+            created.push(
+                await this.createRubric(
+                    auth,
+                    organizationId,
+                    targetEditionId,
+                    {
+                        name: rubric.name,
+                        description: rubric.description,
+                        divisionId,
+                        commentGuidance: rubric.commentGuidance,
+                        criteria: rubric.criteria.map((criterion) => ({
+                            name: criterion.name,
+                            description: criterion.description,
+                            minScore: criterion.minScore,
+                            maxScore: criterion.maxScore,
+                            weight: criterion.weight,
+                        })),
+                    },
+                    ip,
+                ),
+            );
+        }
+        return created;
+    }
+
     async updateRubric(
         auth: AuthContext,
         organizationId: string,
