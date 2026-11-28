@@ -2,7 +2,7 @@
 
 Status: implementation is complete for the repository scope. The tracker records 228 requirements: 146 Verified, 71 Implemented, 0 In progress, 0 Not started, and 11 Blocked; every blocked item requires external infrastructure, credentials, data, or an independent assessor. Production launch is not verified. External blockers are listed in section 5.
 
-Verification date: 2026-11-28, after the second parity pass. The final working tree was checked with formatting, lint, type checking, unit/UI tests, integration/security/fuzz tests, the production build, 11 runtime checks under Node and Bun, 69 Playwright cases, 26 visual/axe checks, Lighthouse mobile and desktop, Caddy validation, the dependency audit, and the secret scan/SBOM generator. A k6 load run and a backup/restore plus retention drill passed earlier in the same tree family; Docker images remain unavailable. The requirement-by-requirement status is in `docs/implementation/REQUIREMENT_TRACKER.md`.
+Verification date: 2026-11-28, after the second parity pass. The final working tree was checked with formatting, lint, type checking, unit/UI tests, integration/security/fuzz tests, the production build, 11 runtime checks under Node and Bun, 72 Playwright cases, 26 visual/axe checks, Lighthouse mobile and desktop, Caddy validation, the dependency audit, and the secret scan/SBOM generator. A k6 load run and a backup/restore plus retention drill passed earlier in the same tree family; Docker images remain unavailable. The requirement-by-requirement status is in `docs/implementation/REQUIREMENT_TRACKER.md`.
 
 ## 1. Implemented system
 
@@ -33,6 +33,9 @@ The implementation now covers the event surfaces the BIBS-C reference deployment
 - Organization administration for members and roles, edition teams and members, team status, team deletion, submission reopening, standings CSV, and preflight readiness.
 - Ten-star peer voting: exact total, five-star per-project cap, transactional recasting, ranked results, and People's Choice.
 - Full showcase experience: showcase index, Signal scroll experience with featured winners and an interactive project marquee, Beneath the Surface data-driven six-winner experience with keyboard project modals, and season archives with results-aware rankings.
+- Project media parity: demonstration video links and the required AI-use disclosure are stored, validated, carried through public projects, and shown in the workspace, public project pages, showcase cards/modals, judging, and voting.
+- Edition parity: theme name/description, public score visibility, and public ranking visibility settings, with track-grouped results, podium ordering, certificates, project links, and hidden-ranking behavior.
+- Rules parity: the binding Code of Conduct and Competition Rules are included verbatim from the reference, with the version and effective date preserved.
 - Rubric parity: division/track rubrics, min/max criteria, comment guidance and templates, immutable rubric versions pinned to assignments, a reusable template library, and edition score curves with judge-facing display scores.
 - Team and profile parity: withdrawn, disqualified, and no-show team states with terminal transition rules and blocked submissions; validated PNG/JPEG/WebP profile theme images.
 - Results publication freezes judging and voting transactionally, closes open voting rounds, restores the previous edition status on unpublish, and notifies affected participants.
@@ -54,8 +57,8 @@ All of this was exercised against a contract-compliant mock OIDC provider, not a
 
 ### Database
 
-- PostgreSQL 18 with Drizzle ORM and seven migrations (`0000` through `0006`).
-- 51 tables covering identity, sessions, auth transactions, revoked access tokens, backchannel events/challenges, global administrators, idempotency keys, outbox events, jobs, audit logs, organizations, settings, memberships, invitations, competition series/editions/divisions/milestones, registrations, participants, teams, team members/invitations, projects, project members, submissions, submission versions/files, judging rubrics/criteria/templates/score curves/assignments/evaluations/scores/flags, voting rounds/ballots/votes, profile themes, debug AI sessions/messages, awards/team awards/published results, announcements, and notifications.
+- PostgreSQL 18 with Drizzle ORM and eight migrations (`0000` through `0007`).
+- 51 tables covering identity, sessions, auth transactions, revoked access tokens, backchannel events/challenges, global administrators, idempotency keys, outbox events, jobs, audit logs, organizations, settings, memberships, invitations, competition series/editions/divisions/milestones, registrations, participants, teams, team members/invitations, projects (including demonstration video and AI-use disclosure), project members, submissions, submission versions/files, judging rubrics/criteria/templates/score curves/assignments/evaluations/scores/flags, voting rounds/ballots/votes, profile themes, debug AI sessions/messages, awards/team awards/published results, announcements, and notifications.
 - Organization scope on organization-owned records, composite foreign keys, unique constraints, and 34 `FORCE ROW LEVEL SECURITY` tables and 36 policies applied through a non-owner runtime role with transaction-local tenant context.
 - Separate runtime and migration credentials, parameterized queries, cursor pagination, idempotency records for critical mutations, and audit records for privileged operations.
 
@@ -76,14 +79,14 @@ All results below were executed on this host unless marked otherwise.
 | Linting | `bun run lint` | Pass, 0 errors; warnings only |
 | Type checking | `bun run typecheck` | Pass for contracts, UI, API, workspace, and site |
 | Combined quality gate | `bun run check` | Pass (format, lint, typecheck, Vitest) |
-| Unit, architecture, security, migration, UI | `bun run test` | 44 root files / 388 tests and 17 UI files / 35 tests passed |
+| Unit, architecture, security, migration, UI | `bun run test` | 49 root files / 413 tests and 17 UI files / 35 tests passed |
 | Integration, API security, fuzzing, and worker | `bun run test:integration`; `bun run test:security` | 18 files / 84 API/auth/security/fuzz/worker tests and 17 files / 80 API/auth/security tests passed against local PostgreSQL 18 |
 | Production build | `bun run build` | Pass: contracts, UI, API, workspace, site |
-| End-to-end | `bun run test:e2e` | 69 cases in 20 files, 1 desktop skip, 68 passed; showcase, rubric, team/profile, results-freeze, and operator journeys included |
+| End-to-end | `bun run test:e2e` | 72 cases in 23 files, 1 desktop skip, 71 passed; showcase, project media, rubric, edition theme, team/profile, results parity, results-freeze, and operator journeys included |
 | Runtime matrix | `bun run verify:runtime` | 11/11 checks passed and exited 0: API health, site HTTP, migrations, and worker startup under Node 24 and Bun 1.3.14, plus package builds |
 | Dependency audit | `bun audit --audit-level=high` | Pass, no high-severity advisory reported |
-| Secret scan and SBOM | `bun run security:scan` | Pass; 740 text files scanned and a 71-component CycloneDX SBOM written |
-| Performance | `bun run test:performance` | Lighthouse 13.6.0 against the production site: mobile 99 performance / 100 / 100 / 100; desktop 100 / 100 / 100 / 100 |
+| Secret scan and SBOM | `bun run security:scan` | Pass; 757 text files scanned and a 71-component CycloneDX SBOM written |
+| Performance | `bun run test:performance` | Lighthouse 13.6.0 against the production site: mobile 100 performance / 100 / 100 / 100; desktop 100 / 100 / 100 / 100 |
 | Load | `bun run test:load` with k6 2.4.0 | Not rerun in this pass; k6 is not installed on this host. An earlier run in this workspace passed with 0% failed requests, public p95 96 ms, health p95 31 ms, 20 VUs. |
 | Migration tool | `tests/migration/migrate-legacy.test.ts` | 22 tests passed |
 | Backup and restore | `scripts/backup-database.ts`, `scripts/restore-database.ts` | 170 KiB custom-format dump created and restored into a scratch database (42 tables at the time of the drill; the schema now has 51); a restore-script import bug was fixed and the drill re-ran cleanly |
@@ -151,6 +154,6 @@ Not verified:
 
 ## 6. Readiness statement
 
-The repository contains a working, tested implementation of the product surface described in `FULL_PLAN.md`: the capability-based Fastify API, organization-aware PostgreSQL schema with RLS, Basis Auth OIDC integration, Nethack UI catalog, public Next.js site, authenticated React workspace, background worker, deployment definitions, and engineering documentation. The current tree passes formatting, linting, type checking, the combined quality gate, 388 unit/architecture/security tests plus 35 UI tests, 84 integration/API-security/fuzz/worker tests, 80 security tests, the production build, 11 runtime checks under Node and Bun, 69 Playwright cases with 68 passed and 1 intentionally skipped mobile case, 26 visual/axe checks, Lighthouse mobile 99 and desktop 100 performance with 100 accessibility/best-practices/SEO, earlier Caddy validation, the high-severity dependency audit, and the secret scan/SBOM generator.
+The repository contains a working, tested implementation of the product surface described in `FULL_PLAN.md`: the capability-based Fastify API, organization-aware PostgreSQL schema with RLS, Basis Auth OIDC integration, Nethack UI catalog, public Next.js site, authenticated React workspace, background worker, deployment definitions, and engineering documentation. The current tree passes formatting, linting, type checking, the combined quality gate, 413 unit/architecture/security tests plus 35 UI tests, 84 integration/API-security/fuzz/worker tests, 80 security tests, the production build, 11 runtime checks under Node and Bun, 72 Playwright cases with 71 passed and 1 intentionally skipped mobile case, 26 visual/axe checks, Lighthouse 100 performance / 100 accessibility / 100 best-practices / 100 SEO on mobile and desktop, earlier Caddy validation, the high-severity dependency audit, and the secret scan/SBOM generator.
 
 It is not a verified production release. Production launch is blocked by the absence of Docker-based deployment verification and a live Basis Auth conformance run. The remaining gaps are tracked explicitly: partial per-component hover/active coverage, no DAST or independent security assessment, and production deployment/auth conformance that require external infrastructure. The legacy migration is a tested tool with a synthetic fixture, not a completed data migration.
