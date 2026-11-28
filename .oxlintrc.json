@@ -53,6 +53,7 @@
         "coverage",
         "playwright-report",
         "test-results",
+        "basishacks-r2",
         ".data",
         "storage",
         "drizzle/meta"

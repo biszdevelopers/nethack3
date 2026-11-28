@@ -180,3 +180,5 @@ SETUP_GUIDE.md
 
 # Deployment environment example is tracked; filled-in env files are not.
 !deployment/.env.production.example
+
+basishacks-r2/

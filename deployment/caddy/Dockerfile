@@ -32,7 +32,9 @@ COPY apps/workspace/tsconfig.json apps/workspace/tsconfig.json
 COPY apps/workspace/tsconfig.build.json apps/workspace/tsconfig.build.json
 
 ARG VITE_API_ORIGIN=https://api.nethack.example
+ARG VITE_SITE_ORIGIN=https://www.nethack.example
 ENV VITE_API_ORIGIN=${VITE_API_ORIGIN}
+ENV VITE_SITE_ORIGIN=${VITE_SITE_ORIGIN}
 
 RUN bun run --cwd packages/contracts build \
     && bun run --cwd packages/ui build \
