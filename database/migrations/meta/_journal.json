@@ -43,6 +43,13 @@
             "when": 1795793813152,
             "tag": "0005_fair_luckman",
             "breakpoints": true
+        },
+        {
+            "idx": 6,
+            "version": "7",
+            "when": 1795831795696,
+            "tag": "0006_lying_fallen_one",
+            "breakpoints": true
         }
     ]
 }
