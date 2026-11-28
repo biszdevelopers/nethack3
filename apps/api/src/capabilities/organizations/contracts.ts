@@ -22,6 +22,8 @@ export interface OrganizationsContract {
     getSummary(organizationId: string): Promise<OrganizationSummary | null>;
     getSummaryBySlug(slug: string): Promise<OrganizationSummary | null>;
     isPublicShowcaseEnabled(organizationId: string): Promise<boolean>;
+    /** The role of an active membership, or null when the user is not one. */
+    getMembershipRole(organizationId: string, userId: string): Promise<OrganizationRole | null>;
     listMembershipsWithUsers(organizationId: string): Promise<readonly OrganizationMembership[]>;
     updateMemberRole(
         actor: OrganizationMembershipActor,

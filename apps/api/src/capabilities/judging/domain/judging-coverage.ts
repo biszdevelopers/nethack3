@@ -1,10 +1,14 @@
 import type {
     JudgeAssignmentStatus,
     JudgingCalibration,
+    JudgingCalibrationOutlier,
     JudgingCoverageJudge,
 } from "@nethack/contracts";
 
 export const CALIBRATION_THRESHOLD = 10;
+export const CALIBRATION_OUTLIER_MIN_EVALUATIONS = 3;
+export const CALIBRATION_OUTLIER_DEVIATION_FACTOR = 2;
+const STANDARD_DEVIATION_EPSILON = 0.01;
 
 export interface CoverageAssignmentRow {
     readonly judgeUserId: string;
@@ -21,9 +25,11 @@ export interface CoverageFlagRow {
 
 export interface CoverageSummary {
     readonly judges: readonly JudgingCoverageJudge[];
+    readonly outliers: readonly JudgingCalibrationOutlier[];
     readonly assignmentCount: number;
     readonly submittedCount: number;
     readonly editionAverageScore: number | null;
+    readonly standardDeviation: number;
 }
 
 interface JudgeAccumulator {
@@ -40,11 +46,28 @@ function roundScore(value: number): number {
     return Math.round(value * 100) / 100;
 }
 
-function average(values: readonly number[]): number | null {
+function mean(values: readonly number[]): number | null {
     if (values.length === 0) {
         return null;
     }
-    return roundScore(values.reduce((total, value) => total + value, 0) / values.length);
+    return values.reduce((total, value) => total + value, 0) / values.length;
+}
+
+function average(values: readonly number[]): number | null {
+    const value = mean(values);
+    return value === null ? null : roundScore(value);
+}
+
+function populationStandardDeviation(
+    values: readonly number[],
+    editionMean: number | null,
+): number {
+    if (values.length === 0 || editionMean === null) {
+        return 0;
+    }
+    return Math.sqrt(
+        values.reduce((total, value) => total + (value - editionMean) ** 2, 0) / values.length,
+    );
 }
 
 function calibrationFor(
@@ -66,7 +89,10 @@ function calibrationFor(
 
 /**
  * Builds per-judge coverage from non-revoked assignments. Draft evaluations are
- * counted as in progress but never influence any average.
+ * counted as in progress but never influence any average. A judge is flagged as
+ * a calibration outlier only after CALIBRATION_OUTLIER_MIN_EVALUATIONS submitted
+ * evaluations and only when the standard deviation is meaningful, so a
+ * near-zero deviation cannot flag every judge against a flat edition.
  */
 export function summarizeJudgeCoverage(
     rows: readonly CoverageAssignmentRow[],
@@ -111,7 +137,10 @@ export function summarizeJudgeCoverage(
         }
     }
 
-    const editionAverageScore = average(submittedScores);
+    const editionMean = mean(submittedScores);
+    const editionAverageScore = editionMean === null ? null : roundScore(editionMean);
+    const exactStandardDeviation = populationStandardDeviation(submittedScores, editionMean);
+    const standardDeviation = roundScore(exactStandardDeviation);
     const summaries: JudgingCoverageJudge[] = [...judges.values()]
         .map((judge) => {
             const judgeAverage = average(judge.submittedScores);
@@ -131,10 +160,47 @@ export function summarizeJudgeCoverage(
         })
         .toSorted((left, right) => left.judgeDisplayName.localeCompare(right.judgeDisplayName));
 
+    const outliers: JudgingCalibrationOutlier[] =
+        editionMean === null || exactStandardDeviation <= STANDARD_DEVIATION_EPSILON
+            ? []
+            : [...judges.values()]
+                  .filter(
+                      (judge) =>
+                          judge.submittedCount >= CALIBRATION_OUTLIER_MIN_EVALUATIONS &&
+                          judge.submittedScores.length >= CALIBRATION_OUTLIER_MIN_EVALUATIONS,
+                  )
+                  .map((judge) => {
+                      const judgeMean = mean(judge.submittedScores);
+                      if (judgeMean === null) {
+                          return null;
+                      }
+                      const delta = judgeMean - editionMean;
+                      if (
+                          Math.abs(delta) <=
+                          exactStandardDeviation * CALIBRATION_OUTLIER_DEVIATION_FACTOR
+                      ) {
+                          return null;
+                      }
+                      return {
+                          judgeUserId: judge.judgeUserId,
+                          judgeDisplayName: judge.judgeDisplayName,
+                          evaluationCount: judge.submittedCount,
+                          averageWeightedScore: roundScore(judgeMean),
+                          calibrationDelta: roundScore(delta),
+                      };
+                  })
+                  .filter((outlier): outlier is JudgingCalibrationOutlier => outlier !== null)
+                  .toSorted(
+                      (left, right) =>
+                          Math.abs(right.calibrationDelta) - Math.abs(left.calibrationDelta),
+                  );
+
     return {
         judges: summaries,
+        outliers,
         assignmentCount,
         submittedCount: summaries.reduce((total, judge) => total + judge.submittedCount, 0),
         editionAverageScore,
+        standardDeviation,
     };
 }

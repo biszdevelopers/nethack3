@@ -319,6 +319,25 @@ export class TeamRepository {
             );
     }
 
+    async hasActiveTeamMembership(
+        db: DatabaseExecutor,
+        organizationId: string,
+        userId: string,
+    ): Promise<boolean> {
+        const rows = await db
+            .select({ id: teamMembers.id })
+            .from(teamMembers)
+            .where(
+                and(
+                    eq(teamMembers.organizationId, organizationId),
+                    eq(teamMembers.userId, userId),
+                    isNull(teamMembers.leftAt),
+                ),
+            )
+            .limit(1);
+        return rows.length > 0;
+    }
+
     async findMember(
         db: DatabaseExecutor,
         teamId: string,

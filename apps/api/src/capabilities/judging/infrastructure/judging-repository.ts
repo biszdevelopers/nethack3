@@ -900,6 +900,30 @@ export class JudgingRepository {
             );
     }
 
+    async deleteEvaluation(
+        session: DatabaseSession,
+        organizationId: string,
+        evaluationId: string,
+    ): Promise<void> {
+        await this.deleteScores(session, organizationId, evaluationId);
+        await session.db
+            .delete(evaluationVersions)
+            .where(
+                and(
+                    eq(evaluationVersions.organizationId, organizationId),
+                    eq(evaluationVersions.evaluationId, evaluationId),
+                ),
+            );
+        await session.db
+            .delete(evaluations)
+            .where(
+                and(
+                    eq(evaluations.organizationId, organizationId),
+                    eq(evaluations.id, evaluationId),
+                ),
+            );
+    }
+
     async insertScores(session: DatabaseSession, values: readonly NewScoreValues[]): Promise<void> {
         if (values.length === 0) {
             return;

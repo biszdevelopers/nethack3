@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import type { DatabaseExecutor, DatabaseSession } from "../../../infrastructure/database/client.js";
 import { ballots, votes, votingRounds } from "../../../infrastructure/database/schema/index.js";
 
@@ -29,6 +29,7 @@ export interface NewBallotValues {
     readonly organizationId: string;
     readonly roundId: string;
     readonly userId: string;
+    readonly voterTeamId: string | null;
     readonly reasoning: string;
     readonly submittedAt: Date;
 }
@@ -45,12 +46,6 @@ export interface NewVoteValues {
 export interface BallotWithVotes {
     readonly ballot: BallotRow;
     readonly scores: readonly { readonly submissionId: string; readonly stars: number }[];
-}
-
-export interface VoteTallyRow {
-    readonly submissionId: string;
-    readonly votes: number;
-    readonly totalStars: number;
 }
 
 export class VotingRepository {
@@ -284,41 +279,13 @@ export class VotingRepository {
         ballotId: string,
         submittedAt: Date,
         reasoning: string,
+        voterTeamId: string | null,
     ): Promise<BallotRow | null> {
         const rows = await session.db
             .update(ballots)
-            .set({ submittedAt, reasoning })
+            .set({ submittedAt, reasoning, voterTeamId })
             .where(and(eq(ballots.organizationId, organizationId), eq(ballots.id, ballotId)))
             .returning();
         return rows[0] ?? null;
-    }
-
-    async aggregateVotes(
-        db: DatabaseExecutor,
-        organizationId: string,
-        roundId: string,
-    ): Promise<readonly VoteTallyRow[]> {
-        return db
-            .select({
-                submissionId: votes.submissionId,
-                votes: sql<number>`count(*)::int`,
-                totalStars: sql<number>`coalesce(sum(${votes.stars}), 0)::int`,
-            })
-            .from(votes)
-            .where(and(eq(votes.organizationId, organizationId), eq(votes.roundId, roundId)))
-            .groupBy(votes.submissionId)
-            .orderBy(sql`count(*) desc`);
-    }
-
-    async countBallots(
-        db: DatabaseExecutor,
-        organizationId: string,
-        roundId: string,
-    ): Promise<number> {
-        const rows = await db
-            .select({ count: sql<number>`count(*)::int` })
-            .from(ballots)
-            .where(and(eq(ballots.organizationId, organizationId), eq(ballots.roundId, roundId)));
-        return rows[0]?.count ?? 0;
     }
 }

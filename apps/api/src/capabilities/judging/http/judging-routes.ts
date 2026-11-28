@@ -654,6 +654,25 @@ export async function registerJudgingRoutes(
         },
     );
 
+    app.delete(
+        "/api/v1/assignments/:assignmentId/evaluation",
+        {
+            schema: { params: assignmentParams },
+        },
+        async (request, reply) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            guard.requireOrganizer(access);
+            await service.voidEvaluation(
+                auth,
+                access.organizationId,
+                request.params.assignmentId,
+                request.ip,
+            );
+            return reply.status(204).send();
+        },
+    );
+
     app.post(
         "/api/v1/assignments/:assignmentId/evaluation/submit",
         {

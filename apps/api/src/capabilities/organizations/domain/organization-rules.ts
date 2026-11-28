@@ -33,6 +33,21 @@ export class OrganizationRules {
         }
     }
 
+    /**
+     * Only participants may compete on a team. Judges and organizers (including
+     * owners) cannot hold a role above participant while they remain on one.
+     */
+    static assertRoleFitsTeamMembership(
+        role: OrganizationRole,
+        hasActiveTeamMembership: boolean,
+    ): void {
+        if (hasActiveTeamMembership && role !== "participant") {
+            throw new ConflictError(
+                "A user who competes on a team cannot also be a judge or organizer in this organization.",
+            );
+        }
+    }
+
     static assertRemovalIsSafe(role: OrganizationRole, ownerCount: number): void {
         if (role === "owner" && ownerCount <= 1) {
             throw new ConflictError("The organization must retain at least one owner.");

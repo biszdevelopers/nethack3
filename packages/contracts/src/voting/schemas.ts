@@ -112,6 +112,7 @@ export const voteResultSchema = z.object({
     roundId: idSchema,
     roundName: z.string(),
     publishedAt: isoDateTimeSchema.nullable(),
+    /** Ballots from active teams or teamless voters; inactive voters are excluded. */
     totalBallots: z.number().int().nonnegative(),
     entries: z.array(
         z.object({
@@ -119,8 +120,10 @@ export const voteResultSchema = z.object({
             projectTitle: z.string(),
             teamName: z.string().nullable(),
             rank: z.number().int().positive(),
+            /** Raw eligible scores behind totalStars, not the unit count. */
             votes: z.number().int().nonnegative(),
             totalStars: z.number().int().nonnegative(),
+            /** Unit-weighted mean: per-unit means averaged across voting units. */
             averageStars: z.number().nonnegative(),
         }),
     ),

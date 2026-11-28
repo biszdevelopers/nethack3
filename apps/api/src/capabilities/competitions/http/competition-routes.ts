@@ -8,6 +8,7 @@ import {
     createMilestoneRequestSchema,
     createSeriesRequestSchema,
     divisionSchema,
+    editionLifecycleRequestSchema,
     listResponseSchema,
     milestoneSchema,
     organizerEditionSchema,
@@ -287,6 +288,29 @@ export async function registerCompetitionRoutes(
                 auth,
                 access.organizationId,
                 request.params.editionId,
+                request.ip,
+            );
+        },
+    );
+
+    app.post(
+        "/api/v1/competitions/:editionId/lifecycle",
+        {
+            schema: {
+                params: editionParams,
+                body: editionLifecycleRequestSchema,
+                response: { 200: competitionEditionSchema },
+            },
+        },
+        async (request) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            guard.requireOrganizer(access);
+            return service.lifecycle(
+                auth,
+                access.organizationId,
+                request.params.editionId,
+                request.body,
                 request.ip,
             );
         },

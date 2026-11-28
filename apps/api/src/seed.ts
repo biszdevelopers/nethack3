@@ -136,7 +136,7 @@ try {
                 slug: "fixture-build-weekend",
                 description:
                     "A development fixture edition used to verify registration, teams, projects, and the public showcase.",
-                status: "published",
+                status: "voting",
                 timezone: "UTC",
                 registrationOpensAt: new Date(now.getTime() - 7 * day),
                 registrationClosesAt: new Date(now.getTime() + 14 * day),

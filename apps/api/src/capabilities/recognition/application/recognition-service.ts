@@ -33,7 +33,9 @@ import type { VotingContract } from "../../voting/contracts.js";
 import {
     applyReviewThreshold,
     assemblePublicResults,
+    findCertificateResult,
     findTeamResult,
+    isActiveTeamStatus,
     type AssemblyAward,
     type TeamResultView,
 } from "../domain/results-assembly.js";
@@ -616,6 +618,26 @@ export class RecognitionService {
         };
     }
 
+    async listTeamAwardNames(
+        organizationId: string,
+        editionId: string,
+    ): Promise<readonly { teamId: string; name: string }[]> {
+        await this.requireEdition(organizationId, editionId);
+        const [awardRows, assignmentRows] = await Promise.all([
+            this.database.transaction({ organizationId }, (session) =>
+                this.repository.listAwards(session.db, organizationId, editionId),
+            ),
+            this.database.transaction({ organizationId }, (session) =>
+                this.repository.listTeamAwards(session.db, organizationId, editionId),
+            ),
+        ]);
+        const namesById = new Map(awardRows.map((award) => [award.id, award.name] as const));
+        return assignmentRows.flatMap((assignment) => {
+            const name = namesById.get(assignment.awardId);
+            return name === undefined ? [] : [{ teamId: assignment.teamId, name }];
+        });
+    }
+
     async published(organizationId: string, editionId: string): Promise<PublicResults | null> {
         await this.requireEdition(organizationId, editionId);
         const row = await this.database.transaction({ organizationId }, (session) =>
@@ -638,15 +660,16 @@ export class RecognitionService {
             throw new NotFoundError("The certificate was not found.");
         }
         const results = parseSnapshot(row.snapshot);
-        const view = findTeamResult(results, teamId);
+        const team = await this.teams.getTeam(row.organizationId, teamId);
+        const view =
+            team === null
+                ? null
+                : findCertificateResult(results, teamId, isActiveTeamStatus(team.status));
         if (view === null) {
             throw new NotFoundError("The certificate was not found.");
         }
         // A rank-only certificate would disclose standings the organizers hid.
         const rank = results.showRanking ? view.rank : null;
-        if (rank === null && view.awards.length === 0) {
-            throw new NotFoundError("The certificate was not found.");
-        }
         return {
             team: { id: view.teamId, name: view.teamName },
             project: view.project,
@@ -723,6 +746,7 @@ export class RecognitionService {
                 id: team.id,
                 name: team.name,
                 divisionId: team.divisionId,
+                status: team.status,
             })),
             submissions: submissionRows.map((submission) => ({
                 id: submission.id,

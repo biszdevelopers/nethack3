@@ -1,4 +1,4 @@
-import type { CompetitionEditionStatus } from "@nethack/contracts";
+import type { CompetitionEditionStatus, EditionLifecycleAction } from "@nethack/contracts";
 import { ConflictError, ValidationError } from "../../../core/errors.js";
 
 const TRANSITIONS: Record<CompetitionEditionStatus, readonly CompetitionEditionStatus[]> = {
@@ -9,9 +9,24 @@ const TRANSITIONS: Record<CompetitionEditionStatus, readonly CompetitionEditionS
     active: ["judging", "completed", "archived"],
     judging: ["voting", "completed", "archived"],
     voting: ["completed", "archived"],
+    paused: [],
     completed: ["archived"],
     archived: [],
 };
+
+const PAUSABLE_STATUSES: ReadonlySet<CompetitionEditionStatus> = new Set([
+    "published",
+    "registration_open",
+    "registration_closed",
+    "active",
+    "judging",
+    "voting",
+]);
+
+export interface LifecycleTransition {
+    readonly status: CompetitionEditionStatus;
+    readonly statusBeforePause: CompetitionEditionStatus | null;
+}
 
 export interface EditionSchedule {
     readonly teamMinSize: number;
@@ -39,6 +54,87 @@ export class CompetitionRules {
     static assertPublishable(status: CompetitionEditionStatus): void {
         if (status !== "draft") {
             throw new ConflictError("Only a draft edition can be published.");
+        }
+    }
+
+    /**
+     * Backward and pausing transitions are owned by the lifecycle operation.
+     * The PATCH transition table above never accepts `paused` as a target, so
+     * a general update cannot pause, resume, reopen, or reset an edition.
+     */
+    static resolveLifecycle(
+        action: EditionLifecycleAction,
+        current: CompetitionEditionStatus,
+        statusBeforePause: CompetitionEditionStatus | null,
+    ): LifecycleTransition {
+        switch (action) {
+            case "pause": {
+                if (current === "paused") {
+                    throw new ConflictError("The edition is already paused.");
+                }
+                if (!PAUSABLE_STATUSES.has(current)) {
+                    throw new ConflictError(
+                        `A ${current} edition cannot be paused. Only an edition that is public or running can be paused.`,
+                    );
+                }
+                return { status: "paused", statusBeforePause: current };
+            }
+            case "resume": {
+                if (current !== "paused") {
+                    throw new ConflictError("Only a paused edition can be resumed.");
+                }
+                const resumed = statusBeforePause ?? "registration_open";
+                if (resumed === "paused" || !PAUSABLE_STATUSES.has(resumed)) {
+                    throw new ConflictError(
+                        "The paused edition does not record a resumable status.",
+                    );
+                }
+                return { status: resumed, statusBeforePause: null };
+            }
+            case "reopen_submissions": {
+                CompetitionRules.assertResultsArePrivate(current, "reopening submissions");
+                if (current !== "paused" && current !== "judging" && current !== "voting") {
+                    throw new ConflictError(`A ${current} edition cannot reopen submissions.`);
+                }
+                return { status: "active", statusBeforePause: null };
+            }
+            case "reopen_judging": {
+                CompetitionRules.assertResultsArePrivate(current, "reopening judging");
+                if (current !== "voting") {
+                    throw new ConflictError(`A ${current} edition cannot reopen judging.`);
+                }
+                return { status: "judging", statusBeforePause: null };
+            }
+            case "reopen_voting": {
+                CompetitionRules.assertResultsArePrivate(current, "reopening voting");
+                if (current !== "judging") {
+                    throw new ConflictError(`A ${current} edition cannot reopen voting.`);
+                }
+                return { status: "voting", statusBeforePause: null };
+            }
+            case "reset": {
+                if (current === "draft") {
+                    throw new ConflictError("The edition is already a draft.");
+                }
+                if (current === "archived") {
+                    throw new ConflictError("An archived edition cannot be reset.");
+                }
+                CompetitionRules.assertResultsArePrivate(current, "resetting the edition");
+                return { status: "draft", statusBeforePause: null };
+            }
+        }
+    }
+
+    /**
+     * A completed edition is the results-publication freeze. Backward
+     * lifecycle actions require unpublishing results first, which restores
+     * the pre-freeze status through the recognition contract.
+     */
+    static assertResultsArePrivate(current: CompetitionEditionStatus, operation: string): void {
+        if (current === "completed") {
+            throw new ConflictError(
+                `Unpublish the results before ${operation}. Publishing results completed the edition.`,
+            );
         }
     }
 

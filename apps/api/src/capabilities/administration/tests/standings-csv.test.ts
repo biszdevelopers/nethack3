@@ -1,19 +1,20 @@
 import { describe, expect, it } from "vitest";
-import type { JudgingResult } from "@nethack/contracts";
-import { csvCell, standingsCsv } from "../application/standings-csv.js";
+import { csvCell, standingsCsv, type StandingRow } from "../application/standings-csv.js";
 
-function result(overrides: Partial<JudgingResult> = {}): JudgingResult {
+function row(overrides: Partial<StandingRow> = {}): StandingRow {
     return {
-        submissionId: "11111111-1111-4111-8111-111111111111",
-        projectId: "22222222-2222-4222-8222-222222222222",
-        projectTitle: "Project",
         teamId: "33333333-3333-4333-8333-333333333333",
         teamName: "Team",
-        assignmentCount: 3,
-        submittedCount: 2,
-        averageScore: 87.5,
+        status: "ready",
+        pathway: "Open",
         rank: 1,
-        evaluations: [],
+        averageScore: 87.5,
+        displayScore: 87.5,
+        awards: ["Best Overall"],
+        projectTitle: "Project",
+        demoUrl: "https://example.test/demo",
+        repositoryUrl: "https://example.test/repo",
+        submitted: true,
         ...overrides,
     };
 }
@@ -39,30 +40,85 @@ describe("csvCell", () => {
 });
 
 describe("standingsCsv", () => {
-    it("writes the documented header and one row per result", () => {
-        const csv = standingsCsv([result()]);
-        const [header, row, trailing] = csv.split("\n");
+    it("writes the documented header and one row per team", () => {
+        const csv = standingsCsv([row()]);
+        const [header, line, trailing] = csv.split("\n");
 
-        expect(header).toBe("rank,project,team,average_score,submitted,assignments,awards");
-        expect(row).toBe("1,Project,Team,87.50,2,3,");
+        expect(header).toBe(
+            "team_id,team,pathway,status,score_exact,score,rank,awards,project_name,demo_url,repo_url,submitted",
+        );
+        expect(line).toBe(
+            "33333333-3333-4333-8333-333333333333,Team,Open,ready,87.5000,87.50,1,Best Overall,Project,https://example.test/demo,https://example.test/repo,yes",
+        );
         expect(trailing).toBe("");
     });
 
-    it("keeps unranked and unscored submissions as empty cells", () => {
-        const csv = standingsCsv([
-            result({ rank: null, averageScore: null, teamName: null, submittedCount: 0 }),
-        ]);
-        const row = csv.split("\n")[1];
+    it("keeps display and exact scores separate and formats both", () => {
+        const line = standingsCsv([
+            row({ averageScore: 87.4567, displayScore: 91.2, awards: [] }),
+        ]).split("\n")[1];
 
-        expect(row).toBe(",Project,,,0,3,");
+        expect(line).toContain(",87.4567,91.20,");
+        expect(line).toContain(",1,,Project,");
     });
 
-    it("escapes participant-authored project and team names", () => {
+    it("exports the disqualified status, links, and submitted state", () => {
+        const line = standingsCsv([
+            row({
+                status: "disqualified",
+                rank: null,
+                averageScore: null,
+                displayScore: null,
+                awards: ["Best Design"],
+                demoUrl: null,
+                repositoryUrl: "https://example.test/repo",
+                submitted: false,
+            }),
+        ]).split("\n")[1];
+
+        expect(line).toBe(
+            "33333333-3333-4333-8333-333333333333,Team,Open,disqualified,,,,Best Design,Project,,https://example.test/repo,no",
+        );
+    });
+
+    it("joins real award names, quoting any commas", () => {
+        const line = standingsCsv([
+            row({ awards: ["Best Overall", "People's Choice, Runner Up"] }),
+        ]).split("\n")[1];
+
+        expect(line).toContain('"Best Overall; People\'s Choice, Runner Up"');
+    });
+
+    it("keeps unranked and unsubmitted teams as empty cells", () => {
+        const line = standingsCsv([
+            row({
+                teamName: "Unsubmitted Team",
+                pathway: null,
+                rank: null,
+                averageScore: null,
+                displayScore: null,
+                awards: [],
+                projectTitle: null,
+                demoUrl: null,
+                repositoryUrl: null,
+                submitted: false,
+            }),
+        ]).split("\n")[1];
+
+        expect(line).toBe("33333333-3333-4333-8333-333333333333,Unsubmitted Team,,ready,,,,,,,,no");
+    });
+
+    it("escapes participant-authored team, project, and award names", () => {
         const csv = standingsCsv([
-            result({ projectTitle: 'A "great", project', teamName: "Team\nTwo" }),
+            row({
+                teamName: "Team\nTwo",
+                projectTitle: 'A "great", project',
+                awards: ["=SUM(A1)", "Judge's Pick"],
+            }),
         ]);
 
-        expect(csv).toContain('"A ""great"", project"');
         expect(csv).toContain('"Team\nTwo"');
+        expect(csv).toContain('"A ""great"", project"');
+        expect(csv).toContain("'=SUM(A1); Judge's Pick");
     });
 });

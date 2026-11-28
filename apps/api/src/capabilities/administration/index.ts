@@ -5,6 +5,7 @@ import { JUDGING_CONTRACT, type JudgingContract } from "../judging/contracts.js"
 import { ORGANIZATIONS_CONTRACT, type OrganizationsContract } from "../organizations/contracts.js";
 import { PARTICIPANTS_CONTRACT, type ParticipantsContract } from "../participants/contracts.js";
 import { PROJECTS_CONTRACT, type ProjectsContract } from "../projects/contracts.js";
+import { RECOGNITION_CONTRACT, type RecognitionContract } from "../recognition/contracts.js";
 import { SUBMISSIONS_CONTRACT, type SubmissionsContract } from "../submissions/contracts.js";
 import { TEAMS_CONTRACT, type TeamsContract } from "../teams/contracts.js";
 import { VOTING_CONTRACT, type VotingContract } from "../voting/contracts.js";
@@ -35,6 +36,7 @@ export const administrationCapability: CapabilityDefinition = {
         "files",
         "judging",
         "voting",
+        "recognition",
     ],
     async register(context) {
         const repository = new AdministrationRepository();
@@ -77,6 +79,8 @@ export const administrationCapability: CapabilityDefinition = {
             teams: teamsContract,
             submissions: submissionsContract,
             judging: judgingContract,
+            projects: context.contracts.get<ProjectsContract>(PROJECTS_CONTRACT),
+            recognition: context.contracts.get<RecognitionContract>(RECOGNITION_CONTRACT),
         });
         const preflight = new PreflightService(
             {

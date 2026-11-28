@@ -28,6 +28,7 @@ import type { AuditLogger } from "../../../infrastructure/audit/audit-logger.js"
 import { OrganizationRules } from "../domain/organization-rules.js";
 import type { OrganizationMembershipActor } from "../contracts.js";
 import type { OrganizationRepository } from "../infrastructure/organization-repository.js";
+import type { TeamsContract } from "../../teams/contracts.js";
 
 const INVITATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -43,6 +44,11 @@ export class OrganizationService {
     private readonly events: OutboxPublisher;
     private readonly audit: AuditLogger;
     private readonly clock: Clock;
+    /**
+     * Resolved lazily because teams depends on organizations; a declared
+     * dependency would form a cycle. Only role/team overlap checks read it.
+     */
+    private readonly teams: () => TeamsContract;
 
     constructor(
         database: DatabaseConnection,
@@ -50,12 +56,14 @@ export class OrganizationService {
         events: OutboxPublisher,
         audit: AuditLogger,
         clock: Clock,
+        teams: () => TeamsContract,
     ) {
         this.database = database;
         this.repository = repository;
         this.events = events;
         this.audit = audit;
         this.clock = clock;
+        this.teams = teams;
     }
 
     async list(auth: AuthContext): Promise<readonly Organization[]> {
@@ -179,6 +187,17 @@ export class OrganizationService {
         targetUserId: string,
         role: OrganizationRole,
     ): Promise<OrganizationMembership> {
+        const current = await this.repository.membership(
+            this.database.db,
+            organizationId,
+            targetUserId,
+        );
+        if (current === null) {
+            throw new NotFoundError("The membership was not found.");
+        }
+        if (current.role !== role) {
+            await this.assertRoleFitsTeamMembership(organizationId, targetUserId, role);
+        }
         const updated = await this.database.transaction(
             { organizationId, userId: actor.userId },
             async (session) => {
@@ -241,6 +260,7 @@ export class OrganizationService {
             if (membership !== null) {
                 throw new ConflictError("That person is already a member of this organization.");
             }
+            await this.assertRoleFitsTeamMembership(organizationId, existingUser.id, role);
             const now = this.clock.now();
             await this.database.transaction(
                 { organizationId, userId: auth.user.id },
@@ -379,6 +399,11 @@ export class OrganizationService {
         if (invitation.email.toLowerCase() !== auth.user.email.toLowerCase()) {
             throw new ForbiddenError("This invitation was issued to a different email address.");
         }
+        await this.assertRoleFitsTeamMembership(
+            invitation.organizationId,
+            auth.user.id,
+            invitation.role,
+        );
         const organization = await this.get(invitation.organizationId);
         await this.database.transaction(
             { organizationId: invitation.organizationId, userId: auth.user.id },
@@ -443,6 +468,9 @@ export class OrganizationService {
         );
         if (membership === null) {
             throw new NotFoundError("The membership was not found.");
+        }
+        if (input.role !== undefined && input.role !== membership.role) {
+            await this.assertRoleFitsTeamMembership(organizationId, targetUserId, input.role);
         }
         const ownerCount = await this.repository.countOwners(this.database.db, organizationId);
         if (input.role !== undefined) {
@@ -573,6 +601,20 @@ export class OrganizationService {
             },
         );
         return this.settings(organizationId);
+    }
+
+    private async assertRoleFitsTeamMembership(
+        organizationId: string,
+        userId: string,
+        role: OrganizationRole,
+    ): Promise<void> {
+        if (role === "participant") {
+            return;
+        }
+        OrganizationRules.assertRoleFitsTeamMembership(
+            role,
+            await this.teams().hasActiveTeamMembership(organizationId, userId),
+        );
     }
 
     async auditPage(

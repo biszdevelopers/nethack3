@@ -7,6 +7,7 @@ import {
     createMilestoneRequestSchema,
     createSeriesRequestSchema,
     divisionSchema,
+    editionLifecycleRequestSchema,
     listResponseSchema,
     milestoneSchema,
     publicCompetitionDetailSchema,
@@ -20,6 +21,7 @@ import {
     type CreateMilestoneRequest,
     type CreateSeriesRequest,
     type Division,
+    type EditionLifecycleRequest,
     type ListResponse,
     type Milestone,
     type PublicCompetition,
@@ -93,6 +95,16 @@ export class CompetitionsApi {
 
     async publish(editionId: string): Promise<CompetitionEdition> {
         return this.client.request("POST", `/api/v1/competitions/${editionId}/publish`, {
+            schema: competitionEditionSchema,
+        });
+    }
+
+    async lifecycle(
+        editionId: string,
+        input: EditionLifecycleRequest,
+    ): Promise<CompetitionEdition> {
+        return this.client.request("POST", `/api/v1/competitions/${editionId}/lifecycle`, {
+            body: editionLifecycleRequestSchema.parse(input),
             schema: competitionEditionSchema,
         });
     }

@@ -797,6 +797,10 @@ export class JudgingService {
                     submission.teamId === null
                         ? null
                         : (teamsById.get(submission.teamId)?.name ?? null),
+                teamStatus:
+                    submission.teamId === null
+                        ? null
+                        : (teamsById.get(submission.teamId)?.status ?? null),
             };
         });
         return aggregateJudgingResults(
@@ -1382,7 +1386,9 @@ export class JudgingService {
             assignmentCount: summary.assignmentCount,
             submittedCount: summary.submittedCount,
             editionAverageScore: summary.editionAverageScore,
+            standardDeviation: summary.standardDeviation,
             judges: [...summary.judges],
+            outliers: [...summary.outliers],
             openFlags: loaded.flags.filter((view) => view.flag.status === "open").map(toJudgeFlag),
         };
     }
@@ -1972,6 +1978,67 @@ export class JudgingService {
                     ? null
                     : applyScoreCurve(evaluation.weightedScore, curvePoints),
         };
+    }
+
+    async voidEvaluation(
+        auth: AuthContext,
+        organizationId: string,
+        assignmentId: string,
+        ip: string | null,
+    ): Promise<void> {
+        this.assertOrganizer(auth, organizationId);
+        const now = this.clock.now();
+        await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const assignment = await this.repository.findAssignmentForUpdate(
+                    session,
+                    organizationId,
+                    assignmentId,
+                );
+                if (assignment === null) {
+                    throw new NotFoundError("The judging assignment was not found.");
+                }
+                const evaluation = await this.repository.findEvaluation(
+                    session.db,
+                    organizationId,
+                    assignmentId,
+                );
+                if (evaluation === null) {
+                    throw new NotFoundError("The evaluation was not found.");
+                }
+                if (evaluation.status !== "submitted") {
+                    throw new ConflictError("Only a submitted evaluation can be voided.");
+                }
+                await this.repository.deleteEvaluation(session, organizationId, evaluation.id);
+                const updated = await this.repository.updateAssignment(
+                    session,
+                    organizationId,
+                    assignmentId,
+                    { status: "revoked", updatedAt: now },
+                );
+                if (updated === null) {
+                    throw new NotFoundError("The judging assignment was not found.");
+                }
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: "judging.evaluation.voided",
+                    entityType: "evaluation",
+                    entityId: evaluation.id,
+                    metadata: {
+                        assignmentId,
+                        submissionId: assignment.submissionId,
+                        judgeUserId: assignment.judgeUserId,
+                        weightedScore:
+                            evaluation.weightedScore === null
+                                ? null
+                                : Number(evaluation.weightedScore),
+                    },
+                    ip,
+                });
+            },
+        );
     }
 
     async revokeAssignment(

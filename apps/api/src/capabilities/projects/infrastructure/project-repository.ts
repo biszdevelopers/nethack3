@@ -24,16 +24,7 @@ import {
     users,
 } from "../../../infrastructure/database/schema/index.js";
 
-const PUBLIC_EDITION_STATUSES = [
-    "published",
-    "registration_open",
-    "registration_closed",
-    "active",
-    "judging",
-    "voting",
-    "completed",
-    "archived",
-] as const;
+const PUBLIC_EDITION_STATUSES = ["voting", "completed", "archived"] as const;
 
 export type ProjectRow = typeof projects.$inferSelect;
 

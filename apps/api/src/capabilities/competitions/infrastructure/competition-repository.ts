@@ -92,6 +92,7 @@ export interface EditionUpdateValues {
     readonly showScores?: boolean;
     readonly showRanking?: boolean;
     readonly status?: CompetitionEditionStatus;
+    readonly statusBeforePause?: CompetitionEditionStatus | null;
     readonly timezone?: string;
     readonly registrationOpensAt?: Date | null;
     readonly registrationClosesAt?: Date | null;

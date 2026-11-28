@@ -1,4 +1,9 @@
-import type { CompetitionEditionStatus, RegistrationStatus, TeamStatus } from "@nethack/contracts";
+import type {
+    CompetitionEditionStatus,
+    OrganizationRole,
+    RegistrationStatus,
+    TeamStatus,
+} from "@nethack/contracts";
 import { ConflictError, ForbiddenError, ValidationError } from "../../../core/errors.js";
 
 export interface EditionTeamPolicy {
@@ -82,6 +87,18 @@ export class TeamRules {
             );
         }
         return registration;
+    }
+
+    /**
+     * Judges and organizers may administer teams but cannot compete on one.
+     * Only the participant role may create or join a team.
+     */
+    static assertParticipantRole(role: OrganizationRole | null): void {
+        if (role !== null && role !== "participant") {
+            throw new ConflictError(
+                "Judges and organizers cannot join or create a team in the same organization.",
+            );
+        }
     }
 
     static limits(edition: EditionTeamPolicy, division: DivisionTeamPolicy | null): TeamSizeLimits {

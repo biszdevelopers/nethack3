@@ -164,6 +164,25 @@ describe("TeamRules registration eligibility", () => {
     });
 });
 
+describe("TeamRules role conflict", () => {
+    it("lets participants, including teamless users, join or create a team", () => {
+        expect(() => TeamRules.assertParticipantRole("participant")).not.toThrow();
+        expect(() => TeamRules.assertParticipantRole(null)).not.toThrow();
+    });
+
+    it("refuses judges, organizers, and owners from joining or creating a team", () => {
+        for (const role of ["judge", "organizer", "owner"] as const) {
+            expect(() => TeamRules.assertParticipantRole(role)).toThrow(ConflictError);
+        }
+    });
+
+    it("still lets organizers administer a team", () => {
+        expect(() =>
+            TeamRules.assertCaptainOrOrganizer("captain", "organizer", true),
+        ).not.toThrow();
+    });
+});
+
 describe("TeamRules deletion", () => {
     it("allows deleting a team without members", () => {
         expect(() => TeamRules.assertCanDelete(0)).not.toThrow();

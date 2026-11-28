@@ -54,6 +54,11 @@ export interface TeamsContract {
         editionId: string,
     ): Promise<readonly TeamWithMembers[]>;
     isTeamMember(organizationId: string, teamId: string, userId: string): Promise<boolean>;
+    /**
+     * Whether the user is an active member of any team in the organization,
+     * across every edition. Memberships that ended do not count.
+     */
+    hasActiveTeamMembership(organizationId: string, userId: string): Promise<boolean>;
     getTeamForUser(
         organizationId: string,
         editionId: string,

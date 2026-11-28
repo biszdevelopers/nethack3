@@ -28,4 +28,21 @@ describe("OrganizationRules", () => {
         expect(() => OrganizationRules.assertRemovalIsSafe("owner", 2)).not.toThrow();
         expect(() => OrganizationRules.assertRemovalIsSafe("participant", 1)).not.toThrow();
     });
+
+    it("refuses judge and organizer roles for competing team members", () => {
+        for (const role of ["judge", "organizer", "owner"] as const) {
+            expect(() => OrganizationRules.assertRoleFitsTeamMembership(role, true)).toThrow(
+                ConflictError,
+            );
+        }
+    });
+
+    it("allows participants on teams and teamless staff", () => {
+        expect(() =>
+            OrganizationRules.assertRoleFitsTeamMembership("participant", true),
+        ).not.toThrow();
+        for (const role of ["judge", "organizer", "owner"] as const) {
+            expect(() => OrganizationRules.assertRoleFitsTeamMembership(role, false)).not.toThrow();
+        }
+    });
 });

@@ -63,6 +63,11 @@ export const teamsCapability: CapabilityDefinition = {
                     return member !== null;
                 });
             },
+            async hasActiveTeamMembership(organizationId, userId) {
+                return context.database.transaction({ organizationId, userId }, async (session) =>
+                    repository.hasActiveTeamMembership(session.db, organizationId, userId),
+                );
+            },
             async getTeamForUser(organizationId, editionId, userId) {
                 return context.database.transaction({ organizationId }, async (session) => {
                     const team = await repository.findByUserInEdition(

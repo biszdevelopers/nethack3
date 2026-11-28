@@ -1,6 +1,6 @@
 # Teams capability
 
-Version `1.0.0`. Dependencies: `competitions`, `participants`. Organization names come from the public `organizations.v1` contract, reached through the declared `competitions -> organizations` chain (same convention as `participants`). Disbanding reads `submissions.v1` lazily through the contract registry because `submissions` already depends on `teams`; declaring it here would form a cycle.
+Version `1.0.0`. Dependencies: `competitions`, `participants`. Organization names and the caller's organization role come from the public `organizations.v1` contract, reached through the declared `competitions -> organizations` chain (same convention as `participants`). Disbanding reads `submissions.v1` lazily through the contract registry because `submissions` already depends on `teams`; declaring it here would form a cycle.
 
 Owns team formation for a competition edition: team records, membership, captaincy, email invitations, and the team activity feed. All database access runs through `database.transaction({ organizationId })` so row-level security sees an organization context.
 
@@ -33,6 +33,7 @@ Invitation routes also require `x-nethack-organization-id`, because `team_invita
 ## Rules
 
 - One team per participant per edition. Creation and acceptance lock the participant's `registrations` row (`SELECT ... FOR UPDATE`) and re-check `team_members` joined to `teams` inside the transaction. `participants.team_id` is kept in sync through the participants contract.
+- Only the `participant` organization role may create or join a team. Judges, organizers, and owners are refused with `409 conflict` before any team write; they may still administer teams through the captain/organizer routes. The role is read through `organizations.v1`.
 - Division team-size limits override edition limits per field. The resolved maximum is stored on the team (`max_members`) at creation and when the division changes. `status: "ready"` requires the resolved minimum and maximum.
 - Team statuses are `forming`, `ready`, `withdrawn`, `disqualified`, `no_show`, and `disbanded`. Only `forming` and `ready` can change status; the other values are terminal. `disqualified` and `no_show` are organizer-only. A terminal status requires a trimmed reason of 5 to 500 characters, stored in `teams.status_reason` and returned as `statusReason`; returning to `forming` or `ready` clears it. Inactive teams reject updates, invitations, invitation acceptance, captain transfers, and readiness, while members may still leave.
 - Captaincy is always a team membership. Transfers update `teams.captain_user_id` and both `team_members.role` rows in one transaction. A captain with other members cannot leave until captaincy is transferred; a solo captain leaves by disbanding.
@@ -54,6 +55,6 @@ Every mutation writes an `audit_logs` row with `entity_type = "team"` and `entit
 
 ## Contract
 
-`TeamsContract` (`teams.v1`) exposes `getTeam`, `listEditionTeams`, `listEditionTeamsWithMembers`, `isTeamMember`, `getTeamForUser`, `countTeams`, `updateTeamStatus`, and `deleteTeam`. Each opens its own organization-scoped transaction and reports `memberCount` from `team_members`; team summaries include `statusReason`.
+`TeamsContract` (`teams.v1`) exposes `getTeam`, `listEditionTeams`, `listEditionTeamsWithMembers`, `isTeamMember`, `hasActiveTeamMembership`, `getTeamForUser`, `countTeams`, `updateTeamStatus`, and `deleteTeam`. Each opens its own organization-scoped transaction and reports `memberCount` from `team_members`; team summaries include `statusReason`. `hasActiveTeamMembership` reports any un-ended team membership in the organization across editions.
 
 Administration methods (`updateTeamStatus`, `deleteTeam`) take a `{ userId, ip }` actor and assume authorization was already established. `updateTeamStatus` also takes the status reason and rejects terminal statuses without a valid one. Both enforce organization and edition scope, audit as `team.updated` / `team.deleted`, and never expose invitation tokens.

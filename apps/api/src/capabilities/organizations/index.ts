@@ -1,4 +1,5 @@
 import type { CapabilityDefinition } from "../../core/capability.js";
+import { TEAMS_CONTRACT, type TeamsContract } from "../teams/contracts.js";
 import { OrganizationService } from "./application/organization-service.js";
 import { OrganizationRepository } from "./infrastructure/organization-repository.js";
 import { registerOrganizationRoutes } from "./http/organization-routes.js";
@@ -16,6 +17,7 @@ export const organizationsCapability: CapabilityDefinition = {
             context.events,
             context.audit,
             context.clock,
+            () => context.contracts.get<TeamsContract>(TEAMS_CONTRACT),
         );
 
         const contract: OrganizationsContract = {
@@ -55,6 +57,16 @@ export const organizationsCapability: CapabilityDefinition = {
                 } catch {
                     return false;
                 }
+            },
+            async getMembershipRole(organizationId, userId) {
+                const membership = await repository.membership(
+                    context.database.db,
+                    organizationId,
+                    userId,
+                );
+                return membership !== null && membership.status === "active"
+                    ? membership.role
+                    : null;
             },
             async listMembershipsWithUsers(organizationId) {
                 return service.listMembershipsWithUsers(organizationId);

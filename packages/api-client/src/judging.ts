@@ -327,6 +327,12 @@ export class JudgingApi {
         );
     }
 
+    async voidEvaluation(organizationId: string, assignmentId: string): Promise<void> {
+        await this.client.request("DELETE", `/api/v1/assignments/${assignmentId}/evaluation`, {
+            headers: organizationHeader(organizationId),
+        });
+    }
+
     async history(organizationId: string, assignmentId: string): Promise<AssignmentHistory> {
         return this.client.request("GET", `/api/v1/assignments/${assignmentId}/history`, {
             schema: assignmentHistorySchema,

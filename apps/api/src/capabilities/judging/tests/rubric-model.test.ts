@@ -237,6 +237,7 @@ describe("score curve", () => {
                     projectTitle: "Project",
                     teamId: null,
                     teamName: null,
+                    teamStatus: null,
                     judgeUserId: "j",
                     judgeDisplayName: "Judge",
                     evaluationStatus: "submitted",

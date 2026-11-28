@@ -42,10 +42,33 @@ export const competitionEditionStatusSchema = z.enum([
     "active",
     "judging",
     "voting",
+    "paused",
     "completed",
     "archived",
 ]);
 export type CompetitionEditionStatus = z.infer<typeof competitionEditionStatusSchema>;
+
+export const editionLifecycleActionSchema = z.enum([
+    "pause",
+    "resume",
+    "reopen_submissions",
+    "reopen_judging",
+    "reopen_voting",
+    "reset",
+]);
+export type EditionLifecycleAction = z.infer<typeof editionLifecycleActionSchema>;
+
+export const editionLifecycleRequestSchema = z
+    .object({
+        action: editionLifecycleActionSchema,
+        confirm: z.boolean().optional(),
+    })
+    .strict()
+    .refine((value) => value.action !== "reset" || value.confirm === true, {
+        message: "Resetting an edition requires explicit confirmation.",
+        path: ["confirm"],
+    });
+export type EditionLifecycleRequest = z.infer<typeof editionLifecycleRequestSchema>;
 
 export const milestoneKindSchema = z.enum([
     "registration",
@@ -107,6 +130,7 @@ export const competitionEditionSchema = z.object({
     showScores: z.boolean(),
     showRanking: z.boolean(),
     status: competitionEditionStatusSchema,
+    statusBeforePause: competitionEditionStatusSchema.nullable(),
     timezone: z.string(),
     registrationOpensAt: isoDateTimeSchema.nullable(),
     registrationClosesAt: isoDateTimeSchema.nullable(),

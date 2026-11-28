@@ -4,6 +4,7 @@ import {
     applyReviewThreshold,
     assemblePublicResults,
     awardsForTeam,
+    findCertificateResult,
     findTeamResult,
     type ResultAssemblyInput,
 } from "../domain/results-assembly.js";
@@ -63,9 +64,9 @@ function input(overrides: Partial<ResultAssemblyInput> = {}): ResultAssemblyInpu
         judging: [],
         voting: [],
         teams: [
-            { id: TEAM_A, name: "Alpha team", divisionId: DIVISION },
-            { id: TEAM_B, name: "Beta team", divisionId: null },
-            { id: TEAM_C, name: "Gamma team", divisionId: null },
+            { id: TEAM_A, name: "Alpha team", divisionId: DIVISION, status: "ready" },
+            { id: TEAM_B, name: "Beta team", divisionId: null, status: "forming" },
+            { id: TEAM_C, name: "Gamma team", divisionId: null, status: "ready" },
         ],
         submissions: [
             {
@@ -346,6 +347,100 @@ describe("public results assembly", () => {
             averageScore: null,
             displayScore: null,
         });
+    });
+
+    it("strips scores, rank, and awards from an inactive team", () => {
+        const results = assemblePublicResults(
+            input({
+                teams: [
+                    { id: TEAM_A, name: "Alpha team", divisionId: DIVISION, status: "withdrawn" },
+                    { id: TEAM_B, name: "Beta team", divisionId: null, status: "ready" },
+                    { id: TEAM_C, name: "Gamma team", divisionId: null, status: "ready" },
+                ],
+                judging: [
+                    judging({
+                        submissionId: SUBMISSION_A,
+                        projectId: PROJECT_A,
+                        projectTitle: "Alpha",
+                        teamId: TEAM_A,
+                        teamName: "Alpha team",
+                        averageScore: 91.5,
+                        displayScore: 88,
+                        rank: 1,
+                    }),
+                    judging({
+                        submissionId: SUBMISSION_B,
+                        projectId: PROJECT_B,
+                        projectTitle: "Beta",
+                        teamId: TEAM_B,
+                        teamName: "Beta team",
+                        averageScore: 80,
+                        displayScore: 78,
+                        rank: 2,
+                    }),
+                ],
+            }),
+        );
+
+        expect(results.judgingEntries.find((entry) => entry.teamId === TEAM_A)).toMatchObject({
+            rank: null,
+            averageScore: null,
+            displayScore: null,
+            awards: [],
+        });
+        expect(results.awards[0]?.teams).toEqual([]);
+        expect(findTeamResult(results, TEAM_A)).toMatchObject({ rank: null, awards: [] });
+        expect(findCertificateResult(results, TEAM_A, false)).toBeNull();
+        expect(findCertificateResult(results, TEAM_A, true)).toBeNull();
+        expect(findCertificateResult(results, TEAM_B, true)).not.toBeNull();
+    });
+
+    it("requires an active team with a shown rank or an award for a certificate", () => {
+        const ranked = assemblePublicResults(
+            input({
+                judging: [
+                    judging({
+                        submissionId: SUBMISSION_A,
+                        projectId: PROJECT_A,
+                        projectTitle: "Alpha",
+                        teamId: TEAM_A,
+                        teamName: "Alpha team",
+                        averageScore: 91.5,
+                        rank: 1,
+                    }),
+                ],
+            }),
+        );
+        expect(findCertificateResult(ranked, TEAM_A, true)).not.toBeNull();
+        expect(findCertificateResult(ranked, TEAM_A, false)).toBeNull();
+        expect(findCertificateResult(ranked, TEAM_C, true)).toBeNull();
+
+        const hiddenRanking = assemblePublicResults(
+            input({
+                showRanking: false,
+                teamAwards: [],
+                judging: [
+                    judging({
+                        submissionId: SUBMISSION_A,
+                        projectId: PROJECT_A,
+                        projectTitle: "Alpha",
+                        teamId: TEAM_A,
+                        teamName: "Alpha team",
+                        averageScore: 91.5,
+                        rank: 1,
+                    }),
+                ],
+            }),
+        );
+        expect(findCertificateResult(hiddenRanking, TEAM_A, true)).toBeNull();
+
+        const awardOnly = assemblePublicResults(
+            input({
+                showRanking: false,
+                teamAwards: [{ awardId: AWARD, teamId: TEAM_C, note: "Special mention." }],
+            }),
+        );
+        expect(findCertificateResult(awardOnly, TEAM_C, true)).not.toBeNull();
     });
 
     it("finds a team result by rank and by award only", () => {

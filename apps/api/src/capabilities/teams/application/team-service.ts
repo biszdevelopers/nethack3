@@ -284,6 +284,9 @@ export class TeamService {
     ): Promise<Team> {
         const now = this.clock.now();
         const edition = await this.resolveEdition(organizationId, input.editionId);
+        TeamRules.assertParticipantRole(
+            await this.organizations.getMembershipRole(organizationId, auth.user.id),
+        );
         TeamRules.assertEditionAcceptsTeams(edition, now);
         TeamRules.requireApprovedRegistration(
             await this.participants.getRegistration(organizationId, input.editionId, auth.user.id),
@@ -659,6 +662,9 @@ export class TeamService {
         }
         TeamRules.assertInvitationMatchesEmail(preview.email, auth.user.email);
         TeamRules.assertInvitationPending(preview.status, preview.expiresAt, this.clock.now());
+        TeamRules.assertParticipantRole(
+            await this.organizations.getMembershipRole(preview.organizationId, auth.user.id),
+        );
         if (
             !(await this.participants.isApprovedParticipant(
                 preview.organizationId,

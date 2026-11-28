@@ -21,6 +21,7 @@ export const editionStatusEnum = pgEnum("edition_status", [
     "active",
     "judging",
     "voting",
+    "paused",
     "completed",
     "archived",
 ]);
@@ -72,6 +73,7 @@ export const competitionEditions = pgTable(
         showScores: boolean("show_scores").notNull().default(false),
         showRanking: boolean("show_ranking").notNull().default(false),
         status: editionStatusEnum("status").notNull().default("draft"),
+        statusBeforePause: editionStatusEnum("status_before_pause"),
         timezone: text("timezone").notNull().default("UTC"),
         registrationOpensAt: timestamp("registration_opens_at", { withTimezone: true }),
         registrationClosesAt: timestamp("registration_closes_at", { withTimezone: true }),

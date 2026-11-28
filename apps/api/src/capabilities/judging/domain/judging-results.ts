@@ -1,4 +1,4 @@
-import type { JudgingResult, ScoreCurvePoint } from "@nethack/contracts";
+import type { JudgingResult, ScoreCurvePoint, TeamStatus } from "@nethack/contracts";
 import { applyScoreCurve } from "./score-curve.js";
 
 export interface JudgingResultRow {
@@ -8,6 +8,7 @@ export interface JudgingResultRow {
     readonly projectTitle: string;
     readonly teamId: string | null;
     readonly teamName: string | null;
+    readonly teamStatus: TeamStatus | null;
     readonly judgeUserId: string;
     readonly judgeDisplayName: string;
     readonly evaluationStatus: "draft" | "submitted" | null;
@@ -15,9 +16,25 @@ export interface JudgingResultRow {
     readonly submittedAt: string | null;
 }
 
+/** A team competes for results only while it is forming or ready. */
+export function isActiveTeamStatus(status: TeamStatus): boolean {
+    return status === "forming" || status === "ready";
+}
+
+/**
+ * A teamless submission has no team status and stays eligible. A submission
+ * whose team is missing or inactive keeps its row but never earns a score or
+ * rank.
+ */
+function isScorableRow(row: JudgingResultRow): boolean {
+    return row.teamId === null || (row.teamStatus !== null && isActiveTeamStatus(row.teamStatus));
+}
+
 /**
  * Ranks submissions by the mean weighted score of submitted evaluations.
  * Draft evaluations are shown for progress but never influence the average.
+ * Withdrawn, disqualified, no-show, and disbanded teams keep their row with a
+ * null score, display score, and rank so they never occupy a podium position.
  */
 export function aggregateJudgingResults(
     rows: readonly JudgingResultRow[],
@@ -40,7 +57,7 @@ export function aggregateJudgingResults(
             (row) => row.evaluationStatus === "submitted" && row.weightedScore !== null,
         );
         const averageScore =
-            submitted.length === 0
+            submitted.length === 0 || !isScorableRow(first)
                 ? null
                 : Math.round(
                       (submitted.reduce((total, row) => total + (row.weightedScore ?? 0), 0) /

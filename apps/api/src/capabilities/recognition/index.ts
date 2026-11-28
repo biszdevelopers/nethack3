@@ -33,6 +33,8 @@ export const recognitionCapability: CapabilityDefinition = {
         const contract: RecognitionContract = {
             getPublishedResults: (organizationId, editionId) =>
                 service.published(organizationId, editionId),
+            listTeamAwardNames: (organizationId, editionId) =>
+                service.listTeamAwardNames(organizationId, editionId),
         };
 
         return {

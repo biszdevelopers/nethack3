@@ -9,6 +9,7 @@ import type {
     PublicTeamAward,
     PublicVotingEntry,
     PublicVotingRound,
+    TeamStatus,
     VoteResult,
 } from "@nethack/contracts";
 
@@ -16,6 +17,12 @@ export interface AssemblyTeam {
     readonly id: string;
     readonly name: string;
     readonly divisionId: string | null;
+    readonly status: TeamStatus;
+}
+
+/** A team competes for public results only while it is forming or ready. */
+export function isActiveTeamStatus(status: TeamStatus): boolean {
+    return status === "forming" || status === "ready";
 }
 
 export interface AssemblySubmission {
@@ -110,6 +117,13 @@ export function assemblePublicResults(input: ResultAssemblyInput): PublicResults
         if (award === undefined) {
             throw new Error("A team award references a missing award.");
         }
+        const team = teamsById.get(assignment.teamId);
+        if (team === undefined) {
+            throw new Error("A team award references a missing team.");
+        }
+        if (!isActiveTeamStatus(team.status)) {
+            continue;
+        }
         const expanded: PublicTeamAward = {
             id: award.id,
             namespace: award.namespace,
@@ -138,7 +152,9 @@ export function assemblePublicResults(input: ResultAssemblyInput): PublicResults
         .map((result) => {
             const team = result.teamId === null ? undefined : teamsById.get(result.teamId);
             const submission = submissionsById.get(result.submissionId);
-            const enoughReviews = result.submittedCount >= MINIMUM_PUBLIC_REVIEWS;
+            const enoughReviews =
+                (team === undefined || isActiveTeamStatus(team.status)) &&
+                result.submittedCount >= MINIMUM_PUBLIC_REVIEWS;
             return {
                 submissionId: result.submissionId,
                 projectId: result.projectId,
@@ -225,19 +241,24 @@ export function assemblePublicResults(input: ResultAssemblyInput): PublicResults
         color: award.color,
         teams: input.teamAwards
             .filter((assignment) => assignment.awardId === award.id)
-            .map((assignment) => {
+            .flatMap((assignment) => {
                 const team = teamsById.get(assignment.teamId);
                 if (team === undefined) {
                     throw new Error("A team award references a missing team.");
                 }
+                if (!isActiveTeamStatus(team.status)) {
+                    return [];
+                }
                 const submission = submissionByTeamId.get(assignment.teamId);
-                return {
-                    teamId: assignment.teamId,
-                    teamName: team.name,
-                    projectId: submission?.projectId ?? null,
-                    projectTitle: submission?.title ?? null,
-                    note: assignment.note,
-                };
+                return [
+                    {
+                        teamId: assignment.teamId,
+                        teamName: team.name,
+                        projectId: submission?.projectId ?? null,
+                        projectTitle: submission?.title ?? null,
+                        note: assignment.note,
+                    },
+                ];
             })
             .toSorted((left, right) => left.teamName.localeCompare(right.teamName)),
     }));
@@ -302,6 +323,30 @@ export function findTeamResult(results: PublicResults, teamId: string): TeamResu
         displayScore: entry?.displayScore ?? null,
         awards,
     };
+}
+
+/**
+ * A certificate needs an active team that earned a published rank or award.
+ * Assembly already strips both from inactive teams; the explicit status guard
+ * also rejects snapshots published before inactive teams were stripped.
+ */
+export function findCertificateResult(
+    results: PublicResults,
+    teamId: string,
+    teamActive: boolean,
+): TeamResultView | null {
+    if (!teamActive) {
+        return null;
+    }
+    const view = findTeamResult(results, teamId);
+    if (view === null) {
+        return null;
+    }
+    const rank = results.showRanking ? view.rank : null;
+    if (rank === null && view.awards.length === 0) {
+        return null;
+    }
+    return view;
 }
 
 function compareResultEntries(left: PublicResultEntry, right: PublicResultEntry): number {

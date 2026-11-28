@@ -84,6 +84,11 @@ export class VotingRules {
     }
 
     static assertEditionAcceptsVoting(status: CompetitionEditionStatus): void {
+        if (status === "paused") {
+            throw new ConflictError(
+                "This competition edition is paused; voting and round changes are unavailable.",
+            );
+        }
         if (isEditionResultsFrozen(status)) {
             throw new ConflictError(
                 "Results are published; voting and round changes are frozen for this edition.",

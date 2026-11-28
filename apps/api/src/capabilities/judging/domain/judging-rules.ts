@@ -48,6 +48,9 @@ export class JudgingRules {
     }
 
     static assertEditionWritable(status: CompetitionEditionStatus): void {
+        if (status === "paused") {
+            throw new ConflictError("This competition edition is paused, so judging is read-only.");
+        }
         if (isEditionResultsFrozen(status)) {
             throw new ConflictError(
                 "Results are published for this edition, so judging is read-only.",

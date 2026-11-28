@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import type { JudgingResult, SubmissionStatus } from "@nethack/contracts";
+import type { JudgingResult, PublicResults, SubmissionStatus } from "@nethack/contracts";
 import type { AuthContext } from "../../../authentication/types.js";
 import type { DivisionSummary, EditionSummary } from "../../competitions/contracts.js";
+import type { ProjectSummary } from "../../projects/contracts.js";
 import type { SubmissionSummary } from "../../submissions/contracts.js";
 import type { TeamWithMembers } from "../../teams/contracts.js";
 import { ConflictError } from "../../../core/errors.js";
@@ -141,11 +142,79 @@ function result(submittedCount: number, overrides: Partial<JudgingResult> = {}):
     };
 }
 
+function project(overrides: Partial<ProjectSummary> = {}): ProjectSummary {
+    return {
+        id: "77777777-7777-4777-8777-777777777777",
+        organizationId,
+        editionId,
+        teamId,
+        ownerUserId: userId,
+        title: "Fixture Project",
+        slug: "fixture-project",
+        summary: "",
+        descriptionMarkdown: "",
+        repositoryUrl: "https://example.test/repo",
+        demoUrl: "https://example.test/demo",
+        videoUrl: null,
+        aiDisclosure: "",
+        tags: [],
+        status: "published",
+        publishedAt: "2026-01-02T00:00:00.000Z",
+        lockedAt: null,
+        ...overrides,
+    };
+}
+
+function publishedResults(overrides: Partial<PublicResults> = {}): PublicResults {
+    return {
+        edition: {
+            id: editionId,
+            name: "Edition",
+            slug: "edition",
+            description: "",
+            status: "judging",
+            seriesName: "Series",
+            organizationName: "Organization",
+            organizationSlug: "organization",
+            startsAt: null,
+            endsAt: null,
+        },
+        showScores: true,
+        showRanking: true,
+        judgingEntries: [],
+        votingRounds: [],
+        peopleChoice: null,
+        awards: [
+            {
+                id: "99999999-9999-4999-8999-999999999999",
+                namespace: "best-overall",
+                name: "Best Overall",
+                description: "",
+                icon: "award",
+                color: "#00DC82",
+                teams: [
+                    {
+                        teamId,
+                        teamName: "Fixture Team",
+                        projectId: null,
+                        projectTitle: null,
+                        note: "",
+                    },
+                ],
+            },
+        ],
+        publishedAt: "2026-01-03T00:00:00.000Z",
+        ...overrides,
+    };
+}
+
 function sources(options: {
     readonly team?: TeamWithMembers;
     readonly submissions?: readonly SubmissionSummary[];
     readonly results?: readonly JudgingResult[];
     readonly teamSubmissions?: number;
+    readonly published?: PublicResults | null;
+    readonly project?: ProjectSummary;
 }): {
     readonly sources: EditionAdministrationSources;
     readonly updateTeamStatus: ReturnType<typeof vi.fn>;
@@ -162,6 +231,7 @@ function sources(options: {
                 listDivisions: async () => [division()],
             },
             teams: {
+                listEditionTeams: async () => [options.team ?? team()],
                 listEditionTeamsWithMembers: async () => [options.team ?? team()],
                 updateTeamStatus,
                 deleteTeam,
@@ -175,6 +245,16 @@ function sources(options: {
             },
             judging: {
                 listEditionResults: async () => options.results ?? [result(0)],
+            },
+            projects: {
+                getProject: async () => options.project ?? project(),
+            },
+            recognition: {
+                getPublishedResults: async () => options.published ?? null,
+                listTeamAwardNames: async () =>
+                    (options.published?.awards ?? []).flatMap((award) =>
+                        award.teams.map((team) => ({ teamId: team.teamId, name: award.name })),
+                    ),
             },
         },
         updateTeamStatus,
@@ -245,6 +325,95 @@ describe("EditionAdministrationService", () => {
         expect(teams[0]?.submittedAt).toBeNull();
         expect(teams[0]?.score).toBeNull();
         expect(teams[0]?.rank).toBeNull();
+    });
+
+    it("maps standings rows with status, pathway, exact and display scores, links, and awards", async () => {
+        const { sources: contractSources } = sources({
+            team: { ...team(), status: "disqualified" },
+            results: [
+                result(3, {
+                    averageScore: 87.4567,
+                    displayScore: 91.2,
+                    rank: 1,
+                }),
+            ],
+            published: publishedResults(),
+        });
+
+        const rows = await new EditionAdministrationService(contractSources).listStandings(
+            organizationId,
+            editionId,
+        );
+
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toEqual({
+            teamId,
+            teamName: "Fixture Team",
+            status: "disqualified",
+            pathway: "Open",
+            rank: 1,
+            averageScore: 87.4567,
+            displayScore: 91.2,
+            awards: ["Best Overall"],
+            projectTitle: "Fixture Project",
+            demoUrl: "https://example.test/demo",
+            repositoryUrl: "https://example.test/repo",
+            submitted: true,
+        });
+    });
+
+    it("falls back to the latest submission and leaves awards empty without published results", async () => {
+        const { sources: contractSources } = sources({
+            submissions: [
+                submission("draft", {
+                    id: "88888888-8888-4888-8888-888888888888",
+                    title: "Draft Project",
+                    submittedAt: null,
+                }),
+            ],
+            results: [],
+            published: null,
+        });
+
+        const rows = await new EditionAdministrationService(contractSources).listStandings(
+            organizationId,
+            editionId,
+        );
+
+        expect(rows[0]?.projectTitle).toBe("Draft Project");
+        expect(rows[0]?.awards).toEqual([]);
+        expect(rows[0]?.submitted).toBe(false);
+        expect(rows[0]?.rank).toBeNull();
+        expect(rows[0]?.averageScore).toBeNull();
+        expect(rows[0]?.displayScore).toBeNull();
+    });
+
+    it("orders ranked teams before unranked teams", async () => {
+        const secondTeamId = "88888888-8888-4888-8888-888888888888";
+        const { sources: contractSources } = sources({
+            results: [
+                result(3, { teamId: secondTeamId, teamName: "Second Team", rank: 2 }),
+                result(3, { teamId, teamName: "Fixture Team", rank: 1 }),
+            ],
+        });
+        const standings = new EditionAdministrationService({
+            ...contractSources,
+            teams: {
+                ...contractSources.teams,
+                listEditionTeams: async () => [
+                    {
+                        ...team(),
+                        id: secondTeamId,
+                        divisionId: null,
+                        name: "Second Team",
+                    },
+                    team(),
+                ],
+            },
+        });
+        const rows = await standings.listStandings(organizationId, editionId);
+
+        expect(rows.map((row) => row.teamName)).toEqual(["Fixture Team", "Second Team"]);
     });
 
     it("delegates team status changes with the acting user and reason", async () => {

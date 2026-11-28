@@ -462,6 +462,15 @@ export const judgingCoverageJudgeSchema = z.object({
 });
 export type JudgingCoverageJudge = z.infer<typeof judgingCoverageJudgeSchema>;
 
+export const judgingCalibrationOutlierSchema = z.object({
+    judgeUserId: idSchema,
+    judgeDisplayName: z.string(),
+    evaluationCount: z.number().int().nonnegative(),
+    averageWeightedScore: z.number(),
+    calibrationDelta: z.number(),
+});
+export type JudgingCalibrationOutlier = z.infer<typeof judgingCalibrationOutlierSchema>;
+
 export const judgingCoverageSchema = z.object({
     editionId: idSchema,
     editionName: z.string(),
@@ -469,7 +478,9 @@ export const judgingCoverageSchema = z.object({
     assignmentCount: z.number().int().nonnegative(),
     submittedCount: z.number().int().nonnegative(),
     editionAverageScore: z.number().nullable(),
+    standardDeviation: z.number().nonnegative(),
     judges: z.array(judgingCoverageJudgeSchema),
+    outliers: z.array(judgingCalibrationOutlierSchema),
     openFlags: z.array(judgeFlagSchema),
 });
 export type JudgingCoverage = z.infer<typeof judgingCoverageSchema>;

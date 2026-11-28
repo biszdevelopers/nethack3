@@ -31,13 +31,19 @@ import type { SubmissionsContract } from "../../submissions/contracts.js";
 import type { TeamsContract } from "../../teams/contracts.js";
 import {
     assertSelectionsEligible,
+    isActiveVotingTeam,
     toBallotEligibility,
     type BallotEligibility,
     type SubmissionPlacement,
     type TeamDivision,
 } from "../domain/ballot-eligibility.js";
 import { toVotableSubmissions, type VotableTeamInfo } from "../domain/votable-submissions.js";
-import { rankVoteTallies } from "../domain/voting-results.js";
+import {
+    isCountableSubmission,
+    rankVoteTallies,
+    tallyVoteUnits,
+    type VoterTeamMembership,
+} from "../domain/voting-results.js";
 import { normalizeEligibleRoles, VotingRules } from "../domain/voting-rules.js";
 import type {
     BallotRow,
@@ -52,6 +58,10 @@ import {
 } from "./project-disclosure.js";
 
 const RESULT_LIMIT = 200;
+
+interface ResolvedTeamInfo extends VotableTeamInfo {
+    readonly active: boolean;
+}
 
 export class VotingService {
     private readonly database: DatabaseConnection;
@@ -117,14 +127,18 @@ export class VotingService {
             organizationId,
             editionId,
         );
-        const votable = submissions.filter((submission) =>
+        const votableStatusSubmissions = submissions.filter((submission) =>
             VotingRules.isVotableSubmission(submission.status),
         );
         const teams = await this.resolveTeamInfo(
             organizationId,
-            votable.flatMap((submission) =>
+            votableStatusSubmissions.flatMap((submission) =>
                 submission.teamId === null ? [] : [submission.teamId],
             ),
+        );
+        const votable = votableStatusSubmissions.filter(
+            (submission) =>
+                submission.teamId === null || teams.get(submission.teamId)?.active === true,
         );
         const disclosures = await this.projectDisclosures(
             organizationId,
@@ -435,6 +449,7 @@ export class VotingService {
                             organizationId,
                             roundId,
                             userId: auth.user.id,
+                            voterTeamId: eligibility.teamId,
                             reasoning: input.reasoning,
                             submittedAt: lockedAt,
                         });
@@ -446,6 +461,7 @@ export class VotingService {
                             existing.id,
                             lockedAt,
                             input.reasoning,
+                            eligibility.teamId,
                         );
                         if (updated === null) {
                             throw new NotFoundError("The ballot was not found.");
@@ -547,74 +563,77 @@ export class VotingService {
         round: VotingRoundRow,
         includeAudit: boolean,
     ): Promise<VoteResult> {
-        const { counts, totalBallots } = await this.database.transaction(
-            { organizationId },
-            async (session) => ({
-                counts: await this.repository.aggregateVotes(session.db, organizationId, round.id),
-                totalBallots: await this.repository.countBallots(
-                    session.db,
-                    organizationId,
-                    round.id,
-                ),
-            }),
+        const ballots = await this.database.transaction({ organizationId }, (session) =>
+            this.repository.listBallotsWithVotes(session.db, organizationId, round.id),
         );
-        const audit = includeAudit ? await this.buildAudit(organizationId, round.id) : undefined;
-        if (counts.length === 0) {
-            return {
-                roundId: round.id,
-                roundName: round.name,
-                publishedAt: nullableIso(round.publishedAt),
-                totalBallots,
-                entries: [],
-                ...(audit === undefined ? {} : { audit }),
-            };
-        }
-        const submissions = await this.submissions.listEditionSubmissions(
-            organizationId,
-            round.editionId,
-        );
-        const titles = new Map<string, string>();
-        const teamNamesBySubmission = new Map<string, string | null>();
-        const teams = await this.resolveTeamInfo(
-            organizationId,
-            submissions.flatMap((submission) =>
-                submission.teamId === null ? [] : [submission.teamId],
-            ),
-        );
-        for (const submission of submissions) {
-            titles.set(submission.id, submission.title);
-            teamNamesBySubmission.set(
-                submission.id,
-                submission.teamId === null ? null : (teams.get(submission.teamId)?.name ?? null),
-            );
-        }
-        const entries = rankVoteTallies(counts, titles, RESULT_LIMIT, teamNamesBySubmission);
-        return {
+        const audit: VoteResult["audit"] = includeAudit
+            ? ballots.map((entry) => ({
+                  userId: entry.ballot.userId,
+                  submittedAt: entry.ballot.submittedAt.toISOString(),
+                  reasoning: entry.ballot.reasoning,
+                  scores: entry.scores.map((score) => ({
+                      submissionId: score.submissionId,
+                      stars: score.stars,
+                  })),
+              }))
+            : undefined;
+        const emptyResult: VoteResult = {
             roundId: round.id,
             roundName: round.name,
             publishedAt: nullableIso(round.publishedAt),
-            totalBallots,
-            entries,
+            totalBallots: 0,
+            entries: [],
             ...(audit === undefined ? {} : { audit }),
         };
-    }
-
-    private async buildAudit(
-        organizationId: string,
-        roundId: string,
-    ): Promise<VoteResult["audit"]> {
-        const ballots = await this.database.transaction({ organizationId }, (session) =>
-            this.repository.listBallotsWithVotes(session.db, organizationId, roundId),
+        if (ballots.length === 0) {
+            return emptyResult;
+        }
+        const [submissions, teamRows] = await Promise.all([
+            this.submissions.listEditionSubmissions(organizationId, round.editionId),
+            this.teams.listEditionTeamsWithMembers(organizationId, round.editionId),
+        ]);
+        const teamsById = new Map(teamRows.map((team) => [team.id, team] as const));
+        const teamMembershipsById = new Map(
+            teamRows.map((team) => [team.id, { teamId: team.id, status: team.status }] as const),
         );
-        return ballots.map((entry) => ({
-            userId: entry.ballot.userId,
-            submittedAt: entry.ballot.submittedAt.toISOString(),
-            reasoning: entry.ballot.reasoning,
-            scores: entry.scores.map((score) => ({
-                submissionId: score.submissionId,
-                stars: score.stars,
+        const teamsByUserId = new Map<string, VoterTeamMembership>();
+        for (const team of teamRows) {
+            for (const member of team.members) {
+                teamsByUserId.set(member.userId, { teamId: team.id, status: team.status });
+            }
+        }
+        const titles = new Map<string, string>();
+        const teamNamesBySubmission = new Map<string, string | null>();
+        const votableSubmissionIds = new Set<string>();
+        for (const submission of submissions) {
+            const team = submission.teamId === null ? undefined : teamsById.get(submission.teamId);
+            const countable = isCountableSubmission({
+                status: submission.status,
+                teamStatus: team?.status ?? null,
+            });
+            const teamless = submission.teamId === null;
+            if (!countable || (!teamless && team === undefined)) {
+                continue;
+            }
+            votableSubmissionIds.add(submission.id);
+            titles.set(submission.id, submission.title);
+            teamNamesBySubmission.set(submission.id, team?.name ?? null);
+        }
+        const { totalBallots, tallies } = tallyVoteUnits(
+            ballots.map((entry) => ({
+                userId: entry.ballot.userId,
+                voterTeamId: entry.ballot.voterTeamId,
+                scores: entry.scores,
             })),
-        }));
+            teamsByUserId,
+            votableSubmissionIds,
+            teamMembershipsById,
+        );
+        return {
+            ...emptyResult,
+            totalBallots,
+            entries: rankVoteTallies(tallies, titles, RESULT_LIMIT, teamNamesBySubmission),
+        };
     }
 
     private async requireEdition(
@@ -715,7 +734,7 @@ export class VotingService {
     private async resolveTeamInfo(
         organizationId: string,
         teamIds: readonly string[],
-    ): Promise<Map<string, VotableTeamInfo>> {
+    ): Promise<Map<string, ResolvedTeamInfo>> {
         const uniqueTeamIds = [...new Set(teamIds)];
         const teamRows = await Promise.all(
             uniqueTeamIds.map(async (teamId) => {
@@ -739,7 +758,7 @@ export class VotingService {
                 }
             }),
         );
-        const info = new Map<string, VotableTeamInfo>();
+        const info = new Map<string, ResolvedTeamInfo>();
         for (const [teamId, team] of teamRows) {
             if (team === null) {
                 continue;
@@ -749,6 +768,7 @@ export class VotingService {
                 divisionId: team.divisionId,
                 divisionName:
                     team.divisionId === null ? null : (divisionNames.get(team.divisionId) ?? null),
+                active: isActiveVotingTeam(team.status),
             });
         }
         return info;
@@ -801,6 +821,11 @@ export class VotingService {
                 submission.teamId === null ? [] : [submission.teamId],
             ),
         );
+        for (const submission of selected) {
+            if (submission.teamId !== null && teams.get(submission.teamId)?.active !== true) {
+                throw new ConflictError("A scored submission's team is not active.");
+            }
+        }
         const teamDivisions = new Map<string, TeamDivision>();
         for (const [teamId, team] of teams) {
             teamDivisions.set(teamId, { divisionId: team.divisionId });

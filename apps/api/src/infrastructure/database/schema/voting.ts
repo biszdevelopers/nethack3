@@ -71,6 +71,7 @@ export const ballots = pgTable(
         userId: uuid("user_id")
             .notNull()
             .references(() => users.id, { onDelete: "cascade" }),
+        voterTeamId: uuid("voter_team_id"),
         reasoning: text("reasoning").notNull().default(""),
         submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

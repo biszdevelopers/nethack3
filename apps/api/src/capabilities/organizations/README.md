@@ -14,7 +14,7 @@ Owns organizations, settings, memberships, invitations, audit-log reads, and edi
 ## Dependencies
 
 - `identity` through the authenticated `AuthContext` supplied by the Core.
-- No other capability. Reports use organization-owned tables only.
+- Reports use organization-owned tables only. The role/team overlap guard calls `teams.v1` lazily at request time because `teams` already depends on `organizations`; declaring the dependency would form a cycle.
 
 ## Permissions
 
@@ -22,6 +22,7 @@ Owns organizations, settings, memberships, invitations, audit-log reads, and edi
 - Owners and organizers read the audit log and reports.
 - Every route requires an active membership in the target organization.
 - Role changes and removals cannot remove the last owner.
+- A user with an active team membership cannot be promoted, invited, or added as judge, organizer, or owner (`409 conflict`). Participants remain eligible.
 
 ## Events
 
@@ -31,8 +32,9 @@ Organization events are published through the transactional outbox and consumed 
 
 `organizations.v1` exposes organization summaries, public-showcase settings, and membership administration:
 
+- `getMembershipRole(organizationId, userId)` returns the role of an active membership, or null.
 - `listMembershipsWithUsers(organizationId)` returns membership summaries with user id, display name, email, role, status, and created timestamp. Status is `active` or `suspended`; pending invitations are managed by the invitation routes and are not memberships. It exposes no invitation tokens or secrets.
-- `updateMemberRole(actor, organizationId, userId, role)` locks the organization's membership rows, enforces last-owner protection with `OrganizationRules.assertRoleChangeIsSafe`, updates the role, writes an `organization.membership.updated` audit row, and returns the updated summary.
+- `updateMemberRole(actor, organizationId, userId, role)` rejects judge, organizer, and owner roles for a user with an active team membership, then locks the organization's membership rows, enforces last-owner protection with `OrganizationRules.assertRoleChangeIsSafe`, updates the role, writes an `organization.membership.updated` audit row, and returns the updated summary.
 
 Membership administration assumes the caller has already established an owner/organizer membership. The contract enforces organization scope, the last-owner rule, and auditing; it does not re-check the caller's role.
 

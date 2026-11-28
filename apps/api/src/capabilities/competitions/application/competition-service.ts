@@ -8,6 +8,7 @@ import type {
     CreateMilestoneRequest,
     CreateSeriesRequest,
     Division,
+    EditionLifecycleRequest,
     Milestone,
     OrganizerEdition,
     PublicCompetition,
@@ -25,6 +26,7 @@ import {
     ConflictError,
     isUniqueViolationError as isUniqueViolation,
     NotFoundError,
+    ValidationError,
 } from "../../../core/errors.js";
 import type { OutboxPublisher } from "../../../core/outbox.js";
 import type { AuditLogger } from "../../../infrastructure/audit/audit-logger.js";
@@ -538,6 +540,67 @@ export class CompetitionService {
             },
         );
         return toEdition(published);
+    }
+
+    async lifecycle(
+        auth: AuthContext,
+        organizationId: string,
+        editionId: string,
+        input: EditionLifecycleRequest,
+        ip: string | null,
+    ): Promise<CompetitionEdition> {
+        if (input.action === "reset" && input.confirm !== true) {
+            throw new ValidationError("Resetting an edition requires explicit confirmation.", {
+                confirm: ["Resetting an edition requires explicit confirmation."],
+            });
+        }
+        const now = this.clock.now();
+        const updated = await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const current = await this.repository.findEdition(
+                    session.db,
+                    organizationId,
+                    editionId,
+                );
+                if (current === null) {
+                    throw new NotFoundError("The competition edition was not found.");
+                }
+                const transition = CompetitionRules.resolveLifecycle(
+                    input.action,
+                    current.status,
+                    current.statusBeforePause,
+                );
+                const row = await this.repository.updateEdition(
+                    session,
+                    organizationId,
+                    editionId,
+                    {
+                        status: transition.status,
+                        statusBeforePause: transition.statusBeforePause,
+                        updatedAt: now,
+                    },
+                );
+                if (row === null) {
+                    throw new NotFoundError("The competition edition was not found.");
+                }
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: "competition.edition.lifecycle",
+                    entityType: "competition_edition",
+                    entityId: editionId,
+                    metadata: {
+                        action: input.action,
+                        previousStatus: current.status,
+                        nextStatus: transition.status,
+                    },
+                    ip,
+                });
+                return row;
+            },
+        );
+        return toEdition(updated);
     }
 
     async divisions(organizationId: string, editionId: string): Promise<readonly Division[]> {
@@ -1099,6 +1162,7 @@ function toEdition(row: EditionRow): CompetitionEdition {
         showScores: row.showScores,
         showRanking: row.showRanking,
         status: row.status,
+        statusBeforePause: row.statusBeforePause,
         timezone: row.timezone,
         registrationOpensAt: nullableIso(row.registrationOpensAt),
         registrationClosesAt: nullableIso(row.registrationClosesAt),
