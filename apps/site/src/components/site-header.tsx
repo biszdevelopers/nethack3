@@ -41,7 +41,7 @@ const PRIMARY_NAVIGATION = [
     { href: "/", label: "Home", icon: House },
     { href: "/competitions", label: "Competitions", icon: Trophy },
     { href: "/past", label: "Seasons", icon: Archive },
-    { href: "/projects", label: "Showcase", icon: FolderGit2 },
+    { href: "/showcase", label: "Showcase", icon: FolderGit2 },
     { href: "/results", label: "Results", icon: Medal },
     { href: "/announcements", label: "Announcements", icon: Megaphone },
 ] as const;

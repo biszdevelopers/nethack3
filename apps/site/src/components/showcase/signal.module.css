@@ -1,0 +1,160 @@
+.titleScrim {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, black 72%, transparent);
+}
+
+.signalWord {
+    color: var(--color-primary);
+    animation: signal-pulse 4s ease-in-out infinite;
+}
+
+@keyframes signal-pulse {
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.72;
+    }
+}
+
+.rankFirst,
+.rankSecond,
+.rankThird {
+    padding-bottom: 0.08em;
+    border-bottom: 2px solid currentColor;
+}
+
+.rankFirst {
+    color: var(--color-primary);
+}
+
+.rankSecond {
+    color: currentColor;
+}
+
+.rankThird {
+    color: color-mix(in srgb, currentColor 65%, transparent);
+}
+
+.giantNumber {
+    position: absolute;
+    z-index: 0;
+    font-size: clamp(9rem, 25vw, 30rem);
+    font-weight: 800;
+    line-height: 0.8;
+    letter-spacing: -0.08em;
+    pointer-events: none;
+    user-select: none;
+}
+
+.giantNumberFirst {
+    top: 50%;
+    left: -0.6rem;
+    transform: translate(-8%, -64%);
+    color: var(--color-primary);
+    opacity: 0.14;
+}
+
+.giantNumberSecond {
+    top: -1rem;
+    left: 50%;
+    transform: translate(-50%, 0);
+    color: currentColor;
+    opacity: 0.12;
+}
+
+.giantNumberThird {
+    top: -0.15em;
+    right: 0.02em;
+    color: currentColor;
+    opacity: 0.16;
+}
+
+.aura {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0;
+    width: 10rem;
+    height: 10rem;
+    border: 1px solid color-mix(in srgb, var(--color-primary) 35%, transparent);
+    border-radius: 999px;
+    pointer-events: none;
+    opacity: 0;
+}
+
+.word {
+    display: inline-block;
+    margin-right: 0.28em;
+    will-change: transform, opacity;
+}
+
+.marqueeShell {
+    overflow: hidden;
+}
+
+.marqueeTrack {
+    display: flex;
+    width: max-content;
+    will-change: transform;
+}
+
+.marqueeRow {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.5rem;
+    scrollbar-width: thin;
+}
+
+.windowShot {
+    display: block;
+    width: 100%;
+    height: auto;
+    object-fit: cover;
+    object-position: top center;
+}
+
+.scrollHint {
+    transition:
+        opacity 400ms ease,
+        transform 400ms ease;
+}
+
+.scrollHintHidden {
+    opacity: 0;
+    transform: translateY(8px);
+    pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .signalWord {
+        animation: none;
+    }
+
+    .marqueeShell {
+        overflow-x: auto;
+    }
+
+    .marqueeTrack {
+        width: max-content;
+    }
+
+    .marqueeDuplicate {
+        display: none;
+    }
+
+    .scrollHint {
+        transition: none;
+    }
+}
+
+@media (forced-colors: active) {
+    .rankFirst,
+    .rankSecond,
+    .rankThird {
+        color: CanvasText;
+    }
+}

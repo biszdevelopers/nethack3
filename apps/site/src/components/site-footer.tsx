@@ -36,10 +36,16 @@ export function SiteFooter(): ReactNode {
                         Competitions
                     </Link>
                     <Link
-                        href="/projects"
+                        href="/showcase"
                         className="text-ink-muted transition-colors hover:text-primary"
                     >
                         Showcase
+                    </Link>
+                    <Link
+                        href="/projects"
+                        className="text-ink-muted transition-colors hover:text-primary"
+                    >
+                        Project gallery
                     </Link>
                     <Link
                         href="/announcements"

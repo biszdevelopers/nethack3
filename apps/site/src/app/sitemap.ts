@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getCompetitions, getProjects } from "../lib/public-api";
+import { getAllProjects, getCompetitions } from "../lib/public-api";
 
 const SITE_ORIGIN = process.env.SITE_ORIGIN ?? "http://localhost:3000";
 
@@ -12,6 +12,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         "/projects",
         "/results",
         "/announcements",
+        "/showcase",
+        "/showcase/signal",
+        "/showcase/beneath-the-surface",
         "/about",
         "/faq",
         "/contact",
@@ -24,7 +27,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }));
 
     try {
-        const [competitions, projects] = await Promise.all([getCompetitions(), getProjects()]);
+        const [competitions, projects] = await Promise.all([getCompetitions(), getAllProjects()]);
         return [
             ...staticRoutes,
             ...competitions.items.flatMap((competition) => [
@@ -40,8 +43,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
                     changeFrequency: "weekly" as const,
                     priority: 0.5,
                 },
+                {
+                    url: `${SITE_ORIGIN}/showcase/seasons/${competition.slug}`,
+                    lastModified: new Date(),
+                    changeFrequency: "weekly" as const,
+                    priority: 0.5,
+                },
             ]),
-            ...projects.items.map((project) => ({
+            ...projects.map((project) => ({
                 url: `${SITE_ORIGIN}/projects/${project.slug}`,
                 lastModified:
                     project.publishedAt === null ? new Date() : new Date(project.publishedAt),

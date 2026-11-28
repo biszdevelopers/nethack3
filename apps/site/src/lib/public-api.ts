@@ -75,6 +75,32 @@ export async function getProjects(competition?: string): Promise<ListResponse<Pu
     return publicRequest(`/api/v1/public/projects${query}`, projectListSchema);
 }
 
+const MAX_PROJECT_PAGES = 50;
+
+export async function getAllProjects(competition?: string): Promise<readonly PublicProject[]> {
+    const projects: PublicProject[] = [];
+    let cursor: string | null = null;
+    for (let page = 0; page < MAX_PROJECT_PAGES; page += 1) {
+        const params = new URLSearchParams({ limit: "100" });
+        if (competition !== undefined) {
+            params.set("competition", competition);
+        }
+        if (cursor !== null) {
+            params.set("cursor", cursor);
+        }
+        const response = await publicRequest(
+            `/api/v1/public/projects?${params.toString()}`,
+            projectListSchema,
+        );
+        projects.push(...response.items);
+        cursor = response.nextCursor;
+        if (cursor === null) {
+            return projects;
+        }
+    }
+    throw new PublicApiError("The public project archive is too large to load.");
+}
+
 export async function getProject(slug: string): Promise<PublicProject> {
     return publicRequest(
         `/api/v1/public/projects/${encodeURIComponent(slug)}`,

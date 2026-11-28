@@ -15,6 +15,10 @@ const PUBLIC_PAGES = [
     "/contact",
     "/contributing",
     `/seasons/${FIXTURE.editionSlug}`,
+    "/showcase",
+    "/showcase/signal",
+    "/showcase/beneath-the-surface",
+    `/showcase/seasons/${FIXTURE.editionSlug}`,
 ] as const;
 
 function siteUrl(path: string): string {
