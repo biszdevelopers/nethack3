@@ -7,6 +7,7 @@ import {
     organizationRoleSchema,
     reportSummarySchema,
 } from "../common/schemas.js";
+import { fileStatusSchema } from "../files/schemas.js";
 import { submissionStatusSchema } from "../submissions/schemas.js";
 import { teamRoleSchema, teamStatusSchema } from "../teams/schemas.js";
 
@@ -161,5 +162,96 @@ export const administrationPreflightSchema = z.object({
     }),
 });
 export type AdministrationPreflight = z.infer<typeof administrationPreflightSchema>;
+
+/**
+ * Read-only file metadata for the global administrator file browser. Storage
+ * keys and file contents are deliberately absent.
+ */
+export const storedFileMetadataSchema = z.object({
+    id: idSchema,
+    organizationId: idSchema,
+    projectId: idSchema.nullable(),
+    submissionId: idSchema.nullable(),
+    versionId: idSchema.nullable(),
+    fileName: z.string(),
+    contentType: z.string(),
+    byteSize: z.number().int().nonnegative(),
+    checksumSha256: z.string(),
+    status: fileStatusSchema,
+    createdAt: isoDateTimeSchema,
+});
+export type StoredFileMetadata = z.infer<typeof storedFileMetadataSchema>;
+
+export const storedFilePageSchema = z.object({
+    items: z.array(storedFileMetadataSchema),
+    total: z.number().int().nonnegative(),
+    limit: z.number().int().positive(),
+    offset: z.number().int().nonnegative(),
+});
+export type StoredFilePage = z.infer<typeof storedFilePageSchema>;
+
+export const storedFileQuerySchema = z.object({
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+    offset: z.coerce.number().int().min(0).default(0),
+});
+export type StoredFileQuery = z.infer<typeof storedFileQuerySchema>;
+
+export const debugAiMessageRoleSchema = z.enum(["user", "assistant"]);
+export type DebugAiMessageRole = z.infer<typeof debugAiMessageRoleSchema>;
+
+export const debugAiMessageSchema = z.object({
+    id: idSchema,
+    sessionId: idSchema,
+    role: debugAiMessageRoleSchema,
+    content: z.string(),
+    createdAt: isoDateTimeSchema,
+});
+export type DebugAiMessage = z.infer<typeof debugAiMessageSchema>;
+
+export const debugAiSessionSchema = z.object({
+    id: idSchema,
+    name: z.string(),
+    messageCount: z.number().int().nonnegative(),
+    createdAt: isoDateTimeSchema,
+    updatedAt: isoDateTimeSchema,
+});
+export type DebugAiSession = z.infer<typeof debugAiSessionSchema>;
+
+export const debugAiSessionDetailSchema = debugAiSessionSchema.extend({
+    messages: z.array(debugAiMessageSchema),
+});
+export type DebugAiSessionDetail = z.infer<typeof debugAiSessionDetailSchema>;
+
+export const debugAiStatusSchema = z.object({
+    configured: z.boolean(),
+    model: z.string().nullable(),
+});
+export type DebugAiStatus = z.infer<typeof debugAiStatusSchema>;
+
+export const debugAiSessionListSchema = z.object({
+    items: z.array(debugAiSessionSchema),
+    configured: z.boolean(),
+});
+export type DebugAiSessionList = z.infer<typeof debugAiSessionListSchema>;
+
+export const createDebugAiSessionRequestSchema = z
+    .object({
+        name: z.string().trim().min(1).max(100),
+    })
+    .strict();
+export type CreateDebugAiSessionRequest = z.infer<typeof createDebugAiSessionRequestSchema>;
+
+export const sendDebugAiMessageRequestSchema = z
+    .object({
+        content: z.string().trim().min(1).max(4000),
+    })
+    .strict();
+export type SendDebugAiMessageRequest = z.infer<typeof sendDebugAiMessageRequestSchema>;
+
+export const debugAiExchangeSchema = z.object({
+    userMessage: debugAiMessageSchema,
+    assistantMessage: debugAiMessageSchema,
+});
+export type DebugAiExchange = z.infer<typeof debugAiExchangeSchema>;
 
 export { reportSummarySchema };

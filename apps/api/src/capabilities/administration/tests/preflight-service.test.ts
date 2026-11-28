@@ -55,6 +55,7 @@ function round(status: VotingRound["status"]): VotingRound {
         status,
         eligibleRoles: ["participant"],
         maxSelections: 10,
+        maxVotesPerUser: 0,
         opensAt: null,
         closesAt: null,
         publishedAt: null,

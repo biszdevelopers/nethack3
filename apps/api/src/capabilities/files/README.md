@@ -33,6 +33,8 @@ Owns project file uploads, inspection, storage, listing, authorized downloads, d
 
 `getFile(organizationId, fileId)` reads within the organization transaction. `listProjectFiles(organizationId, projectId)` returns approved project-level rows only (`submission_id` and `version_id` are null), ordered by `created_at` descending; version snapshots never appear there.
 
+`listStoredFiles(organizationIds, query)` is a read-only metadata feed for the global administrator developer browser. It accepts a page limit/offset and a `linkedOnly` flag, sets the organization context per supplied organization, excludes deleted rows, and returns no storage key, uploader identity, rejection note, or content. Total counts cover every supplied organization even when the requested page is already full.
+
 `attachToSubmission(...)` creates a new approved snapshot row for the given submission and version, copying the project-level file's metadata and sharing its storage object. The original project-level row stays unchanged so earlier versions keep their file lists. A snapshot for the same `(submission_id, version_id, storage_key)` is not inserted twice.
 
 Composite foreign keys enforce that the submission and version also belong to the organization. Snapshot rows carry `project_id`, so download authorization (project membership/organizer, or public when the project is published) works unchanged for version files.

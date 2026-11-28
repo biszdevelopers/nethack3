@@ -3,6 +3,7 @@ import type { DatabaseExecutor, DatabaseSession } from "../../../infrastructure/
 import {
     auditLogs,
     globalAdministrators,
+    organizations,
     users,
 } from "../../../infrastructure/database/schema/index.js";
 
@@ -44,6 +45,18 @@ const administratorColumns = {
 };
 
 export class AdministrationRepository {
+    /**
+     * Platform directory used by global administrator tools. Organization
+     * business data is still reached through capability contracts.
+     */
+    async listOrganizationIds(db: DatabaseExecutor): Promise<readonly string[]> {
+        const rows = await db
+            .select({ id: organizations.id })
+            .from(organizations)
+            .orderBy(organizations.id);
+        return rows.map((row) => row.id);
+    }
+
     async listAdministrators(db: DatabaseExecutor): Promise<readonly GlobalAdministratorRow[]> {
         return db
             .select(administratorColumns)

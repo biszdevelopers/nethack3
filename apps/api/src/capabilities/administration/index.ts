@@ -1,5 +1,6 @@
 import type { CapabilityDefinition } from "../../core/capability.js";
 import { COMPETITIONS_CONTRACT, type CompetitionsContract } from "../competitions/contracts.js";
+import { FILES_CONTRACT, type FilesContract } from "../files/contracts.js";
 import { JUDGING_CONTRACT, type JudgingContract } from "../judging/contracts.js";
 import { ORGANIZATIONS_CONTRACT, type OrganizationsContract } from "../organizations/contracts.js";
 import { PARTICIPANTS_CONTRACT, type ParticipantsContract } from "../participants/contracts.js";
@@ -8,11 +9,16 @@ import { SUBMISSIONS_CONTRACT, type SubmissionsContract } from "../submissions/c
 import { TEAMS_CONTRACT, type TeamsContract } from "../teams/contracts.js";
 import { VOTING_CONTRACT, type VotingContract } from "../voting/contracts.js";
 import { AdministrationService } from "./application/administration-service.js";
+import { DatabaseExportService } from "./application/database-export.js";
+import { DebugAiService, loadAiConfiguration } from "./application/debug-ai-service.js";
 import { EditionAdministrationService } from "./application/edition-administration-service.js";
 import { PreflightService } from "./application/preflight-service.js";
 import { ReportService } from "./application/report-service.js";
 import { registerAdministrationRoutes } from "./http/administration-routes.js";
+import { registerOperatorRoutes } from "./http/operator-routes.js";
 import { AdministrationRepository } from "./infrastructure/administration-repository.js";
+import { PostgresDatabaseExportSource } from "./infrastructure/database-export-repository.js";
+import { DebugAiRepository } from "./infrastructure/debug-ai-repository.js";
 
 export const administrationCapability: CapabilityDefinition = {
     id: "administration",
@@ -25,11 +31,22 @@ export const administrationCapability: CapabilityDefinition = {
         "teams",
         "projects",
         "submissions",
+        "files",
         "judging",
         "voting",
     ],
     async register(context) {
         const repository = new AdministrationRepository();
+        const databaseExport = new DatabaseExportService(
+            new PostgresDatabaseExportSource(context.database),
+            context.clock,
+        );
+        const debugAi = new DebugAiService(
+            context.database,
+            new DebugAiRepository(),
+            context.clock,
+            loadAiConfiguration(process.env),
+        );
         const organizationsContract =
             context.contracts.get<OrganizationsContract>(ORGANIZATIONS_CONTRACT);
         const service = new AdministrationService(
@@ -44,6 +61,7 @@ export const administrationCapability: CapabilityDefinition = {
         const submissionsContract =
             context.contracts.get<SubmissionsContract>(SUBMISSIONS_CONTRACT);
         const judgingContract = context.contracts.get<JudgingContract>(JUDGING_CONTRACT);
+        const filesContract = context.contracts.get<FilesContract>(FILES_CONTRACT);
         const reports = new ReportService({
             editions: editionsContract,
             registrations: context.contracts.get<ParticipantsContract>(PARTICIPANTS_CONTRACT),
@@ -76,6 +94,14 @@ export const administrationCapability: CapabilityDefinition = {
                     reports,
                     editionService,
                     preflight,
+                );
+                await registerOperatorRoutes(
+                    app,
+                    context,
+                    databaseExport,
+                    debugAi,
+                    filesContract,
+                    repository,
                 );
             },
         };

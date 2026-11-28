@@ -1,9 +1,37 @@
-import { and, desc, eq, isNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, ne, or, sql, type SQL } from "drizzle-orm";
 import type { DatabaseExecutor, DatabaseSession } from "../../../infrastructure/database/client.js";
 import { submissionFiles } from "../../../infrastructure/database/schema/index.js";
 import { buildFileSnapshot } from "../domain/file-snapshot.js";
 
 export type FileRow = typeof submissionFiles.$inferSelect;
+
+export interface AdministrationFileRow {
+    readonly id: string;
+    readonly organizationId: string;
+    readonly projectId: string | null;
+    readonly submissionId: string | null;
+    readonly versionId: string | null;
+    readonly fileName: string;
+    readonly contentType: string;
+    readonly byteSize: number;
+    readonly checksumSha256: string;
+    readonly status: FileRow["status"];
+    readonly createdAt: Date;
+}
+
+const administrationFileColumns = {
+    id: submissionFiles.id,
+    organizationId: submissionFiles.organizationId,
+    projectId: submissionFiles.projectId,
+    submissionId: submissionFiles.submissionId,
+    versionId: submissionFiles.versionId,
+    fileName: submissionFiles.fileName,
+    contentType: submissionFiles.contentType,
+    byteSize: submissionFiles.byteSize,
+    checksumSha256: submissionFiles.checksumSha256,
+    status: submissionFiles.status,
+    createdAt: submissionFiles.createdAt,
+};
 
 export class FileRepository {
     async insert(
@@ -144,6 +172,54 @@ export class FileRepository {
                 },
             ),
         );
+    }
+
+    async countAdministrationFiles(
+        db: DatabaseExecutor,
+        organizationId: string,
+        linkedOnly: boolean,
+    ): Promise<number> {
+        const conditions: SQL[] = [
+            eq(submissionFiles.organizationId, organizationId),
+            ne(submissionFiles.status, "deleted"),
+        ];
+        if (linkedOnly) {
+            conditions.push(
+                or(isNotNull(submissionFiles.submissionId), isNotNull(submissionFiles.versionId)) ??
+                    sql`false`,
+            );
+        }
+        const rows = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(submissionFiles)
+            .where(and(...conditions));
+        return rows[0]?.count ?? 0;
+    }
+
+    async listAdministrationFiles(
+        db: DatabaseExecutor,
+        organizationId: string,
+        linkedOnly: boolean,
+        limit: number,
+        offset: number,
+    ): Promise<readonly AdministrationFileRow[]> {
+        const conditions: SQL[] = [
+            eq(submissionFiles.organizationId, organizationId),
+            ne(submissionFiles.status, "deleted"),
+        ];
+        if (linkedOnly) {
+            conditions.push(
+                or(isNotNull(submissionFiles.submissionId), isNotNull(submissionFiles.versionId)) ??
+                    sql`false`,
+            );
+        }
+        return db
+            .select(administrationFileColumns)
+            .from(submissionFiles)
+            .where(and(...conditions))
+            .orderBy(desc(submissionFiles.createdAt), desc(submissionFiles.id))
+            .limit(limit)
+            .offset(offset);
     }
 
     async countStorageReferences(

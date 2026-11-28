@@ -115,6 +115,14 @@ export const router = createBrowserRouter([
                         },
                     },
                     {
+                        path: "judging/rubrics",
+                        lazy: async () => {
+                            const { JudgingRubricsPage } =
+                                await import("../pages/judging-rubrics-page.js");
+                            return { Component: JudgingRubricsPage };
+                        },
+                    },
+                    {
                         path: "voting",
                         lazy: async () => {
                             const { VotingPage } = await import("../pages/voting-page.js");
@@ -201,6 +209,22 @@ export const router = createBrowserRouter([
                             const { PresentationPage } =
                                 await import("../pages/presentation-page.js");
                             return { Component: PresentationPage };
+                        },
+                    },
+                    {
+                        path: "developers/debug",
+                        lazy: async () => {
+                            const { DevelopersDebugPage } =
+                                await import("../pages/developers-debug-page.js");
+                            return { Component: DevelopersDebugPage };
+                        },
+                    },
+                    {
+                        path: "developers/docs",
+                        lazy: async () => {
+                            const { DevelopersDocsPage } =
+                                await import("../pages/developers-docs-page.js");
+                            return { Component: DevelopersDocsPage };
                         },
                     },
                     ...(import.meta.env.DEV

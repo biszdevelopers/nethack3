@@ -1,6 +1,6 @@
 # Administration capability
 
-Owns platform and organization administration: global administrator grants, the cross-organization audit view, organization member role administration, edition team operating tools, standings export, preflight counts, and the organization report summary. Global administrator privileges are a platform flag on a user account, never an organization role.
+Owns platform and organization administration: global administrator grants, the cross-organization audit view, organization member role administration, edition team operating tools, standings export, preflight counts, the organization report summary, the anonymized database export, the read-only developer file browser, and the persisted operator AI chat. Global administrator privileges are a platform flag on a user account, never an organization role.
 
 ## Dependencies
 
@@ -9,15 +9,18 @@ Owns platform and organization administration: global administrator grants, the 
 - `competitions` (`competitions.v1`) for edition resolution.
 - `participants` (`participants.v1`), `teams` (`teams.v1`), `projects` (`projects.v1`), `submissions` (`submissions.v1`), `judging` (`judging.v1`) for per-edition counts, team lists, submission lists, and judging results.
 - `voting` (`voting.v1`) for the published-results flag in preflight.
+- `files` (`files.v1`) for read-only stored-file metadata in the developer browser.
 - Core services: database transactions, audit log, clock.
 
 ## Tables
 
-Owned writes: `global_administrators`.
+Owned writes: `global_administrators`, `debug_ai_sessions`, `debug_ai_messages`.
 
-Platform reads: `users` for global administrator display/grant lookup and audit actor display, `audit_logs` for audit pages, and `global_administrators` for grants.
+Platform reads: `users` for global administrator display/grant lookup and audit actor display, `audit_logs` for audit pages, `global_administrators` for grants, and the `organizations` platform directory for the export and file browser organization list.
 
-Organization memberships are read and updated only through `organizations.v1`. Administration does not import `organization_memberships` or `organizations`. Team, submission, and judging data is reached only through their public contracts.
+The database export deliberately reads tenant tables directly because it is a platform archive endpoint. Every tenant read runs inside one `REPEATABLE READ READ ONLY` transaction and sets `nethack.organization_id` per organization so row level security still applies. Administration does not write or import another capability's tables for normal operations.
+
+Organization memberships are read and updated only through `organizations.v1`. Administration does not import `organization_memberships`. Team, submission, and judging data is reached only through their public contracts.
 
 ## Routes and permissions
 
@@ -39,8 +42,37 @@ Administrator routes never establish an organization context. Organization-scope
 | POST | `/api/v1/administration/editions/:editionId/submissions/:submissionId/reopen` | Owner or organizer |
 | GET | `/api/v1/administration/editions/:editionId/preflight` | Owner or organizer |
 | GET | `/api/v1/administration/editions/:editionId/standings.csv` | Owner or organizer |
+| GET | `/api/v1/admin/database/export` | Global administrator |
+| GET | `/api/v1/admin/debug/files` | Global administrator |
+| GET | `/api/v1/admin/debug/references` | Global administrator |
+| GET | `/api/v1/admin/debug/ai/status` | Global administrator |
+| GET | `/api/v1/admin/debug/ai/sessions` | Global administrator |
+| POST | `/api/v1/admin/debug/ai/sessions` | Global administrator |
+| GET | `/api/v1/admin/debug/ai/sessions/:sessionId` | Global administrator |
+| DELETE | `/api/v1/admin/debug/ai/sessions/:sessionId` | Global administrator |
+| POST | `/api/v1/admin/debug/ai/sessions/:sessionId/messages` | Global administrator |
 
 `GET /api/v1/admin/audit` requires `organizationId`; audit records are always organization-scoped. `GET /api/v1/admin/audit/global` accepts an optional `organizationId` plus `action`, `entityType`, `actorUserId`, `cursor`, and `limit` (1-100). Both pages are newest first and join `users` for `actorDisplayName`.
+
+## Operator tools
+
+### Database export
+
+`GET /api/v1/admin/database/export` streams one JSON object with `formatVersion`, `generatedAt`, `omitted`, and these sections: organizations, competition series and editions, divisions, milestones, teams and team members, projects and project members, submissions and versions, file metadata, judging rubrics/criteria/assignments and per-submission judging aggregates, awards and team awards, published results snapshots, voting rounds and per-submission vote totals, and notification metadata.
+
+The export omits judge identities and per-judge evaluation records, invitation tokens, session token hashes, CSRF hashes, encrypted OAuth access and refresh tokens, other authentication secrets, stored file contents and storage keys, notification recipients, bodies and deduplication keys, and individual evaluation rows and comments. The serializer also strips any forbidden key recursively in case a query later selects one.
+
+Tenant tables are read organization by organization inside one repeatable-read, read-only transaction. The response is an attachment named `nethack-export-<date>.json` with `cache-control: private, no-store`.
+
+### File browser
+
+`GET /api/v1/admin/debug/files` and `GET /api/v1/admin/debug/references` return paginated file metadata with `limit` (1-100) and `offset`. References are files linked to a submission or submission version. The response contains file name, content type, byte size, SHA-256 checksum, status, organization, project, submission, and version identifiers. Storage keys, uploader identity, rejection notes, and contents are never returned.
+
+### Operator AI chat
+
+Configuration is read only from the API process environment: `OPENAI_API_KEY` enables the feature, `OPENAI_BASE_URL` defaults to `https://api.openai.com/v1`, and `OPENAI_MODEL` defaults to `gpt-4o-mini`. A request never supplies a URL, model, or credential. The provider call has a fixed 20-second timeout and no tools.
+
+Without `OPENAI_API_KEY`, `/status` and the session list report `configured: false`; message sends return `503` with a clear not-configured message and never invent a reply. Sessions and messages belong to the authenticated global administrator. A message send persists the user message and the assistant reply together only after the provider returns a non-empty answer; provider failures return `502` and persist nothing.
 
 ## Rules
 
@@ -83,6 +115,8 @@ No domain events or jobs are published.
 - `tests/preflight-service.test.ts` covers count aggregation, readiness, open flags, published results, and missing editions with mocked contracts.
 - `tests/standings-csv.test.ts` covers CSV quoting, formula neutralization, numeric formatting, and empty ranks/scores.
 - `tests/report-summary.test.ts` covers the report aggregation shape, edition ordering, and the 50-edition bound with mocked contracts. No database is required.
+- `tests/database-export.test.ts` covers archive parsing, recursive omission of judge/token/file/notification secrets, and rollback when a read fails. No database is required.
+- `tests/debug-ai-service.test.ts` covers the not-configured status and the `503` send path without any provider or repository call. No database is required.
 
 ## Extraction
 

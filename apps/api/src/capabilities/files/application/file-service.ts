@@ -15,8 +15,17 @@ import {
 } from "../../../core/errors.js";
 import type { ProjectsContract } from "../../projects/contracts.js";
 import { inspectFileUpload } from "../domain/file-inspector.js";
-import type { StoredFileSummary } from "../contracts.js";
-import type { FileRepository, FileRow } from "../infrastructure/file-repository.js";
+import type {
+    StoredFileMetadata,
+    StoredFilePage,
+    StoredFileQuery,
+    StoredFileSummary,
+} from "../contracts.js";
+import type {
+    AdministrationFileRow,
+    FileRepository,
+    FileRow,
+} from "../infrastructure/file-repository.js";
 
 export interface UploadInput {
     readonly organizationId: string;
@@ -295,6 +304,58 @@ export class FileService {
               };
     }
 
+    async contractListStoredFiles(
+        organizationIds: readonly string[],
+        query: StoredFileQuery,
+    ): Promise<StoredFilePage> {
+        const items: StoredFileMetadata[] = [];
+        let total = 0;
+        let remainingOffset = query.offset;
+        let remainingLimit = query.limit;
+
+        for (const organizationId of organizationIds) {
+            const page = await this.database.transaction({ organizationId }, async (session) => {
+                const count = await this.repository.countAdministrationFiles(
+                    session.db,
+                    organizationId,
+                    query.linkedOnly,
+                );
+                if (remainingLimit <= 0 || remainingOffset >= count) {
+                    return { count, rows: [] as readonly AdministrationFileRow[] };
+                }
+                const rows = await this.repository.listAdministrationFiles(
+                    session.db,
+                    organizationId,
+                    query.linkedOnly,
+                    Math.min(remainingLimit, count - remainingOffset),
+                    remainingOffset,
+                );
+                return { count, rows };
+            });
+
+            total += page.count;
+            if (remainingLimit <= 0) {
+                continue;
+            }
+            if (remainingOffset >= page.count) {
+                remainingOffset -= page.count;
+                continue;
+            }
+            for (const row of page.rows) {
+                items.push(toStoredFileMetadata(row));
+            }
+            remainingLimit -= page.rows.length;
+            remainingOffset = 0;
+        }
+
+        return {
+            items,
+            total,
+            limit: query.limit,
+            offset: query.offset,
+        };
+    }
+
     async contractAttachToSubmission(
         organizationId: string,
         fileId: string,
@@ -367,6 +428,22 @@ function toSubmissionFile(row: FileRow): SubmissionFile {
         status: row.status,
         rejectionReason: row.rejectionReason,
         uploadedByUserId: row.uploadedByUserId,
+        createdAt: row.createdAt.toISOString(),
+    };
+}
+
+function toStoredFileMetadata(row: AdministrationFileRow): StoredFileMetadata {
+    return {
+        id: row.id,
+        organizationId: row.organizationId,
+        projectId: row.projectId,
+        submissionId: row.submissionId,
+        versionId: row.versionId,
+        fileName: row.fileName,
+        contentType: row.contentType,
+        byteSize: row.byteSize,
+        checksumSha256: row.checksumSha256,
+        status: row.status,
         createdAt: row.createdAt.toISOString(),
     };
 }

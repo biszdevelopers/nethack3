@@ -3,18 +3,32 @@ import {
     administrationTeamSchema,
     administrationUserSchema,
     auditLogSchema,
+    createDebugAiSessionRequestSchema,
+    debugAiExchangeSchema,
+    debugAiSessionDetailSchema,
+    debugAiSessionListSchema,
+    debugAiSessionSchema,
+    debugAiStatusSchema,
     globalAdministratorSchema,
     grantGlobalAdministratorRequestSchema,
     listResponseSchema,
     reopenAdministrationSubmissionRequestSchema,
     reportSummarySchema,
     revokeGlobalAdministratorRequestSchema,
+    sendDebugAiMessageRequestSchema,
+    storedFilePageSchema,
     updateAdministrationTeamRequestSchema,
     updateAdministrationUserRequestSchema,
     type AdministrationPreflight,
     type AdministrationTeam,
     type AdministrationUser,
     type AuditLog,
+    type CreateDebugAiSessionRequest,
+    type DebugAiExchange,
+    type DebugAiSession,
+    type DebugAiSessionDetail,
+    type DebugAiSessionList,
+    type DebugAiStatus,
     type GlobalAdministrator,
     type GrantGlobalAdministratorRequest,
     type ListResponse,
@@ -22,6 +36,7 @@ import {
     type ReopenAdministrationSubmissionRequest,
     type ReportSummary,
     type RevokeGlobalAdministratorRequest,
+    type StoredFilePage,
     type TeamStatus,
 } from "@nethack/contracts";
 import type { ApiClient } from "./client.js";
@@ -186,6 +201,74 @@ export class AdministrationApi {
             `/api/v1/administration/editions/${editionId}/preflight`,
             { schema: administrationPreflightSchema, headers: organizationHeader(organizationId) },
         );
+    }
+
+    async debugFiles(
+        kind: "files" | "references",
+        query: { readonly limit?: number; readonly offset?: number } = {},
+    ): Promise<StoredFilePage> {
+        return this.client.request("GET", `/api/v1/admin/debug/${kind}`, {
+            query: { limit: query.limit, offset: query.offset },
+            schema: storedFilePageSchema,
+        });
+    }
+
+    async debugAiStatus(): Promise<DebugAiStatus> {
+        return this.client.request("GET", "/api/v1/admin/debug/ai/status", {
+            schema: debugAiStatusSchema,
+        });
+    }
+
+    async debugAiSessions(): Promise<DebugAiSessionList> {
+        return this.client.request("GET", "/api/v1/admin/debug/ai/sessions", {
+            schema: debugAiSessionListSchema,
+        });
+    }
+
+    async createDebugAiSession(input: CreateDebugAiSessionRequest): Promise<DebugAiSession> {
+        return this.client.request("POST", "/api/v1/admin/debug/ai/sessions", {
+            body: createDebugAiSessionRequestSchema.parse(input),
+            schema: debugAiSessionSchema,
+        });
+    }
+
+    async debugAiSession(sessionId: string): Promise<DebugAiSessionDetail> {
+        return this.client.request("GET", `/api/v1/admin/debug/ai/sessions/${sessionId}`, {
+            schema: debugAiSessionDetailSchema,
+        });
+    }
+
+    async deleteDebugAiSession(sessionId: string): Promise<void> {
+        await this.client.request("DELETE", `/api/v1/admin/debug/ai/sessions/${sessionId}`);
+    }
+
+    async sendDebugAiMessage(sessionId: string, content: string): Promise<DebugAiExchange> {
+        return this.client.request(
+            "POST",
+            `/api/v1/admin/debug/ai/sessions/${sessionId}/messages`,
+            {
+                body: sendDebugAiMessageRequestSchema.parse({ content }),
+                schema: debugAiExchangeSchema,
+            },
+        );
+    }
+
+    /**
+     * The database export is a large JSON attachment. It bypasses the JSON
+     * request path so the browser receives a streamed Blob.
+     */
+    async databaseExport(): Promise<{ blob: Blob; fileName: string }> {
+        const response = await fetch(this.client.buildUrl("/api/v1/admin/database/export"), {
+            method: "GET",
+            credentials: "include",
+            headers: { Accept: "application/json" },
+        });
+        if (!response.ok) {
+            throw new Error(`The database export could not be generated (${response.status}).`);
+        }
+        const disposition = response.headers.get("content-disposition") ?? "";
+        const fileName = /filename="([^"]+)"/.exec(disposition)?.[1] ?? "nethack-export.json";
+        return { blob: await response.blob(), fileName };
     }
 
     /**

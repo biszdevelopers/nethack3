@@ -8,4 +8,5 @@ export * from "./submissions.js";
 export * from "./judging.js";
 export * from "./voting.js";
 export * from "./recognition.js";
+export * from "./debug.js";
 export * from "./communications.js";

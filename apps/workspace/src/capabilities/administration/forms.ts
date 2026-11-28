@@ -23,3 +23,13 @@ export const auditSchema = z.object({
         ),
 });
 export type AuditForm = z.infer<typeof auditSchema>;
+
+export const createDebugAiSessionSchema = z.object({
+    name: z.string().trim().min(1, "Name the session.").max(100),
+});
+export type CreateDebugAiSessionForm = z.infer<typeof createDebugAiSessionSchema>;
+
+export const sendDebugAiMessageSchema = z.object({
+    content: z.string().trim().min(1, "Write a message.").max(4000),
+});
+export type SendDebugAiMessageForm = z.infer<typeof sendDebugAiMessageSchema>;

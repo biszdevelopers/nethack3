@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+    CreateDebugAiSessionRequest,
     GrantGlobalAdministratorRequest,
     OrganizationRole,
     ReopenAdministrationSubmissionRequest,
     RevokeGlobalAdministratorRequest,
+    StoredFilePage,
     TeamStatus,
 } from "@nethack/contracts";
 import type { AuditQuery, GlobalAuditQuery } from "@nethack/api-client";
@@ -257,6 +259,114 @@ export function useAdministrationPreflight(
         },
         enabled: organizationId !== null && editionId !== null && enabled,
     });
+}
+
+const operatorKeys = {
+    debugFiles: (kind: "files" | "references", offset: number) =>
+        ["administration", "debug-files", kind, offset] as const,
+    debugAiStatus: () => ["administration", "debug-ai", "status"] as const,
+    debugAiSessions: () => ["administration", "debug-ai", "sessions"] as const,
+    debugAiSession: (sessionId: string) =>
+        ["administration", "debug-ai", "session", sessionId] as const,
+};
+
+export function useAdministrationDebugFiles(
+    kind: "files" | "references",
+    offset: number,
+    enabled: boolean,
+) {
+    return useQuery<StoredFilePage>({
+        queryKey: operatorKeys.debugFiles(kind, offset),
+        queryFn: () => api.administration.debugFiles(kind, { limit: 25, offset }),
+        enabled,
+    });
+}
+
+export function useDebugAiStatus(enabled: boolean) {
+    return useQuery({
+        queryKey: operatorKeys.debugAiStatus(),
+        queryFn: () => api.administration.debugAiStatus(),
+        enabled,
+    });
+}
+
+export function useDebugAiSessions(enabled: boolean) {
+    return useQuery({
+        queryKey: operatorKeys.debugAiSessions(),
+        queryFn: () => api.administration.debugAiSessions(),
+        enabled,
+    });
+}
+
+export function useDebugAiSession(sessionId: string | null) {
+    return useQuery({
+        queryKey: operatorKeys.debugAiSession(sessionId ?? "none"),
+        queryFn: async () => {
+            if (sessionId === null) {
+                return null;
+            }
+            return api.administration.debugAiSession(sessionId);
+        },
+        enabled: sessionId !== null,
+    });
+}
+
+export function useCreateDebugAiSession() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (input: CreateDebugAiSessionRequest) =>
+            api.administration.createDebugAiSession(input),
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: operatorKeys.debugAiSessions() });
+        },
+    });
+}
+
+export function useDeleteDebugAiSession() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (sessionId: string) => api.administration.deleteDebugAiSession(sessionId),
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: operatorKeys.debugAiSessions() });
+            await queryClient.invalidateQueries({
+                queryKey: ["administration", "debug-ai", "session"],
+            });
+        },
+    });
+}
+
+export function useSendDebugAiMessage(sessionId: string | null) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (content: string) => {
+            if (sessionId === null) {
+                throw new Error("Select a session first.");
+            }
+            return api.administration.sendDebugAiMessage(sessionId, content);
+        },
+        onSuccess: async () => {
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: operatorKeys.debugAiSessions() }),
+                sessionId === null
+                    ? Promise.resolve()
+                    : queryClient.invalidateQueries({
+                          queryKey: operatorKeys.debugAiSession(sessionId),
+                      }),
+            ]);
+        },
+    });
+}
+
+export async function downloadDatabaseExport(): Promise<void> {
+    const { blob, fileName } = await api.administration.databaseExport();
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
 
 export async function downloadStandingsCsv(

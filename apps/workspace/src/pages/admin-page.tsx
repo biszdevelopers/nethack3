@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
+import { BookOpen, Database, Download, FileSearch, MessagesSquare } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { AuditLog, GlobalAdministrator } from "@nethack/contracts";
@@ -40,6 +41,7 @@ import { formatDateTime } from "../capabilities/shared/datetime.js";
 import { describeError } from "../capabilities/shared/errors.js";
 import { RequestError } from "../capabilities/shared/states.jsx";
 import {
+    downloadDatabaseExport,
     useAdministrationAudit,
     useGlobalAdministrators,
     useGrantAdministrator,
@@ -452,6 +454,8 @@ function AdminContent({
                 )}
             </section>
 
+            <OperatorTools />
+
             <Dialog
                 open={pendingRevoke !== null}
                 onOpenChange={(open) => {
@@ -547,6 +551,137 @@ function AdminContent({
                 </Card>
             ) : null}
         </div>
+    );
+}
+
+const EXPORT_OMISSIONS = [
+    "Judge identities and per-judge evaluation records; only per-submission judging aggregates are exported.",
+    "Invitation tokens, session token hashes, CSRF hashes, and encrypted OAuth tokens.",
+    "Stored file contents and storage keys.",
+    "Notification recipients, bodies, and deduplication keys.",
+] as const;
+
+function OperatorTools(): ReactNode {
+    const { toast } = useToast();
+    const [exporting, setExporting] = useState(false);
+
+    const onExport = async (): Promise<void> => {
+        if (exporting) {
+            return;
+        }
+        setExporting(true);
+        try {
+            await downloadDatabaseExport();
+            toast({ title: "Database export downloaded", tone: "success" });
+        } catch (error) {
+            toast({
+                title: "Could not download the database export",
+                description: describeError(error),
+                tone: "critical",
+            });
+        } finally {
+            setExporting(false);
+        }
+    };
+
+    return (
+        <section
+            className="flex flex-col gap-4 border-t border-line pt-6"
+            aria-labelledby="operator-tools-heading"
+        >
+            <div className="flex flex-col gap-1">
+                <h2 id="operator-tools-heading" className="text-lg font-bold tracking-tight">
+                    Operator tools
+                </h2>
+                <p className="text-sm text-ink-muted">
+                    Global administrator downloads and read-only developer tools.
+                </p>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Database className="size-4 text-primary" aria-hidden="true" />
+                            Database export
+                        </CardTitle>
+                        <CardDescription>
+                            A repeatable-read JSON archive of platform records. The response is
+                            streamed as an attachment.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-4">
+                        <ul className="flex flex-col gap-1.5 text-xs text-ink-muted">
+                            {EXPORT_OMISSIONS.map((item) => (
+                                <li key={item} className="flex gap-2">
+                                    <span aria-hidden="true" className="text-primary">
+                                        -
+                                    </span>
+                                    <span>{item}</span>
+                                </li>
+                            ))}
+                        </ul>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            loading={exporting}
+                            onClick={() => void onExport()}
+                            className="self-start"
+                        >
+                            <Download className="size-4" aria-hidden="true" />
+                            Download database export
+                        </Button>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Developer tools</CardTitle>
+                        <CardDescription>
+                            Inspect stored file metadata, review active references, and use the
+                            operator AI assistant when it is configured.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ul className="flex flex-col gap-2">
+                            <li>
+                                <Link
+                                    to="/developers/debug"
+                                    className="flex min-h-11 items-center gap-2 rounded-md border border-line px-3 text-sm transition-colors hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/25"
+                                >
+                                    <FileSearch
+                                        className="size-4 text-primary"
+                                        aria-hidden="true"
+                                    />
+                                    Files and references
+                                </Link>
+                            </li>
+                            <li>
+                                <Link
+                                    to="/developers/docs"
+                                    className="flex min-h-11 items-center gap-2 rounded-md border border-line px-3 text-sm transition-colors hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/25"
+                                >
+                                    <BookOpen className="size-4 text-primary" aria-hidden="true" />
+                                    Engineering documentation
+                                </Link>
+                            </li>
+                            <li>
+                                <Link
+                                    to="/developers/debug#ai-assistant"
+                                    className="flex min-h-11 items-center gap-2 rounded-md border border-line px-3 text-sm transition-colors hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/25"
+                                >
+                                    <MessagesSquare
+                                        className="size-4 text-primary"
+                                        aria-hidden="true"
+                                    />
+                                    Operator AI assistant
+                                </Link>
+                            </li>
+                        </ul>
+                    </CardContent>
+                </Card>
+            </div>
+        </section>
     );
 }
 

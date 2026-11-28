@@ -40,6 +40,9 @@ export const filesCapability: CapabilityDefinition = {
                     status: row.status,
                 }));
             },
+            async listStoredFiles(organizationIds, query) {
+                return service.contractListStoredFiles(organizationIds, query);
+            },
             async attachToSubmission(organizationId, fileId, submissionId, versionId) {
                 await service.contractAttachToSubmission(
                     organizationId,
