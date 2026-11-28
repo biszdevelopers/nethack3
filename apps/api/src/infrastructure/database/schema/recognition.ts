@@ -10,7 +10,7 @@ import {
     uuid,
 } from "drizzle-orm/pg-core";
 import type { PublicResults } from "@nethack/contracts";
-import { competitionEditions } from "./competitions.js";
+import { competitionEditions, editionStatusEnum } from "./competitions.js";
 import { organizations } from "./organizations.js";
 import { teams } from "./teams.js";
 import { users } from "./identity.js";
@@ -95,6 +95,7 @@ export const editionResults = pgTable(
         publishedByUserId: uuid("published_by_user_id")
             .notNull()
             .references(() => users.id, { onDelete: "restrict" }),
+        previousEditionStatus: editionStatusEnum("previous_edition_status"),
         snapshot: jsonb("snapshot").$type<PublicResults>().notNull(),
     },
     (table) => [

@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, or, sql } from "drizzle-orm";
-import type { PublicResults } from "@nethack/contracts";
+import type { CompetitionEditionStatus, PublicResults } from "@nethack/contracts";
 import type { DatabaseExecutor, DatabaseSession } from "../../../infrastructure/database/client.js";
 import {
     awards,
@@ -47,6 +47,7 @@ export interface NewEditionResultsValues {
     readonly editionId: string;
     readonly publishedAt: Date;
     readonly publishedByUserId: string;
+    readonly previousEditionStatus: CompetitionEditionStatus | null;
     readonly snapshot: PublicResults;
 }
 
@@ -226,6 +227,25 @@ export class RecognitionRepository {
                 ),
             )
             .limit(1);
+        return rows[0] ?? null;
+    }
+
+    async findResultsForUpdate(
+        session: DatabaseSession,
+        organizationId: string,
+        editionId: string,
+    ): Promise<EditionResultsRow | null> {
+        const rows = await session.db
+            .select()
+            .from(editionResults)
+            .where(
+                and(
+                    eq(editionResults.organizationId, organizationId),
+                    eq(editionResults.editionId, editionId),
+                ),
+            )
+            .limit(1)
+            .for("update");
         return rows[0] ?? null;
     }
 

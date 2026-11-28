@@ -60,6 +60,22 @@ describe("castBallotRequestSchema", () => {
     it("rejects an empty score list", () => {
         expect(parse([])).toBe(false);
     });
+
+    it("accepts bounded reasoning and rejects text above the limit", () => {
+        const scores = [
+            { submissionId: ONE, stars: 5 },
+            { submissionId: TWO, stars: 5 },
+        ];
+        expect(
+            castBallotRequestSchema.safeParse({ scores, reasoning: "Clear trade-offs." }).success,
+        ).toBe(true);
+        expect(
+            castBallotRequestSchema.safeParse({
+                scores,
+                reasoning: "x".repeat(2001),
+            }).success,
+        ).toBe(false);
+    });
 });
 
 describe("ballotSchema", () => {
@@ -71,5 +87,18 @@ describe("ballotSchema", () => {
             submittedAt: "2026-06-15T12:00:00.000Z",
         });
         expect(parsed.success).toBe(true);
+        expect(parsed.data?.reasoning).toBe("");
+    });
+
+    it("carries organizer-visible reasoning", () => {
+        const parsed = ballotSchema.safeParse({
+            roundId: ONE,
+            userId: TWO,
+            scores: [{ submissionId: THREE, stars: 5 }],
+            reasoning: "Strongest demo.",
+            submittedAt: "2026-06-15T12:00:00.000Z",
+        });
+        expect(parsed.success).toBe(true);
+        expect(parsed.data?.reasoning).toBe("Strongest demo.");
     });
 });

@@ -1,11 +1,13 @@
 import type {
     BallotScore,
+    CompetitionEditionStatus,
     OrganizationRole,
     SubmissionStatus,
     VotingRoundStatus,
 } from "@nethack/contracts";
 import { BALLOT_MAX_STARS_PER_SUBMISSION, BALLOT_TOTAL_STARS } from "@nethack/contracts";
 import { ConflictError, ForbiddenError, ValidationError } from "../../../core/errors.js";
+import { isEditionResultsFrozen } from "../../competitions/contracts.js";
 
 export type VotingEligibleRole = "participant" | "judge" | "organizer";
 
@@ -77,7 +79,23 @@ export class VotingRules {
         }
     }
 
-    static assertScores(scores: readonly BallotScore[], maxSelections: number): void {
+    static scoredProjectCap(maxSelections: number, maxVotesPerUser: number): number {
+        return maxVotesPerUser > 0 ? Math.min(maxSelections, maxVotesPerUser) : maxSelections;
+    }
+
+    static assertEditionAcceptsVoting(status: CompetitionEditionStatus): void {
+        if (isEditionResultsFrozen(status)) {
+            throw new ConflictError(
+                "Results are published; voting and round changes are frozen for this edition.",
+            );
+        }
+    }
+
+    static assertScores(
+        scores: readonly BallotScore[],
+        maxSelections: number,
+        maxVotesPerUser = 0,
+    ): void {
         if (scores.length === 0) {
             throw new ValidationError("Score at least one submission.", {
                 scores: ["Score at least one submission."],
@@ -88,9 +106,10 @@ export class VotingRules {
                 scores: ["Each submission may be scored only once."],
             });
         }
-        if (scores.length > maxSelections) {
-            throw new ValidationError(`Score at most ${String(maxSelections)} submissions.`, {
-                scores: [`Score at most ${String(maxSelections)} submissions.`],
+        const cap = VotingRules.scoredProjectCap(maxSelections, maxVotesPerUser);
+        if (scores.length > cap) {
+            throw new ValidationError(`Score at most ${String(cap)} submissions.`, {
+                scores: [`Score at most ${String(cap)} submissions.`],
             });
         }
         let total = 0;
@@ -116,6 +135,10 @@ export class VotingRules {
                 scores: [`Distribute exactly ${String(BALLOT_TOTAL_STARS)} stars.`],
             });
         }
+    }
+
+    static isOrganizerRole(role: OrganizationRole): boolean {
+        return role === "owner" || role === "organizer";
     }
 
     static effectiveRole(role: OrganizationRole): VotingEligibleRole {

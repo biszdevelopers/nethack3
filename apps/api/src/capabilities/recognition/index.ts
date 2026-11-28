@@ -25,6 +25,7 @@ export const recognitionCapability: CapabilityDefinition = {
             context.contracts.get<JudgingContract>(JUDGING_CONTRACT),
             context.contracts.get<VotingContract>(VOTING_CONTRACT),
             context.contracts.get<OrganizationsContract>(ORGANIZATIONS_CONTRACT),
+            context.events,
             context.audit,
             context.clock,
         );

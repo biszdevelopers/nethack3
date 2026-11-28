@@ -92,5 +92,15 @@ test.describe("results and awards", () => {
             await expect(page.getByRole("banner")).toBeHidden();
             await page.emulateMedia({ media: "screen" });
         });
+
+        await test.step("unpublish restores the edition for later journeys", async () => {
+            await page.goto("/awards");
+            await chooseOption(page.getByLabel("Competition edition"), FIXTURE.editionName);
+            await page.getByRole("button", { name: "Unpublish results" }).click();
+            const dialog = page.getByRole("alertdialog", { name: "Unpublish results" });
+            await expect(dialog).toBeVisible();
+            await dialog.getByRole("button", { name: "Unpublish results" }).click();
+            await expectToast(page, "Results unpublished");
+        });
     });
 });

@@ -18,6 +18,7 @@ const SUBSCRIBED_EVENTS: readonly string[] = [
     domainEvents.submissionReviewed,
     domainEvents.judgeAssigned,
     domainEvents.votingOpened,
+    domainEvents.resultsPublished,
     domainEvents.announcementPublished,
 ];
 

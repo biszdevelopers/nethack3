@@ -33,6 +33,7 @@ async function createAndOpenRound(page: Page, name: string): Promise<string> {
     const form = page.getByRole("button", { name: "Create round" }).locator("xpath=ancestor::form");
     await form.getByLabel("Name").fill(name);
     await form.getByLabel("Description").fill("Star voting rules created by the Playwright suite.");
+    await form.getByRole("spinbutton", { name: "Per-voter cap" }).fill("2");
     await form.getByRole("checkbox", { name: "Organizers" }).check();
     await form.getByRole("button", { name: "Create round" }).click();
     await expectToast(page, "Voting round created");
@@ -55,6 +56,7 @@ async function castBallotWithCsrf(
     page: Page,
     roundId: string,
     scores: readonly BallotScore[],
+    reasoning?: string,
 ): Promise<number> {
     const token = await csrfToken(page);
     const response = await page.request.post(
@@ -66,7 +68,10 @@ async function castBallotWithCsrf(
                 "x-nethack-organization-id": FIXTURE.organizationId,
                 origin: WORKSPACE_ORIGIN,
             },
-            data: { scores: [...scores] },
+            data: {
+                scores: [...scores],
+                ...(reasoning === undefined ? {} : { reasoning }),
+            },
         },
     );
     return response.status();
@@ -156,17 +161,38 @@ test.describe("star voting", () => {
                 { submissionId: fixtureId, stars: 5 },
                 { submissionId: labId, stars: 5 },
             ];
-            expect(await castBallotWithCsrf(page, roundId, scores)).toBe(201);
-            expect(await castBallotWithCsrf(page, roundId, scores)).toBe(201);
+            expect(await castBallotWithCsrf(page, roundId, scores, "Balanced demo scores.")).toBe(
+                201,
+            );
+            expect(await castBallotWithCsrf(page, roundId, scores, "Updated after the demo.")).toBe(
+                201,
+            );
 
             const current = await page.request.get(
                 `${API_ORIGIN}/api/v1/voting-rounds/${roundId}/ballot`,
                 { headers: { "x-nethack-organization-id": FIXTURE.organizationId } },
             );
             expect(current.status()).toBe(200);
-            const ballot = (await current.json()) as { scores: readonly BallotScore[] };
+            const ballot = (await current.json()) as {
+                scores: readonly BallotScore[];
+                reasoning: string;
+            };
             expect(ballot.scores).toHaveLength(2);
             expect(ballot.scores.reduce((sum, score) => sum + score.stars, 0)).toBe(10);
+            expect(ballot.reasoning).toBe("Updated after the demo.");
+        });
+
+        await test.step("reasoning above the bound is rejected", async () => {
+            const status = await castBallotWithCsrf(
+                page,
+                roundId,
+                [
+                    { submissionId: fixtureId, stars: 5 },
+                    { submissionId: labId, stars: 5 },
+                ],
+                "x".repeat(2001),
+            );
+            expect(status).toBe(400);
         });
     });
 

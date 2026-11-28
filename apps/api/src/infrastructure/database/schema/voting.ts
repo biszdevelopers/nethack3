@@ -37,6 +37,7 @@ export const votingRounds = pgTable(
         status: votingRoundStatusEnum("status").notNull().default("draft"),
         eligibleRoles: text("eligible_roles").array().notNull().default(["participant"]),
         maxSelections: integer("max_selections").notNull().default(10),
+        maxVotesPerUser: integer("max_votes_per_user").notNull().default(0),
         opensAt: timestamp("opens_at", { withTimezone: true }),
         closesAt: timestamp("closes_at", { withTimezone: true }),
         publishedAt: timestamp("published_at", { withTimezone: true }),
@@ -44,6 +45,10 @@ export const votingRounds = pgTable(
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     },
     (table) => [
+        check(
+            "voting_rounds_max_votes_per_user_check",
+            sql`${table.maxVotesPerUser} between 0 and 50`,
+        ),
         unique("voting_rounds_id_org_unique").on(table.id, table.organizationId),
         index("voting_rounds_org_edition_idx").on(table.organizationId, table.editionId),
         index("voting_rounds_status_idx").on(table.status),
@@ -66,10 +71,12 @@ export const ballots = pgTable(
         userId: uuid("user_id")
             .notNull()
             .references(() => users.id, { onDelete: "cascade" }),
+        reasoning: text("reasoning").notNull().default(""),
         submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull().defaultNow(),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     },
     (table) => [
+        check("ballots_reasoning_length_check", sql`length(${table.reasoning}) <= 2000`),
         uniqueIndex("ballots_round_user_unique").on(table.roundId, table.userId),
         unique("ballots_id_org_unique").on(table.id, table.organizationId),
         index("ballots_org_round_idx").on(table.organizationId, table.roundId),

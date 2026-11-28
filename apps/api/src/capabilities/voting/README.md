@@ -19,10 +19,13 @@ Owns voting rounds, ballots, and votes. Organizers create rounds for a competiti
 | --- | --- |
 | `listRounds(organizationId, editionId)` | All rounds of the edition, in an organization-scoped transaction. |
 | `getPublishedResults(organizationId, editionId)` | Results for published rounds only. Totals come from grouped SQL over `votes`; titles from `submissions.v1`. |
+| `closeOpenRoundsForResults(session, organizationId, editionId, actorUserId)` | Results publication freeze: closes every `open` round of the edition inside the caller's transaction. |
 
 ## Star ballots
 
-A ballot is a list of `{ submissionId, stars }` scores. Each scored submission receives 1 to 5 stars and the whole ballot must distribute exactly 10 stars, so at least two submissions must be scored. A submission appears at most once, and no more than the round's `maxSelections` submissions may be scored. Zero-star entries are not submitted; leaving a submission out means zero.
+A ballot is a list of `{ submissionId, stars }` scores. Each scored submission receives 1 to 5 stars and the whole ballot must distribute exactly 10 stars, so at least two submissions must be scored. A submission appears at most once, and no more than the round's effective cap may be scored. The effective cap is `maxVotesPerUser` when it is greater than zero, otherwise `maxSelections`; when both are set the lower one wins. `maxVotesPerUser = 0` means no extra cap beyond `maxSelections`.
+
+A ballot may carry optional `reasoning` text up to 2000 characters. It is stored on the ballot, returned to its author, and included only in organizer result payloads (`audit`) for review; it never appears in published public results.
 
 `votes.stars` stores the awarded stars (integer, 1 to 5, database check constraint). Ballots remain editable while the round is `open`: recasting deletes the previous votes and inserts the new scores inside the same transaction, keeping the ballot row and its unique constraints.
 
@@ -52,21 +55,22 @@ All routes require authentication. `x-nethack-organization-id` establishes the o
 - Round transitions are allowlisted: `draft -> open`, `open -> closed`, `closed -> published`. Anything else is a `409 conflict`. Repeating a status is also a conflict.
 - Opening validates `opensAt`/`closesAt` ordering and rejects a window that has already ended.
 - A ballot is accepted only while the round is `open` and `now` is inside `opensAt`/`closesAt`.
+- Results publication freezes the edition: while the edition status is `completed` or `archived`, creating, opening, closing, or publishing rounds and casting ballots are rejected with `409 conflict`. Unpublishing results restores the previous edition status but does not reopen rounds or delete ballots.
 - Eligibility: the caller's active organization role must be listed in `eligibleRoles`. `owner` counts as `organizer`. A caller whose effective role is `participant` must also have an approved registration for the edition; `judge` and `organizer` need no registration.
-- Scoring rules: unique submission IDs, between 1 and `maxSelections` scored submissions, every score from 1 to 5 stars, exactly 10 stars in total, all submissions belonging to the round's edition, and in a votable status (`submitted`, `under_review`, `changes_requested`, `accepted`). `draft`, `rejected`, `disqualified`, and `withdrawn` are rejected.
+- Scoring rules: unique submission IDs, between 1 and the effective scored-project cap (see above), every score from 1 to 5 stars, exactly 10 stars in total, all submissions belonging to the round's edition, and in a votable status (`submitted`, `under_review`, `changes_requested`, `accepted`). `draft`, `rejected`, `disqualified`, and `withdrawn` are rejected.
 - Casting locks the round row with `SELECT ... FOR UPDATE`, re-checks the window, and writes the ballot and its votes in one transaction. A first cast inserts the ballot; a recast deletes the existing votes and inserts the new scores. The `(round, user)` and `(round, user, submission)` unique constraints remain the final defense.
 - Results group votes per submission with `count(*)` (ballots) and `SUM(stars)`, then rank by average stars descending, total stars descending, and project title ascending. Each entry carries `rank`, `votes`, `totalStars`, `averageStars` (rounded to two decimals), and the resolved team name. Rank 1 is the People's Choice. `totalBallots` is the real ballot count; `publishedAt` is null until the round is published.
 - Votable-submission discovery returns only submissions in the ballot's votable set, mapped to `{ id, projectTitle, summary, teamId, teamName }`. Team names are resolved through `teams.v1` once per distinct team in the filtered result set; a missing team yields a null name. The endpoint is authenticated and relies on the server default `Cache-Control: private, no-store`.
 
 ## Audit and events
 
-Audited: `voting.round.created`, `voting.round.opened`, `voting.round.closed`, `voting.round.published`, `voting.ballot.cast`. Ballot audit metadata contains the edition, the number of scored submissions, the total stars, and whether the cast replaced an earlier ballot; never the scored submissions themselves.
+Audited: `voting.round.created`, `voting.round.opened`, `voting.round.closed`, `voting.round.published`, `voting.ballot.cast`. Ballot audit metadata contains the edition, the number of scored submissions, the total stars, and whether the cast replaced an earlier ballot; reasoning is stored on the ballot rather than copied into audit metadata. Results publication closes open rounds with the `results_published` reason.
 
-Published events: `voting.round.opened`, `voting.round.closed`, `voting.round.published`, each with `{ organizationId, organizationName, editionId, roundId, roundName }`.
+Published events: `voting.round.opened`, `voting.round.closed`, `voting.round.published`, each with `{ organizationId, organizationName, editionId, roundId, roundName }`. Freeze closures omit `organizationName` and add `reason: "results_published"`.
 
 ## Tests
 
-`tests/voting-rules.test.ts` covers every allowed and forbidden transition, schedule and window validation, star allocation rules (exact total, per-submission bounds, duplicates, scored-project cap), eligibility (including owner-as-organizer and participant approval), result visibility, and votable submission statuses. `tests/voting-results.test.ts` covers star aggregation, average rounding, ranking, and the People's Choice leader. `tests/votable-submissions.test.ts` covers discovery filtering, field mapping, and team-name resolution. The tests are pure and do not require a database.
+`tests/voting-rules.test.ts` covers every allowed and forbidden transition, schedule and window validation, star allocation rules (exact total, per-submission bounds, duplicates, scored-project cap, per-voter cap, edition freeze), eligibility (including owner-as-organizer and participant approval), result visibility, and votable submission statuses. `tests/ballot-schema.test.ts` covers reasoning bounds and ballot defaults. `tests/voting-results.test.ts` covers star aggregation, average rounding, ranking, and the People's Choice leader. `tests/votable-submissions.test.ts` covers discovery filtering, field mapping, and team-name resolution. The tests are pure and do not require a database.
 
 ## Extraction
 

@@ -26,5 +26,6 @@ export const domainEvents = {
     votingOpened: "voting.round.opened",
     votingClosed: "voting.round.closed",
     votingPublished: "voting.round.published",
+    resultsPublished: "recognition.results.published",
     announcementPublished: "announcements.announcement.published",
 } as const;

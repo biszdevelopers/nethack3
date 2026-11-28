@@ -15,6 +15,7 @@ export const roundSchema = z.object({
         .array(z.enum(["participant", "judge", "organizer"]))
         .min(1, "Select at least one eligible role."),
     maxSelections: z.number().int().min(2).max(50),
+    maxVotesPerUser: z.number().int().min(0).max(50),
     opensAt: optionalDateTime,
     closesAt: optionalDateTime,
 });

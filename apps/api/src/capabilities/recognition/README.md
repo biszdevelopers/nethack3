@@ -11,7 +11,7 @@ Organizer awards, results publication, public results, and certificates.
 
 - `awards` — award catalog, unique by `(edition_id, namespace)`.
 - `team_awards` — award assignments, unique by `(team_id, award_id)`; deleting an assigned award is refused.
-- `edition_results` — one row per edition holding the immutable `publicResultsSchema` snapshot.
+- `edition_results` — one row per edition holding the immutable `publicResultsSchema` snapshot plus `previous_edition_status` for restoring the edition on unpublish.
 
 Migration `0005_fair_luckman.sql` enables forced row-level security on all three tables, grants the runtime role, adds an organization-scoped policy to each, and adds a public `SELECT` policy on `edition_results` for the public results and certificate routes. The public policy only exposes rows that organizers explicitly published.
 
@@ -40,7 +40,20 @@ Public:
 
 ## Events and audit
 
-Publication, publication removal, and every award mutation write an audit record inside the same transaction. Domain events are not emitted.
+Publication, publication removal, and every award mutation write an audit record inside the same transaction.
+
+## Results publication freeze
+
+Publishing results is one transaction that:
+
+1. calls `CompetitionsContract.freezeForResults`, which writes edition status `completed` and returns the previous status;
+2. calls `VotingContract.closeOpenRoundsForResults`, closing every `open` round of the edition;
+3. inserts the `edition_results` row with `previous_edition_status` and the snapshot;
+4. emits `recognition.results.published` with the distinct participant user IDs of the edition's teams.
+
+While the edition is `completed` or `archived`, voting mutations and judging evaluation saves/submits are rejected. Unpublishing deletes only the publication row, restores the stored previous edition status, and keeps ballots, votes, and evaluations. Restoring the status is the documented explicit reopen for judging; voting rounds closed by the freeze stay closed.
+
+The event is fanned out by the notifications capability into one in-app notification job per participant, deduplicated by `organizationId + editionId + userId`. Email is optional and not required.
 
 ## Tests
 

@@ -38,6 +38,8 @@ export const votingCapability: CapabilityDefinition = {
                 service.listRounds(organizationId, editionId),
             getPublishedResults: (organizationId, editionId) =>
                 service.publishedResults(organizationId, editionId),
+            closeOpenRoundsForResults: (session, organizationId, editionId, actorUserId) =>
+                service.closeOpenRoundsForResults(session, organizationId, editionId, actorUserId),
         };
 
         return {

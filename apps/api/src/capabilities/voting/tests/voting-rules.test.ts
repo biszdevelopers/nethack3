@@ -145,7 +145,6 @@ describe("VotingRules.assertScores", () => {
     const one = "3d0f2d0e-1111-4111-8111-111111111111";
     const two = "3d0f2d0e-2222-4222-8222-222222222222";
     const three = "3d0f2d0e-3333-4333-8333-333333333333";
-
     it("accepts scores that total exactly ten within the limits", () => {
         expect(() =>
             VotingRules.assertScores(
@@ -194,6 +193,44 @@ describe("VotingRules.assertScores", () => {
                 1,
             ),
         ).toThrow(ValidationError);
+    });
+
+    it("applies the per-voter cap when it is lower than the scored-project limit", () => {
+        expect(VotingRules.scoredProjectCap(5, 2)).toBe(2);
+        expect(VotingRules.scoredProjectCap(2, 5)).toBe(2);
+        expect(VotingRules.scoredProjectCap(5, 0)).toBe(5);
+        expect(() =>
+            VotingRules.assertScores(
+                [
+                    { submissionId: one, stars: 4 },
+                    { submissionId: two, stars: 3 },
+                    { submissionId: three, stars: 3 },
+                ],
+                5,
+                2,
+            ),
+        ).toThrow(ValidationError);
+        expect(() =>
+            VotingRules.assertScores(
+                [
+                    { submissionId: one, stars: 5 },
+                    { submissionId: two, stars: 5 },
+                ],
+                5,
+                2,
+            ),
+        ).not.toThrow();
+        expect(() =>
+            VotingRules.assertScores(
+                [
+                    { submissionId: one, stars: 4 },
+                    { submissionId: two, stars: 3 },
+                    { submissionId: three, stars: 3 },
+                ],
+                5,
+                0,
+            ),
+        ).not.toThrow();
     });
 
     it("rejects zero, over five, and non-integer stars", () => {
@@ -273,6 +310,27 @@ describe("VotingRules.assertCanViewResults", () => {
             ForbiddenError,
         );
         expect(() => VotingRules.assertCanViewResults("draft", "judge")).toThrow(ForbiddenError);
+    });
+});
+
+describe("VotingRules.assertEditionAcceptsVoting", () => {
+    it("freezes voting for completed and archived editions", () => {
+        expect(() => VotingRules.assertEditionAcceptsVoting("completed")).toThrow(ConflictError);
+        expect(() => VotingRules.assertEditionAcceptsVoting("archived")).toThrow(ConflictError);
+    });
+
+    it("allows every other edition status", () => {
+        for (const status of [
+            "draft",
+            "published",
+            "registration_open",
+            "registration_closed",
+            "active",
+            "judging",
+            "voting",
+        ] as const) {
+            expect(() => VotingRules.assertEditionAcceptsVoting(status)).not.toThrow();
+        }
     });
 });
 

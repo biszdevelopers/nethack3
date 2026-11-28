@@ -3,6 +3,7 @@ import { idSchema, isoDateTimeSchema } from "../common/schemas.js";
 
 export const BALLOT_TOTAL_STARS = 10;
 export const BALLOT_MAX_STARS_PER_SUBMISSION = 5;
+export const BALLOT_REASONING_MAX_LENGTH = 2000;
 
 export const votingRoundStatusSchema = z.enum(["draft", "open", "closed", "published"]);
 export type VotingRoundStatus = z.infer<typeof votingRoundStatusSchema>;
@@ -16,6 +17,7 @@ export const votingRoundSchema = z.object({
     status: votingRoundStatusSchema,
     eligibleRoles: z.array(z.enum(["participant", "judge", "organizer"])),
     maxSelections: z.number().int().min(1).max(50),
+    maxVotesPerUser: z.number().int().min(0).max(50),
     opensAt: isoDateTimeSchema.nullable(),
     closesAt: isoDateTimeSchema.nullable(),
     publishedAt: isoDateTimeSchema.nullable(),
@@ -33,6 +35,7 @@ export const ballotSchema = z.object({
     roundId: idSchema,
     userId: idSchema,
     scores: z.array(ballotScoreSchema),
+    reasoning: z.string().max(BALLOT_REASONING_MAX_LENGTH).default(""),
     submittedAt: isoDateTimeSchema.nullable(),
 });
 export type Ballot = z.infer<typeof ballotSchema>;
@@ -46,6 +49,7 @@ export const createVotingRoundRequestSchema = z
             .min(1)
             .default(["participant"]),
         maxSelections: z.number().int().min(2).max(50).default(10),
+        maxVotesPerUser: z.number().int().min(0).max(50).default(0),
         opensAt: isoDateTimeSchema.nullable().default(null),
         closesAt: isoDateTimeSchema.nullable().default(null),
     })
@@ -55,6 +59,7 @@ export type CreateVotingRoundRequest = z.infer<typeof createVotingRoundRequestSc
 export const castBallotRequestSchema = z
     .object({
         scores: z.array(ballotScoreSchema).min(1).max(50),
+        reasoning: z.string().trim().max(BALLOT_REASONING_MAX_LENGTH).default(""),
     })
     .strict()
     .superRefine(({ scores }, context) => {
@@ -90,6 +95,14 @@ export const votableSubmissionSchema = z.object({
 });
 export type VotableSubmission = z.infer<typeof votableSubmissionSchema>;
 
+export const voteAuditEntrySchema = z.object({
+    userId: idSchema,
+    submittedAt: isoDateTimeSchema.nullable(),
+    reasoning: z.string(),
+    scores: z.array(ballotScoreSchema),
+});
+export type VoteAuditEntry = z.infer<typeof voteAuditEntrySchema>;
+
 export const voteResultSchema = z.object({
     roundId: idSchema,
     roundName: z.string(),
@@ -106,5 +119,6 @@ export const voteResultSchema = z.object({
             averageStars: z.number().nonnegative(),
         }),
     ),
+    audit: z.array(voteAuditEntrySchema).optional(),
 });
 export type VoteResult = z.infer<typeof voteResultSchema>;

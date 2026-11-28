@@ -1,4 +1,5 @@
 import type { CompetitionEditionStatus } from "@nethack/contracts";
+import type { DatabaseSession } from "../../infrastructure/database/client.js";
 
 export interface EditionSummary {
     readonly id: string;
@@ -37,6 +38,26 @@ export interface CompetitionsContract {
     getDivision(organizationId: string, divisionId: string): Promise<DivisionSummary | null>;
     listEditions(organizationId: string): Promise<readonly EditionSummary[]>;
     isPublicEdition(editionId: string): Promise<boolean>;
+    /**
+     * Results publication freeze. Moves the edition to `completed` inside the
+     * caller's transaction and returns the previous status so unpublishing can
+     * restore it. The edition stays frozen while it is `completed` or `archived`.
+     */
+    freezeForResults(
+        session: DatabaseSession,
+        organizationId: string,
+        editionId: string,
+    ): Promise<CompetitionEditionStatus>;
+    restoreEditionStatus(
+        session: DatabaseSession,
+        organizationId: string,
+        editionId: string,
+        status: CompetitionEditionStatus,
+    ): Promise<void>;
+}
+
+export function isEditionResultsFrozen(status: CompetitionEditionStatus): boolean {
+    return status === "completed" || status === "archived";
 }
 
 export const COMPETITIONS_CONTRACT = "competitions.v1";

@@ -668,12 +668,12 @@ export function AwardsPage(): ReactNode {
                                     </div>
                                     <CardDescription>
                                         {status.data.published
-                                            ? `Published ${formatDateTime(status.data.publishedAt)}.`
-                                            : "Participants and the public cannot see results before publication."}
+                                            ? `Published ${formatDateTime(status.data.publishedAt)}. Voting and judging are frozen until results are unpublished.`
+                                            : "Participants and the public cannot see results before publication. Publishing freezes voting and judging."}
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="flex flex-col gap-4">
-                                    <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+                                    <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-4">
                                         <div className="flex flex-col gap-0.5">
                                             <dt className="text-xs text-ink-subtle">
                                                 Judging entries
@@ -696,6 +696,14 @@ export function AwardsPage(): ReactNode {
                                             </dt>
                                             <dd className="tabular-nums">
                                                 {String(status.data.votingRoundCount)}
+                                            </dd>
+                                        </div>
+                                        <div className="flex flex-col gap-0.5">
+                                            <dt className="text-xs text-ink-subtle">
+                                                Published by
+                                            </dt>
+                                            <dd className="truncate font-mono text-xs">
+                                                {status.data.publishedByUserId ?? "—"}
                                             </dd>
                                         </div>
                                     </dl>
@@ -747,7 +755,7 @@ export function AwardsPage(): ReactNode {
                 open={confirmPublish}
                 onOpenChange={setConfirmPublish}
                 title="Publish results"
-                description="Publish the current rankings, awards, and peer voting? The snapshot cannot change without unpublishing."
+                description="Publish the current rankings, awards, and peer voting? Publishing freezes the edition: open voting rounds close, and judges can no longer save or submit evaluations. The snapshot cannot change without unpublishing."
                 confirmLabel="Publish results"
                 loading={publishResults.isPending}
                 onConfirm={onConfirmPublish}
@@ -757,7 +765,7 @@ export function AwardsPage(): ReactNode {
                 open={confirmUnpublish}
                 onOpenChange={setConfirmUnpublish}
                 title="Unpublish results"
-                description="Remove the published snapshot? Public results and certificates become unavailable immediately."
+                description="Remove the published snapshot? Public results and certificates become unavailable immediately. Voting rounds stay closed and ballots are kept; the edition returns to its previous status so judging can resume explicitly."
                 confirmLabel="Unpublish results"
                 tone="destructive"
                 loading={unpublishResults.isPending}

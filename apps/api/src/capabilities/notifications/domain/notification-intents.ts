@@ -16,6 +16,18 @@ export interface NotificationIntent {
     readonly dedupeKey: string;
 }
 
+export function buildNotificationIntents(
+    eventType: string,
+    payload: Record<string, unknown>,
+    workspaceOrigin: string,
+): readonly NotificationIntent[] {
+    if (eventType === domainEvents.resultsPublished) {
+        return resultsPublishedIntents(payload, workspaceOrigin);
+    }
+    const intent = buildNotificationIntent(eventType, payload, workspaceOrigin);
+    return intent === null ? [] : [intent];
+}
+
 export function buildNotificationIntent(
     eventType: string,
     payload: Record<string, unknown>,
@@ -237,6 +249,43 @@ function votingOpened(payload: Record<string, unknown>, origin: string): Notific
             title ?? organizationName ?? "round"
         }`,
     };
+}
+
+function resultsPublishedIntents(
+    payload: Record<string, unknown>,
+    origin: string,
+): readonly NotificationIntent[] {
+    const organizationId = readUuid(payload, "organizationId");
+    const editionId = readUuid(payload, "editionId");
+    if (organizationId === null || editionId === null) {
+        return [];
+    }
+    const editionName = readString(payload, "editionName");
+    const linkUrl = workspaceLink(origin, "/results", { edition: editionId });
+    return readUuidArray(payload, "participantUserIds").map((userId) => ({
+        userId,
+        email: null,
+        organizationId,
+        kind: "system",
+        title: "Results published",
+        body: `${editionName ?? "Competition"} results are published. View your results.`,
+        linkUrl,
+        dedupeKey: `recognition.results.published:${organizationId}:${editionId}:${userId}`,
+    }));
+}
+
+function readUuidArray(payload: Record<string, unknown>, key: string): readonly string[] {
+    const value = payload[key];
+    if (!Array.isArray(value)) {
+        return [];
+    }
+    const ids = new Set<string>();
+    for (const item of value) {
+        if (typeof item === "string" && uuidSchema.safeParse(item).success) {
+            ids.add(item);
+        }
+    }
+    return [...ids];
 }
 
 function readString(payload: Record<string, unknown>, key: string): string | null {

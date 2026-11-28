@@ -1,6 +1,7 @@
 import type {
     CompetitionEdition,
     CompetitionEditionDetail,
+    CompetitionEditionStatus,
     CompetitionSeries,
     CreateDivisionRequest,
     CreateEditionRequest,
@@ -418,6 +419,49 @@ export class CompetitionService {
             },
         );
         return toEdition(updated);
+    }
+
+    /**
+     * Results publication freeze: one direct status write to `completed`,
+     * bypassing the normal transition table because publication is the
+     * organizer's explicit freeze action. Returns the status to restore on
+     * unpublish.
+     */
+    async freezeForResults(
+        session: DatabaseSession,
+        organizationId: string,
+        editionId: string,
+    ): Promise<CompetitionEditionStatus> {
+        const current = await this.repository.findEdition(session.db, organizationId, editionId);
+        if (current === null) {
+            throw new NotFoundError("The competition edition was not found.");
+        }
+        if (current.status === "completed") {
+            return current.status;
+        }
+        const row = await this.repository.updateEdition(session, organizationId, editionId, {
+            status: "completed",
+            updatedAt: this.clock.now(),
+        });
+        if (row === null) {
+            throw new NotFoundError("The competition edition was not found.");
+        }
+        return current.status;
+    }
+
+    async restoreEditionStatus(
+        session: DatabaseSession,
+        organizationId: string,
+        editionId: string,
+        status: CompetitionEditionStatus,
+    ): Promise<void> {
+        const row = await this.repository.updateEdition(session, organizationId, editionId, {
+            status,
+            updatedAt: this.clock.now(),
+        });
+        if (row === null) {
+            throw new NotFoundError("The competition edition was not found.");
+        }
     }
 
     async publish(

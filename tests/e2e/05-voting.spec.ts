@@ -13,6 +13,7 @@ async function createAndOpenRound(
     const form = page.getByRole("button", { name: "Create round" }).locator("xpath=ancestor::form");
     await form.getByLabel("Name").fill(name);
     await form.getByLabel("Description").fill("Round created by the Playwright voting journey.");
+    await form.getByRole("spinbutton", { name: "Per-voter cap" }).fill("2");
     if (includeOrganizers) {
         await form.getByRole("checkbox", { name: "Organizers" }).check();
     }
@@ -73,6 +74,9 @@ test.describe("voting", () => {
             await addStars(page, FIXTURE.projectTitle, 5);
             await addStars(page, FIXTURE.labProjectTitle, 5);
             await expect(page.getByText(/10 of 10 stars assigned/)).toBeVisible();
+            await page
+                .getByLabel("Reasoning")
+                .fill("Both projects shipped; the fixture project had the clearer demo.");
             await page.getByRole("button", { name: "Cast ballot" }).click();
             await expectToast(page, "Ballot submitted");
             await expect(page.getByText(/You submitted a ballot/)).toBeVisible();
@@ -96,6 +100,7 @@ test.describe("voting", () => {
                             { submissionId: fixtureSubmissionId, stars: 5 },
                             { submissionId: labSubmissionId, stars: 5 },
                         ],
+                        reasoning: "Recast after reviewing the lab notes.",
                     },
                 },
             );
@@ -132,6 +137,13 @@ test.describe("voting", () => {
                 await expectToast(page, "Results published");
             });
 
+            await test.step("organizer sees ballot reasoning in the results audit", async () => {
+                await expect(
+                    page.getByRole("heading", { name: "Organizer ballot audit" }),
+                ).toBeVisible();
+                await expect(page.getByText("Recast after reviewing the lab notes.")).toBeVisible();
+            });
+
             await test.step("participant reads the published star results", async () => {
                 await participantPage.reload();
                 await expect(
@@ -146,6 +158,9 @@ test.describe("voting", () => {
                 await expect(
                     participantPage.getByRole("columnheader", { name: "Average stars" }),
                 ).toBeVisible();
+                await expect(
+                    participantPage.getByRole("heading", { name: "Organizer ballot audit" }),
+                ).toHaveCount(0);
             });
         } finally {
             await participantContext.close();

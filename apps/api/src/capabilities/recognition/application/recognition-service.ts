@@ -12,6 +12,7 @@ import type {
 import { publicResultsSchema } from "@nethack/contracts";
 import type { AuthContext } from "../../../authentication/types.js";
 import type { Clock } from "../../../core/clock.js";
+import { domainEvents } from "../../../core/domain-event.js";
 import {
     ConflictError,
     databaseErrorDetails,
@@ -19,6 +20,7 @@ import {
     isUniqueViolationError,
     NotFoundError,
 } from "../../../core/errors.js";
+import type { OutboxPublisher } from "../../../core/outbox.js";
 import type { AuditLogger } from "../../../infrastructure/audit/audit-logger.js";
 import type { DatabaseConnection } from "../../../infrastructure/database/client.js";
 import type { CompetitionsContract, EditionSummary } from "../../competitions/contracts.js";
@@ -48,6 +50,7 @@ export class RecognitionService {
     private readonly judging: JudgingContract;
     private readonly voting: VotingContract;
     private readonly organizations: OrganizationsContract;
+    private readonly events: OutboxPublisher;
     private readonly audit: AuditLogger;
     private readonly clock: Clock;
 
@@ -60,6 +63,7 @@ export class RecognitionService {
         judging: JudgingContract,
         voting: VotingContract,
         organizations: OrganizationsContract,
+        events: OutboxPublisher,
         audit: AuditLogger,
         clock: Clock,
     ) {
@@ -71,6 +75,7 @@ export class RecognitionService {
         this.judging = judging;
         this.voting = voting;
         this.organizations = organizations;
+        this.events = events;
         this.audit = audit;
         this.clock = clock;
     }
@@ -372,7 +377,8 @@ export class RecognitionService {
         editionId: string,
         ip: string | null,
     ): Promise<PublicResults> {
-        await this.requireEdition(organizationId, editionId);
+        const edition = await this.requireEdition(organizationId, editionId);
+        const organization = await this.requireOrganization(organizationId);
         const existing = await this.database.transaction({ organizationId }, (session) =>
             this.repository.findResults(session.db, organizationId, editionId),
         );
@@ -380,17 +386,39 @@ export class RecognitionService {
             throw new ConflictError("Results for this edition are already published.");
         }
         const publishedAt = this.clock.now();
-        const snapshot = await this.buildSnapshot(organizationId, editionId, publishedAt);
+        const [snapshot, teams] = await Promise.all([
+            this.buildSnapshot(organizationId, editionId, publishedAt),
+            this.teams.listEditionTeamsWithMembers(organizationId, editionId),
+        ]);
+        const participantUserIds = [
+            ...new Set(teams.flatMap((team) => team.members.map((member) => member.userId))),
+        ];
+        const frozenSnapshot: PublicResults = {
+            ...snapshot,
+            edition: { ...snapshot.edition, status: "completed" },
+        };
         try {
             await this.database.transaction(
                 { organizationId, userId: auth.user.id },
                 async (session) => {
+                    const previousEditionStatus = await this.competitions.freezeForResults(
+                        session,
+                        organizationId,
+                        editionId,
+                    );
+                    const closedRounds = await this.voting.closeOpenRoundsForResults(
+                        session,
+                        organizationId,
+                        editionId,
+                        auth.user.id,
+                    );
                     const inserted = await this.repository.insertResults(session, {
                         organizationId,
                         editionId,
                         publishedAt,
                         publishedByUserId: auth.user.id,
-                        snapshot,
+                        previousEditionStatus,
+                        snapshot: frozenSnapshot,
                     });
                     await this.audit.record(session, {
                         organizationId,
@@ -400,10 +428,26 @@ export class RecognitionService {
                         entityId: inserted.editionId,
                         metadata: {
                             editionId,
-                            judgingEntries: snapshot.judgingEntries.length,
-                            awards: snapshot.awards.length,
+                            judgingEntries: frozenSnapshot.judgingEntries.length,
+                            awards: frozenSnapshot.awards.length,
+                            closedRounds,
+                            previousEditionStatus,
                         },
                         ip,
+                    });
+                    await this.events.publish(session, {
+                        type: domainEvents.resultsPublished,
+                        organizationId,
+                        aggregateType: "competition_edition",
+                        aggregateId: editionId,
+                        payload: {
+                            organizationId,
+                            organizationName: organization.name,
+                            editionId,
+                            editionName: edition.name,
+                            participantUserIds,
+                            publishedAt: publishedAt.toISOString(),
+                        },
                     });
                 },
             );
@@ -413,7 +457,7 @@ export class RecognitionService {
             }
             throw error;
         }
-        return snapshot;
+        return frozenSnapshot;
     }
 
     async unpublish(
@@ -426,6 +470,14 @@ export class RecognitionService {
         await this.database.transaction(
             { organizationId, userId: auth.user.id },
             async (session) => {
+                const existing = await this.repository.findResultsForUpdate(
+                    session,
+                    organizationId,
+                    editionId,
+                );
+                if (existing === null) {
+                    throw new NotFoundError("This edition has no published results.");
+                }
                 const deleted = await this.repository.deleteResults(
                     session,
                     organizationId,
@@ -434,13 +486,21 @@ export class RecognitionService {
                 if (deleted === null) {
                     throw new NotFoundError("This edition has no published results.");
                 }
+                // Pre-migration publications have no stored status; voting is the safe pre-freeze default.
+                const restoredStatus = existing.previousEditionStatus ?? "voting";
+                await this.competitions.restoreEditionStatus(
+                    session,
+                    organizationId,
+                    editionId,
+                    restoredStatus,
+                );
                 await this.audit.record(session, {
                     organizationId,
                     actorUserId: auth.user.id,
                     action: "recognition.results.unpublished",
                     entityType: "edition_results",
                     entityId: editionId,
-                    metadata: { editionId },
+                    metadata: { editionId, restoredEditionStatus: restoredStatus },
                     ip,
                 });
             },

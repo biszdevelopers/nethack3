@@ -23,7 +23,7 @@ import type {
     DatabaseConnection,
     DatabaseSession,
 } from "../../../infrastructure/database/client.js";
-import type { CompetitionsContract } from "../../competitions/contracts.js";
+import type { CompetitionsContract, EditionSummary } from "../../competitions/contracts.js";
 import type { OrganizationsContract } from "../../organizations/contracts.js";
 import type { ParticipantsContract } from "../../participants/contracts.js";
 import type { SubmissionsContract } from "../../submissions/contracts.js";
@@ -114,7 +114,8 @@ export class VotingService {
         input: CreateVotingRoundRequest,
         ip: string | null,
     ): Promise<VotingRound> {
-        await this.requireEdition(organizationId, editionId);
+        const edition = await this.requireEdition(organizationId, editionId);
+        VotingRules.assertEditionAcceptsVoting(edition.status);
         const opensAt = parseNullable(input.opensAt);
         const closesAt = parseNullable(input.closesAt);
         VotingRules.assertSchedule(opensAt, closesAt);
@@ -128,6 +129,7 @@ export class VotingService {
                     description: input.description,
                     eligibleRoles: normalizeEligibleRoles(input.eligibleRoles),
                     maxSelections: input.maxSelections,
+                    maxVotesPerUser: input.maxVotesPerUser,
                     opensAt,
                     closesAt,
                 });
@@ -152,6 +154,8 @@ export class VotingService {
         roundId: string,
         ip: string | null,
     ): Promise<VotingRound> {
+        const preview = await this.requireRound(organizationId, roundId);
+        await this.requireUnfrozenEdition(organizationId, preview.editionId);
         const organizationName = await this.requireOrganizationName(organizationId);
         const row = await this.database.transaction(
             { organizationId, userId: auth.user.id },
@@ -195,6 +199,8 @@ export class VotingService {
         roundId: string,
         ip: string | null,
     ): Promise<VotingRound> {
+        const preview = await this.requireRound(organizationId, roundId);
+        await this.requireUnfrozenEdition(organizationId, preview.editionId);
         const organizationName = await this.requireOrganizationName(organizationId);
         const row = await this.database.transaction(
             { organizationId, userId: auth.user.id },
@@ -238,6 +244,8 @@ export class VotingService {
         roundId: string,
         ip: string | null,
     ): Promise<VotingRound> {
+        const preview = await this.requireRound(organizationId, roundId);
+        await this.requireUnfrozenEdition(organizationId, preview.editionId);
         const organizationName = await this.requireOrganizationName(organizationId);
         const row = await this.database.transaction(
             { organizationId, userId: auth.user.id },
@@ -276,6 +284,46 @@ export class VotingService {
         return toVotingRound(row);
     }
 
+    async closeOpenRoundsForResults(
+        session: DatabaseSession,
+        organizationId: string,
+        editionId: string,
+        actorUserId: string,
+    ): Promise<number> {
+        const now = this.clock.now();
+        const closed = await this.repository.closeOpenRounds(
+            session,
+            organizationId,
+            editionId,
+            now,
+        );
+        for (const round of closed) {
+            await this.audit.record(session, {
+                organizationId,
+                actorUserId,
+                action: "voting.round.closed",
+                entityType: "voting_round",
+                entityId: round.id,
+                metadata: { editionId, reason: "results_published" },
+                ip: null,
+            });
+            await this.events.publish(session, {
+                type: domainEvents.votingClosed,
+                organizationId,
+                aggregateType: "voting_round",
+                aggregateId: round.id,
+                payload: {
+                    organizationId,
+                    editionId,
+                    roundId: round.id,
+                    roundName: round.name,
+                    reason: "results_published",
+                },
+            });
+        }
+        return closed.length;
+    }
+
     async ballot(
         auth: AuthContext,
         organizationId: string,
@@ -304,6 +352,7 @@ export class VotingService {
             roundId,
             userId: auth.user.id,
             scores: [...found.scores],
+            reasoning: found.ballot.reasoning,
             submittedAt: found.ballot.submittedAt.toISOString(),
         };
     }
@@ -317,9 +366,10 @@ export class VotingService {
         ip: string | null,
     ): Promise<Ballot> {
         const round = await this.requireRound(organizationId, roundId);
+        await this.requireUnfrozenEdition(organizationId, round.editionId);
         const now = this.clock.now();
         VotingRules.assertBallotWindow(round, now);
-        VotingRules.assertScores(input.scores, round.maxSelections);
+        VotingRules.assertScores(input.scores, round.maxSelections, round.maxVotesPerUser);
         await this.assertVoterEligible(organizationId, round, auth.user.id, role);
         await this.assertSelectionsAreVotable(
             organizationId,
@@ -346,6 +396,7 @@ export class VotingService {
                             organizationId,
                             roundId,
                             userId: auth.user.id,
+                            reasoning: input.reasoning,
                             submittedAt: lockedAt,
                         });
                     } else {
@@ -355,6 +406,7 @@ export class VotingService {
                             organizationId,
                             existing.id,
                             lockedAt,
+                            input.reasoning,
                         );
                         if (updated === null) {
                             throw new NotFoundError("The ballot was not found.");
@@ -391,6 +443,7 @@ export class VotingService {
                 roundId,
                 userId: auth.user.id,
                 scores: [...input.scores],
+                reasoning: input.reasoning,
                 submittedAt: ballot.submittedAt.toISOString(),
             };
         } catch (error) {
@@ -408,7 +461,7 @@ export class VotingService {
     ): Promise<VoteResult> {
         const round = await this.requireRound(organizationId, roundId);
         VotingRules.assertCanViewResults(round.status, role);
-        return this.buildResult(organizationId, round);
+        return this.buildResult(organizationId, round, VotingRules.isOrganizerRole(role));
     }
 
     async editionResults(
@@ -424,7 +477,7 @@ export class VotingService {
             role === "owner" || role === "organizer"
                 ? rounds
                 : rounds.filter((round) => round.status === "published");
-        return this.buildResults(organizationId, visible);
+        return this.buildResults(organizationId, visible, role === "owner" || role === "organizer");
     }
 
     async publishedResults(
@@ -435,21 +488,26 @@ export class VotingService {
         const rounds = await this.database.transaction({ organizationId }, (session) =>
             this.repository.listPublishedRounds(session.db, organizationId, editionId),
         );
-        return this.buildResults(organizationId, rounds);
+        return this.buildResults(organizationId, rounds, false);
     }
 
     private async buildResults(
         organizationId: string,
         rounds: readonly VotingRoundRow[],
+        includeAudit: boolean,
     ): Promise<readonly VoteResult[]> {
         const results: VoteResult[] = [];
         for (const round of rounds) {
-            results.push(await this.buildResult(organizationId, round));
+            results.push(await this.buildResult(organizationId, round, includeAudit));
         }
         return results;
     }
 
-    private async buildResult(organizationId: string, round: VotingRoundRow): Promise<VoteResult> {
+    private async buildResult(
+        organizationId: string,
+        round: VotingRoundRow,
+        includeAudit: boolean,
+    ): Promise<VoteResult> {
         const { counts, totalBallots } = await this.database.transaction(
             { organizationId },
             async (session) => ({
@@ -461,6 +519,7 @@ export class VotingService {
                 ),
             }),
         );
+        const audit = includeAudit ? await this.buildAudit(organizationId, round.id) : undefined;
         if (counts.length === 0) {
             return {
                 roundId: round.id,
@@ -468,6 +527,7 @@ export class VotingService {
                 publishedAt: nullableIso(round.publishedAt),
                 totalBallots,
                 entries: [],
+                ...(audit === undefined ? {} : { audit }),
             };
         }
         const submissions = await this.submissions.listEditionSubmissions(
@@ -496,14 +556,42 @@ export class VotingService {
             publishedAt: nullableIso(round.publishedAt),
             totalBallots,
             entries,
+            ...(audit === undefined ? {} : { audit }),
         };
     }
 
-    private async requireEdition(organizationId: string, editionId: string): Promise<void> {
+    private async buildAudit(
+        organizationId: string,
+        roundId: string,
+    ): Promise<VoteResult["audit"]> {
+        const ballots = await this.database.transaction({ organizationId }, (session) =>
+            this.repository.listBallotsWithVotes(session.db, organizationId, roundId),
+        );
+        return ballots.map((entry) => ({
+            userId: entry.ballot.userId,
+            submittedAt: entry.ballot.submittedAt.toISOString(),
+            reasoning: entry.ballot.reasoning,
+            scores: entry.scores.map((score) => ({
+                submissionId: score.submissionId,
+                stars: score.stars,
+            })),
+        }));
+    }
+
+    private async requireEdition(
+        organizationId: string,
+        editionId: string,
+    ): Promise<EditionSummary> {
         const edition = await this.competitions.getEdition(organizationId, editionId);
         if (edition === null) {
             throw new NotFoundError("The competition edition was not found.");
         }
+        return edition;
+    }
+
+    private async requireUnfrozenEdition(organizationId: string, editionId: string): Promise<void> {
+        const edition = await this.requireEdition(organizationId, editionId);
+        VotingRules.assertEditionAcceptsVoting(edition.status);
     }
 
     private async requireOrganizationName(organizationId: string): Promise<string> {
@@ -647,6 +735,7 @@ function toVotingRound(row: VotingRoundRow): VotingRound {
         status: row.status,
         eligibleRoles: normalizeEligibleRoles(row.eligibleRoles),
         maxSelections: row.maxSelections,
+        maxVotesPerUser: row.maxVotesPerUser,
         opensAt: nullableIso(row.opensAt),
         closesAt: nullableIso(row.closesAt),
         publishedAt: nullableIso(row.publishedAt),

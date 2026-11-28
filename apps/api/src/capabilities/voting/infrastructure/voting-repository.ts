@@ -12,6 +12,7 @@ export interface NewRoundValues {
     readonly description: string;
     readonly eligibleRoles: readonly string[];
     readonly maxSelections: number;
+    readonly maxVotesPerUser: number;
     readonly opensAt: Date | null;
     readonly closesAt: Date | null;
 }
@@ -28,6 +29,7 @@ export interface NewBallotValues {
     readonly organizationId: string;
     readonly roundId: string;
     readonly userId: string;
+    readonly reasoning: string;
     readonly submittedAt: Date;
 }
 
@@ -62,6 +64,7 @@ export class VotingRepository {
                 description: values.description,
                 eligibleRoles: [...values.eligibleRoles],
                 maxSelections: values.maxSelections,
+                maxVotesPerUser: values.maxVotesPerUser,
                 opensAt: values.opensAt,
                 closesAt: values.closesAt,
             })
@@ -159,6 +162,25 @@ export class VotingRepository {
         return rows[0] ?? null;
     }
 
+    async closeOpenRounds(
+        session: DatabaseSession,
+        organizationId: string,
+        editionId: string,
+        updatedAt: Date,
+    ): Promise<readonly VotingRoundRow[]> {
+        return session.db
+            .update(votingRounds)
+            .set({ status: "closed", updatedAt })
+            .where(
+                and(
+                    eq(votingRounds.organizationId, organizationId),
+                    eq(votingRounds.editionId, editionId),
+                    eq(votingRounds.status, "open"),
+                ),
+            )
+            .returning();
+    }
+
     async findBallot(
         db: DatabaseExecutor,
         organizationId: string,
@@ -197,6 +219,43 @@ export class VotingRepository {
         return { ballot, scores: rows };
     }
 
+    async listBallotsWithVotes(
+        db: DatabaseExecutor,
+        organizationId: string,
+        roundId: string,
+    ): Promise<readonly BallotWithVotes[]> {
+        const ballotRows = await db
+            .select()
+            .from(ballots)
+            .where(and(eq(ballots.organizationId, organizationId), eq(ballots.roundId, roundId)))
+            .orderBy(asc(ballots.submittedAt), asc(ballots.id));
+        if (ballotRows.length === 0) {
+            return [];
+        }
+        const voteRows = await db
+            .select({
+                ballotId: votes.ballotId,
+                submissionId: votes.submissionId,
+                stars: votes.stars,
+            })
+            .from(votes)
+            .where(and(eq(votes.organizationId, organizationId), eq(votes.roundId, roundId)))
+            .orderBy(asc(votes.createdAt), asc(votes.id));
+        const scoresByBallot = new Map<
+            string,
+            { readonly submissionId: string; readonly stars: number }[]
+        >();
+        for (const row of voteRows) {
+            const scores = scoresByBallot.get(row.ballotId) ?? [];
+            scores.push({ submissionId: row.submissionId, stars: row.stars });
+            scoresByBallot.set(row.ballotId, scores);
+        }
+        return ballotRows.map((ballot) => ({
+            ballot,
+            scores: scoresByBallot.get(ballot.id) ?? [],
+        }));
+    }
+
     async insertBallot(session: DatabaseSession, values: NewBallotValues): Promise<BallotRow> {
         const [row] = await session.db.insert(ballots).values(values).returning();
         if (row === undefined) {
@@ -224,10 +283,11 @@ export class VotingRepository {
         organizationId: string,
         ballotId: string,
         submittedAt: Date,
+        reasoning: string,
     ): Promise<BallotRow | null> {
         const rows = await session.db
             .update(ballots)
-            .set({ submittedAt })
+            .set({ submittedAt, reasoning })
             .where(and(eq(ballots.organizationId, organizationId), eq(ballots.id, ballotId)))
             .returning();
         return rows[0] ?? null;
