@@ -5,6 +5,7 @@ import type {
     CreateEditionRequest,
     CreateMilestoneRequest,
     CreateSeriesRequest,
+    EditionLifecycleRequest,
     UpdateEditionRequest,
 } from "@nethack/contracts";
 import { competitionsApi } from "./competitions-api.js";
@@ -144,6 +145,34 @@ export function usePublishEdition(organizationId: string | null) {
                 throw new Error("Select an organization first.");
             }
             return competitionsApi.publishEdition(organizationId, editionId);
+        },
+        onSuccess: async (edition) => {
+            if (organizationId === null) {
+                return;
+            }
+            await Promise.all([
+                queryClient.invalidateQueries({
+                    queryKey: queryKeys.edition(edition.id),
+                }),
+                queryClient.invalidateQueries({
+                    queryKey: queryKeys.reports(organizationId),
+                }),
+                queryClient.invalidateQueries({
+                    queryKey: queryKeys.publicCompetitions(),
+                }),
+            ]);
+        },
+    });
+}
+
+export function useEditionLifecycle(organizationId: string | null) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (input: { editionId: string; body: EditionLifecycleRequest }) => {
+            if (organizationId === null) {
+                throw new Error("Select an organization first.");
+            }
+            return competitionsApi.lifecycleEdition(organizationId, input.editionId, input.body);
         },
         onSuccess: async (edition) => {
             if (organizationId === null) {

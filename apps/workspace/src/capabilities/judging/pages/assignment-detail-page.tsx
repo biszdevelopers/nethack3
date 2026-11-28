@@ -1,11 +1,12 @@
 import {
+    useEffect,
     useRef,
     useState,
     type KeyboardEvent as ReactKeyboardEvent,
     type PointerEvent as ReactPointerEvent,
     type ReactNode,
 } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useBlocker, useParams } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { JudgeAssignmentStatus } from "@nethack/contracts";
@@ -91,6 +92,38 @@ function statusTone(status: JudgeAssignmentStatus): "neutral" | "primary" | "out
     }
 }
 
+const AUTOSAVE_DEBOUNCE_MS = 650;
+
+type SaveStatus = "idle" | "unsaved" | "saving" | "saved" | "error";
+
+interface EvaluationDraftEdit {
+    readonly key: string;
+    readonly scores: Record<string, RubricDraftScore>;
+    readonly comment: string;
+}
+
+interface AutosaveDraft {
+    readonly key: string;
+    readonly scores: Record<string, RubricDraftScore>;
+    readonly comment: string;
+}
+
+interface SaveState {
+    readonly key: string | null;
+    readonly status: SaveStatus;
+    readonly savedAt: number | null;
+    readonly error: string | null;
+    readonly dirty: boolean;
+}
+
+function formatTimeOfDay(value: number): string {
+    return new Intl.DateTimeFormat(undefined, {
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+    }).format(value);
+}
+
 export function AssignmentDetailPage(): ReactNode {
     const { assignmentId } = useParams<{ assignmentId: string }>();
     const { session, membership } = useActiveMembership();
@@ -104,14 +137,282 @@ export function AssignmentDetailPage(): ReactNode {
     const declareConflict = useDeclareConflict(organizationId, assignmentId ?? null);
     const flagAssignment = useFlagAssignment(organizationId, assignmentId ?? null);
 
-    const [edit, setEdit] = useState<{
-        readonly key: string;
-        readonly scores: Record<string, RubricDraftScore>;
-        readonly comment: string;
-    } | null>(null);
+    const loaded = detail.data ?? null;
+    const draftKey = loaded?.assignment.id ?? null;
+    const criteria = loaded?.criteria ?? [];
+    const evaluation = loaded?.evaluation ?? null;
+    const serverScores: Record<string, RubricDraftScore> = {};
+    for (const score of evaluation?.scores ?? []) {
+        serverScores[score.criterionId] = { score: score.score, comment: score.comment };
+    }
+    const judgeIdentity = {
+        displayName: session.data?.user.displayName ?? "",
+        email: session.data?.user.email ?? null,
+    };
+
+    const [edit, setEdit] = useState<EvaluationDraftEdit | null>(null);
     const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
     const [conflictOpen, setConflictOpen] = useState(false);
     const [flagOpen, setFlagOpen] = useState(false);
+    const [manualSaving, setManualSaving] = useState(false);
+    const [saveState, setSaveState] = useState<SaveState>({
+        key: draftKey,
+        status: "idle",
+        savedAt: null,
+        error: null,
+        dirty: false,
+    });
+
+    const dirtyRef = useRef(false);
+    const revisionRef = useRef(0);
+    const autosaveDraftRef = useRef<AutosaveDraft | null>(null);
+    const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const inFlightRef = useRef<Promise<boolean> | null>(null);
+    const lastSaveErrorRef = useRef<string | null>(null);
+    const mountedRef = useRef(true);
+    const activeDraftKeyRef = useRef<string | null>(draftKey);
+    const flushRef = useRef<() => Promise<boolean>>(async () => true);
+
+    const currentSave = saveState.key === draftKey ? saveState : null;
+    const dirty = currentSave?.dirty ?? false;
+    const saveStatus = currentSave?.status ?? "idle";
+    const savedAt = currentSave?.savedAt ?? null;
+    const saveError = currentSave?.error ?? null;
+
+    const draft = edit !== null && draftKey !== null && edit.key === draftKey ? edit : null;
+    const scores = draft?.scores ?? serverScores;
+    const overallComment = draft?.comment ?? evaluation?.overallComment ?? "";
+    const scoresComplete =
+        criteria.length > 0 &&
+        criteria.every((criterion) =>
+            isValidCriterionScore(criterion, scores[criterion.id]?.score),
+        );
+    const commentIssue = judgeCommentIssue(overallComment, judgeIdentity);
+    const commentError = overallComment.trim().length === 0 ? null : commentIssue;
+    const serverSavedAt = evaluation === null ? null : Date.parse(evaluation.updatedAt);
+    const displaySavedAt =
+        savedAt ?? (serverSavedAt !== null && !Number.isNaN(serverSavedAt) ? serverSavedAt : null);
+
+    const updateSaveState = (
+        patch: Partial<Pick<SaveState, "status" | "savedAt" | "error" | "dirty">>,
+    ): void => {
+        if (draftKey === null || activeDraftKeyRef.current !== draftKey) {
+            return;
+        }
+        setSaveState((previous) =>
+            previous.key === draftKey
+                ? { ...previous, ...patch }
+                : {
+                      key: draftKey,
+                      status: "idle",
+                      savedAt: null,
+                      error: null,
+                      dirty: false,
+                      ...patch,
+                  },
+        );
+    };
+
+    const clearSaveTimer = (): void => {
+        if (saveTimerRef.current !== null) {
+            clearTimeout(saveTimerRef.current);
+            saveTimerRef.current = null;
+        }
+    };
+
+    const isSaveableDraft = (
+        nextScores: Readonly<Record<string, RubricDraftScore>>,
+        nextComment: string,
+    ): boolean =>
+        criteria.length > 0 &&
+        criteria.every((criterion) =>
+            isValidCriterionScore(criterion, nextScores[criterion.id]?.score),
+        ) &&
+        judgeCommentIssue(nextComment, judgeIdentity) === null;
+
+    const buildScoresPayload = (current: AutosaveDraft) => {
+        const payload = criteria.flatMap((criterion) => {
+            const entry = current.scores[criterion.id];
+            const score = entry?.score;
+            if (!isValidCriterionScore(criterion, score)) {
+                return [];
+            }
+            return [{ criterionId: criterion.id, score, comment: entry?.comment ?? "" }];
+        });
+        return payload.length === criteria.length ? payload : null;
+    };
+
+    const scheduleAutosave = (): void => {
+        clearSaveTimer();
+        saveTimerRef.current = setTimeout(() => {
+            saveTimerRef.current = null;
+            void flushRef.current();
+        }, AUTOSAVE_DEBOUNCE_MS);
+    };
+
+    const flushDraft = async (): Promise<boolean> => {
+        clearSaveTimer();
+        const active = inFlightRef.current;
+        if (active !== null) {
+            const previousSaved = await active;
+            if (!previousSaved) {
+                return false;
+            }
+            if (!dirtyRef.current) {
+                return true;
+            }
+            return flushDraft();
+        }
+        if (!dirtyRef.current) {
+            return true;
+        }
+        const current = autosaveDraftRef.current;
+        if (current === null || current.key !== draftKey) {
+            autosaveDraftRef.current = null;
+            dirtyRef.current = false;
+            return true;
+        }
+        if (!isSaveableDraft(current.scores, current.comment)) {
+            return false;
+        }
+        const payload = buildScoresPayload(current);
+        if (payload === null) {
+            return false;
+        }
+        const revision = revisionRef.current;
+        updateSaveState({ status: "saving" });
+        const request = (async (): Promise<boolean> => {
+            try {
+                await saveEvaluation.mutateAsync({
+                    scores: payload,
+                    overallComment: current.comment,
+                });
+                if (mountedRef.current && activeDraftKeyRef.current === draftKey) {
+                    lastSaveErrorRef.current = null;
+                    if (revisionRef.current === revision) {
+                        dirtyRef.current = false;
+                        updateSaveState({
+                            status: "saved",
+                            savedAt: Date.now(),
+                            error: null,
+                            dirty: false,
+                        });
+                    } else {
+                        updateSaveState({ status: "unsaved", error: null });
+                        scheduleAutosave();
+                    }
+                }
+                return true;
+            } catch (error) {
+                const message = describeError(error);
+                lastSaveErrorRef.current = message;
+                if (mountedRef.current && activeDraftKeyRef.current === draftKey) {
+                    updateSaveState({ status: "error", error: message, dirty: true });
+                }
+                return false;
+            } finally {
+                inFlightRef.current = null;
+            }
+        })();
+        inFlightRef.current = request;
+        return request;
+    };
+
+    const queueDraftChange = (
+        nextScores: Record<string, RubricDraftScore>,
+        nextComment: string,
+    ): void => {
+        if (draftKey === null) {
+            return;
+        }
+        autosaveDraftRef.current = { key: draftKey, scores: nextScores, comment: nextComment };
+        revisionRef.current += 1;
+        dirtyRef.current = true;
+        lastSaveErrorRef.current = null;
+        updateSaveState({ status: "unsaved", error: null, dirty: true });
+        if (!isSaveableDraft(nextScores, nextComment)) {
+            clearSaveTimer();
+            return;
+        }
+        scheduleAutosave();
+    };
+
+    const setScores = (next: Record<string, RubricDraftScore>): void => {
+        if (draftKey === null) {
+            return;
+        }
+        setEdit({ key: draftKey, scores: next, comment: overallComment });
+        queueDraftChange(next, overallComment);
+    };
+
+    const setOverallComment = (next: string): void => {
+        if (draftKey === null) {
+            return;
+        }
+        setEdit({ key: draftKey, scores, comment: next });
+        queueDraftChange(scores, next);
+    };
+
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+            if (saveTimerRef.current !== null) {
+                clearTimeout(saveTimerRef.current);
+                saveTimerRef.current = null;
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        activeDraftKeyRef.current = draftKey;
+    }, [draftKey]);
+
+    useEffect(() => {
+        if (!dirty) {
+            return;
+        }
+        const handleBeforeUnload = (event: BeforeUnloadEvent): void => {
+            event.preventDefault();
+            event.returnValue = "";
+        };
+        window.addEventListener("beforeunload", handleBeforeUnload);
+        return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+    }, [dirty]);
+
+    useEffect(() => {
+        flushRef.current = flushDraft;
+    });
+
+    const blocker = useBlocker(
+        ({ currentLocation, nextLocation }) =>
+            dirty &&
+            scoresComplete &&
+            commentIssue === null &&
+            currentLocation.pathname !== nextLocation.pathname,
+    );
+
+    useEffect(() => {
+        if (blocker.state !== "blocked") {
+            return;
+        }
+        const blocked = blocker;
+        let cancelled = false;
+        void (async () => {
+            const flushed = await flushRef.current();
+            if (cancelled) {
+                return;
+            }
+            if (flushed) {
+                blocked.proceed();
+            } else {
+                blocked.reset();
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [blocker]);
 
     const conflictForm = useForm<ConflictForm>({
         resolver: zodResolver(conflictSchema),
@@ -159,7 +460,7 @@ export function AssignmentDetailPage(): ReactNode {
             </div>
         );
     }
-    if (detail.data === null) {
+    if (loaded === null) {
         return (
             <EmptyState
                 title="Assignment not found"
@@ -173,35 +474,13 @@ export function AssignmentDetailPage(): ReactNode {
         );
     }
 
-    const { assignment, rubric, criteria, submission, evaluation, scoreCurve, frozen } =
-        detail.data;
+    const { assignment, rubric, submission, scoreCurve, frozen } = loaded;
     const videoUrl = safeExternalUrl(submission.videoUrl);
     const repositoryUrl = safeExternalUrl(submission.repositoryUrl);
     const demoUrl = safeExternalUrl(submission.demoUrl);
-    const evaluationKey = evaluation?.id ?? `${assignment.id}-new`;
-    const serverScores: Record<string, RubricDraftScore> = {};
-    for (const score of evaluation?.scores ?? []) {
-        serverScores[score.criterionId] = { score: score.score, comment: score.comment };
-    }
-    const scores = edit !== null && edit.key === evaluationKey ? edit.scores : serverScores;
-    const overallComment =
-        edit !== null && edit.key === evaluationKey
-            ? edit.comment
-            : (evaluation?.overallComment ?? "");
-    const setScores = (next: Record<string, RubricDraftScore>): void => {
-        setEdit({ key: evaluationKey, scores: next, comment: overallComment });
-    };
-    const setOverallComment = (next: string): void => {
-        setEdit({ key: evaluationKey, scores, comment: next });
-    };
     const canEvaluate =
         (assignment.status === "assigned" || assignment.status === "in_progress") && !frozen;
     const submitted = evaluation?.status === "submitted";
-    const scoresComplete =
-        criteria.length > 0 &&
-        criteria.every((criterion) =>
-            isValidCriterionScore(criterion, scores[criterion.id]?.score),
-        );
     const previewScores: Record<string, { score: number; comment?: string }> = {};
     for (const criterion of criteria) {
         const score = scores[criterion.id]?.score;
@@ -211,11 +490,6 @@ export function AssignmentDetailPage(): ReactNode {
     }
     const rawPreview = weightedRubricScore(criteria, previewScores);
     const displayPreview = rawPreview === null ? null : curveScore(rawPreview, scoreCurve.points);
-    const commentIssue = judgeCommentIssue(overallComment, {
-        displayName: session.data?.user.displayName ?? "",
-        email: session.data?.user.email ?? null,
-    });
-    const commentError = overallComment.trim().length === 0 ? null : commentIssue;
     const trackLabel = assignment.divisionName ?? "Edition-wide";
     const submissionState = humanizeToken(submission.submissionStatus);
 
@@ -223,30 +497,33 @@ export function AssignmentDetailPage(): ReactNode {
         if (!scoresComplete) {
             return;
         }
-        const payload = criteria.flatMap((criterion) => {
-            const entry = scores[criterion.id];
-            const score = entry?.score;
-            if (!isValidCriterionScore(criterion, score)) {
-                return [];
-            }
-            return [{ criterionId: criterion.id, score, comment: entry?.comment ?? "" }];
-        });
-        if (payload.length !== criteria.length) {
-            return;
-        }
-        try {
-            await saveEvaluation.mutateAsync({ scores: payload, overallComment });
+        setManualSaving(true);
+        const saved = await flushDraft();
+        setManualSaving(false);
+        if (saved) {
             toast({ title: "Draft saved", tone: "success" });
-        } catch (error) {
+        } else {
             toast({
                 title: "Could not save the evaluation",
-                description: describeError(error),
+                description: lastSaveErrorRef.current ?? "The draft could not be saved.",
                 tone: "critical",
             });
         }
     };
 
     const onSubmit = async (): Promise<void> => {
+        const flushed = await flushDraft();
+        if (!flushed) {
+            setConfirmSubmitOpen(false);
+            toast({
+                title: "Could not save the latest draft",
+                description:
+                    lastSaveErrorRef.current ??
+                    "Finish every criterion and the overall comment, then try again.",
+                tone: "critical",
+            });
+            return;
+        }
         try {
             await submitEvaluation.mutateAsync();
             setConfirmSubmitOpen(false);
@@ -460,7 +737,7 @@ export function AssignmentDetailPage(): ReactNode {
                                             <Button
                                                 type="button"
                                                 variant="outline"
-                                                loading={saveEvaluation.isPending}
+                                                loading={manualSaving}
                                                 disabled={!scoresComplete || commentIssue !== null}
                                                 onClick={() => void onSave()}
                                             >
@@ -478,11 +755,12 @@ export function AssignmentDetailPage(): ReactNode {
                                             >
                                                 Submit evaluation
                                             </Button>
-                                            {evaluation?.status === "draft" ? (
-                                                <span className="self-center text-xs text-ink-muted">
-                                                    Save the draft, then submit it.
-                                                </span>
-                                            ) : null}
+                                            <SaveStateIndicator
+                                                status={saveStatus}
+                                                savedAt={displaySavedAt}
+                                                error={saveError}
+                                                onRetry={() => void flushDraft()}
+                                            />
                                         </div>
                                     </div>
                                 )}
@@ -870,6 +1148,51 @@ function SplitWorkspace({
             </div>
         </div>
     );
+}
+
+function SaveStateIndicator({
+    status,
+    savedAt,
+    error,
+    onRetry,
+}: {
+    readonly status: SaveStatus;
+    readonly savedAt: number | null;
+    readonly error: string | null;
+    readonly onRetry: () => void;
+}): ReactNode {
+    if (status === "error") {
+        return (
+            <span role="alert" className="flex items-center gap-2 self-center text-xs text-ink">
+                <span title={error ?? undefined}>Save failed</span>
+                <Button type="button" variant="ghost" size="sm" onClick={onRetry}>
+                    Retry save
+                </Button>
+            </span>
+        );
+    }
+    if (status === "saving") {
+        return (
+            <span role="status" className="self-center text-xs text-ink-muted">
+                Saving...
+            </span>
+        );
+    }
+    if (savedAt !== null && (status === "saved" || status === "idle")) {
+        return (
+            <span role="status" className="self-center text-xs text-ink-muted">
+                Draft saved at {formatTimeOfDay(savedAt)}
+            </span>
+        );
+    }
+    if (status === "unsaved") {
+        return (
+            <span role="status" className="self-center text-xs text-ink-muted">
+                Unsaved changes
+            </span>
+        );
+    }
+    return null;
 }
 
 function ReadOnlyScores({

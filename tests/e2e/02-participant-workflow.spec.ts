@@ -72,17 +72,17 @@ test.describe("participant workflow", () => {
         });
 
         await test.step("invite the second participant by email", async () => {
-            await page.getByLabel("Invite by email").fill(USERS.judge.email);
+            await page.getByLabel("Invite by email").fill(USERS.partner.email);
             await page.getByRole("button", { name: "Send invitation" }).click();
             await expect(
-                page.getByText(`Invitation sent to ${USERS.judge.email}.`, { exact: false }),
+                page.getByText(`Invitation sent to ${USERS.partner.email}.`, { exact: false }),
             ).toBeVisible();
             await expect(page.getByLabel("Invitation link")).toHaveValue(/\/invitations\?token=/);
 
             await expect
-                .poll(async () => invitationTokenForEmail(USERS.judge.email), { timeout: 20_000 })
+                .poll(async () => invitationTokenForEmail(USERS.partner.email), { timeout: 20_000 })
                 .not.toBeNull();
-            const token = await invitationTokenForEmail(USERS.judge.email);
+            const token = await invitationTokenForEmail(USERS.partner.email);
             if (token === null) {
                 throw new Error("The team invitation token was not published to the outbox.");
             }
@@ -90,7 +90,7 @@ test.describe("participant workflow", () => {
             const judgeContext = await newAppContext(browser);
             try {
                 const judgePage = await judgeContext.newPage();
-                await signIn(judgePage, USERS.judge);
+                await signIn(judgePage, USERS.partner);
                 await judgePage.goto("/invitations");
                 await expect(
                     judgePage.getByRole("heading", { name: "Invitations", level: 1 }),
@@ -117,7 +117,7 @@ test.describe("participant workflow", () => {
             }
 
             await page.reload();
-            await expect(page.getByText("Fixture Judge", { exact: true }).first()).toBeVisible();
+            await expect(page.getByText("Fixture Partner", { exact: true }).first()).toBeVisible();
             await expect(page.getByText("2 of 4 members")).toBeVisible();
         });
 

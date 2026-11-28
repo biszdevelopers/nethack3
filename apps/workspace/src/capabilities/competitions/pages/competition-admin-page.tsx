@@ -6,10 +6,12 @@ import type {
     CompetitionEditionDetail,
     CompetitionEditionStatus,
     Division,
+    EditionLifecycleAction,
     Milestone,
 } from "@nethack/contracts";
 import {
     Alert,
+    AlertDialog,
     Badge,
     Button,
     Card,
@@ -65,6 +67,7 @@ import {
     useCreateSeries,
     useDivisions,
     useEdition,
+    useEditionLifecycle,
     useMilestones,
     useOrganizerEditions,
     usePublishEdition,
@@ -80,9 +83,67 @@ const STATUS_OPTIONS = [
     { value: "active", label: "Active" },
     { value: "judging", label: "Judging" },
     { value: "voting", label: "Voting" },
+    { value: "paused", label: "Paused", disabled: true },
     { value: "completed", label: "Completed" },
     { value: "archived", label: "Archived" },
 ] as const;
+
+const PAUSABLE_STATUSES: ReadonlySet<CompetitionEditionStatus> = new Set([
+    "published",
+    "registration_open",
+    "registration_closed",
+    "active",
+    "judging",
+    "voting",
+]);
+
+interface LifecycleConfirmation {
+    readonly action: EditionLifecycleAction;
+    readonly title: string;
+    readonly description: string;
+    readonly confirmLabel: string;
+}
+
+const LIFECYCLE_SUCCESS: Record<EditionLifecycleAction, string> = {
+    pause: "Edition paused",
+    resume: "Edition resumed",
+    reopen_submissions: "Submissions reopened",
+    reopen_judging: "Judging reopened",
+    reopen_voting: "Voting reopened",
+    reset: "Edition reset to draft",
+};
+
+type ConfirmedLifecycleAction = "reopen_submissions" | "reopen_judging" | "reopen_voting" | "reset";
+
+const LIFECYCLE_CONFIRMATIONS: Record<
+    ConfirmedLifecycleAction,
+    Omit<LifecycleConfirmation, "action">
+> = {
+    reopen_submissions: {
+        title: "Reopen submissions?",
+        description:
+            "The edition returns to active so teams can submit again. Existing teams, projects, submissions, and scores are kept.",
+        confirmLabel: "Reopen submissions",
+    },
+    reopen_judging: {
+        title: "Reopen judging?",
+        description:
+            "The edition returns to judging so scores can be revised. Existing evaluations and awards are kept.",
+        confirmLabel: "Reopen judging",
+    },
+    reopen_voting: {
+        title: "Reopen voting?",
+        description:
+            "The edition returns to voting and public results close. Existing votes, evaluations, and awards are kept.",
+        confirmLabel: "Reopen voting",
+    },
+    reset: {
+        title: "Reset the edition to draft?",
+        description:
+            "The edition becomes private and leaves public competition and project pages. Teams, projects, submissions, and scores are kept.",
+        confirmLabel: "Reset to draft",
+    },
+};
 
 const MILESTONE_KIND_OPTIONS = [
     { value: "registration", label: "Registration" },
@@ -101,6 +162,8 @@ function editionStatusTone(status: CompetitionEditionStatus): "neutral" | "prima
         case "registration_open":
         case "active":
             return "primary";
+        case "paused":
+            return "neutral";
         default:
             return "outline";
     }
@@ -122,6 +185,8 @@ function statusLabel(status: CompetitionEditionStatus): string {
             return "Judging";
         case "voting":
             return "Voting";
+        case "paused":
+            return "Paused";
         case "completed":
             return "Completed";
         case "archived":
@@ -173,6 +238,8 @@ export function CompetitionAdminPage(): ReactNode {
     const organizerEditions = useOrganizerEditions(organizationId, isOrganizer);
     const editionId = searchParams.get("edition");
     const [editionSeriesId, setEditionSeriesId] = useState<string | null>(null);
+    const [lifecycleConfirmation, setLifecycleConfirmation] =
+        useState<LifecycleConfirmation | null>(null);
     const edition = useEdition(organizationId, editionId);
     const divisions = useDivisions(organizationId, editionId);
     const milestones = useMilestones(organizationId, editionId);
@@ -181,6 +248,7 @@ export function CompetitionAdminPage(): ReactNode {
     const createEdition = useCreateEdition(organizationId);
     const updateEdition = useUpdateEdition(organizationId);
     const publishEdition = usePublishEdition(organizationId);
+    const lifecycle = useEditionLifecycle(organizationId);
     const createDivision = useCreateDivision(organizationId);
     const createMilestone = useCreateMilestone(organizationId);
 
@@ -500,6 +568,36 @@ export function CompetitionAdminPage(): ReactNode {
             });
         }
     });
+
+    const applyLifecycle = (action: EditionLifecycleAction): void => {
+        if (editionId === null) {
+            return;
+        }
+        lifecycle.mutate(
+            {
+                editionId,
+                body: { action, ...(action === "reset" ? { confirm: true } : {}) },
+            },
+            {
+                onSuccess: () => {
+                    setLifecycleConfirmation(null);
+                    toast({ title: LIFECYCLE_SUCCESS[action], tone: "success" });
+                },
+                onError: (error) => {
+                    setLifecycleConfirmation(null);
+                    toast({
+                        title: "Could not update the edition lifecycle",
+                        description: describeError(error),
+                        tone: "critical",
+                    });
+                },
+            },
+        );
+    };
+
+    const confirmLifecycle = (action: ConfirmedLifecycleAction): void => {
+        setLifecycleConfirmation({ action, ...LIFECYCLE_CONFIRMATIONS[action] });
+    };
 
     return (
         <div className="flex flex-col gap-6">
@@ -941,6 +1039,14 @@ export function CompetitionAdminPage(): ReactNode {
                         </div>
                     </div>
 
+                    {editionData.status === "paused" ? (
+                        <Alert tone="warning" title="This edition is paused">
+                            It is hidden from public competition and project pages. Resuming
+                            restores{" "}
+                            {statusLabel(editionData.statusBeforePause ?? "registration_open")}.
+                        </Alert>
+                    ) : null}
+
                     <KeyValue
                         columns={2}
                         items={[
@@ -968,6 +1074,98 @@ export function CompetitionAdminPage(): ReactNode {
                             },
                         ]}
                     />
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Lifecycle</CardTitle>
+                            <CardDescription>
+                                Pause hides the edition from public pages. Reopening a stage moves
+                                the edition backwards; all teams, projects, submissions, and scores
+                                are kept.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex flex-wrap gap-2">
+                                {PAUSABLE_STATUSES.has(editionData.status) ? (
+                                    <Button
+                                        type="button"
+                                        loading={lifecycle.isPending}
+                                        onClick={() => {
+                                            applyLifecycle("pause");
+                                        }}
+                                    >
+                                        Pause edition
+                                    </Button>
+                                ) : null}
+                                {editionData.status === "paused" ? (
+                                    <Button
+                                        type="button"
+                                        loading={lifecycle.isPending}
+                                        onClick={() => {
+                                            applyLifecycle("resume");
+                                        }}
+                                    >
+                                        Resume edition
+                                    </Button>
+                                ) : null}
+                                {editionData.status === "paused" ||
+                                editionData.status === "judging" ||
+                                editionData.status === "voting" ? (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => {
+                                            confirmLifecycle("reopen_submissions");
+                                        }}
+                                    >
+                                        Reopen submissions
+                                    </Button>
+                                ) : null}
+                                {editionData.status === "voting" ? (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => {
+                                            confirmLifecycle("reopen_judging");
+                                        }}
+                                    >
+                                        Reopen judging
+                                    </Button>
+                                ) : null}
+                                {editionData.status === "judging" ? (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => {
+                                            confirmLifecycle("reopen_voting");
+                                        }}
+                                    >
+                                        Reopen voting
+                                    </Button>
+                                ) : null}
+                                {editionData.status !== "draft" &&
+                                editionData.status !== "archived" &&
+                                editionData.status !== "completed" ? (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        color="critical"
+                                        onClick={() => {
+                                            confirmLifecycle("reset");
+                                        }}
+                                    >
+                                        Reset to draft
+                                    </Button>
+                                ) : null}
+                            </div>
+                            {editionData.status === "completed" ? (
+                                <p className="mt-3 text-sm text-ink-muted">
+                                    Unpublish the published results before reopening or resetting a
+                                    completed edition.
+                                </p>
+                            ) : null}
+                        </CardContent>
+                    </Card>
 
                     <PreflightWarnings
                         organizationId={organizationId}
@@ -999,7 +1197,12 @@ export function CompetitionAdminPage(): ReactNode {
                                                     options={STATUS_OPTIONS}
                                                     value={field.value}
                                                     onValueChange={field.onChange}
-                                                    description="Only valid transitions are accepted."
+                                                    disabled={editionData.status === "paused"}
+                                                    description={
+                                                        editionData.status === "paused"
+                                                            ? "Resume the edition to continue its lifecycle."
+                                                            : "Only valid transitions are accepted."
+                                                    }
                                                     {...(fieldState.error?.message === undefined
                                                         ? {}
                                                         : { error: fieldState.error.message })}
@@ -1438,6 +1641,26 @@ export function CompetitionAdminPage(): ReactNode {
                     </div>
                 </section>
             )}
+
+            <AlertDialog
+                open={lifecycleConfirmation !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setLifecycleConfirmation(null);
+                    }
+                }}
+                title={lifecycleConfirmation?.title ?? ""}
+                description={lifecycleConfirmation?.description ?? ""}
+                confirmLabel={lifecycleConfirmation?.confirmLabel ?? "Confirm"}
+                tone={lifecycleConfirmation?.action === "reset" ? "destructive" : "brand"}
+                loading={lifecycle.isPending}
+                onConfirm={() => {
+                    const action = lifecycleConfirmation?.action;
+                    if (action !== undefined) {
+                        applyLifecycle(action);
+                    }
+                }}
+            />
         </div>
     );
 }

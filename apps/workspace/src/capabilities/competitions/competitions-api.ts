@@ -7,6 +7,7 @@ import {
     createMilestoneRequestSchema,
     createSeriesRequestSchema,
     divisionSchema,
+    editionLifecycleRequestSchema,
     listResponseSchema,
     milestoneSchema,
     publicCompetitionSchema,
@@ -19,6 +20,7 @@ import {
     type CreateMilestoneRequest,
     type CreateSeriesRequest,
     type Division,
+    type EditionLifecycleRequest,
     type ListResponse,
     type Milestone,
     type PublicCompetition,
@@ -91,6 +93,18 @@ export const competitionsApi = {
 
     async publishEdition(organizationId: string, editionId: string): Promise<CompetitionEdition> {
         return apiClient.request("POST", `/api/v1/competitions/${editionId}/publish`, {
+            schema: competitionEditionSchema,
+            headers: organizationHeader(organizationId),
+        });
+    },
+
+    async lifecycleEdition(
+        organizationId: string,
+        editionId: string,
+        input: EditionLifecycleRequest,
+    ): Promise<CompetitionEdition> {
+        return apiClient.request("POST", `/api/v1/competitions/${editionId}/lifecycle`, {
+            body: editionLifecycleRequestSchema.parse(input),
             schema: competitionEditionSchema,
             headers: organizationHeader(organizationId),
         });

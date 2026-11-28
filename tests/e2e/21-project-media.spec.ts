@@ -18,6 +18,13 @@ function siteUrl(path: string): string {
 }
 
 test.describe("project media and AI-use disclosure", () => {
+    test.afterAll(async () => {
+        await ownerTenantQuery(
+            FIXTURE.organizationId,
+            "update competition_editions set status = 'voting' where id = $1",
+            [FIXTURE.editionId],
+        );
+    });
     test("creates, publishes, and exposes the video and AI-use disclosure", async ({ page }) => {
         test.setTimeout(240_000);
         const projectTitle = `E2E Media Project ${String(test.info().retry)}`;
@@ -64,6 +71,18 @@ test.describe("project media and AI-use disclosure", () => {
         }
 
         await test.step("the public payload carries the media and team fields", async () => {
+            await ownerTenantQuery(
+                FIXTURE.organizationId,
+                "update competition_editions set status = 'judging' where id = $1",
+                [FIXTURE.editionId],
+            );
+            const hidden = await fetch(`${API_ORIGIN}/api/v1/public/projects/${slug}`);
+            expect(hidden.status).toBe(404);
+            await ownerTenantQuery(
+                FIXTURE.organizationId,
+                "update competition_editions set status = 'voting' where id = $1",
+                [FIXTURE.editionId],
+            );
             const response = await fetch(`${API_ORIGIN}/api/v1/public/projects/${slug}`);
             expect(response.status).toBe(200);
             const payload = (await response.json()) as {

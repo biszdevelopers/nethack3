@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import {
+    AlertDialog,
     Badge,
     Button,
     Card,
@@ -12,13 +13,21 @@ import {
     TableHead,
     TableHeader,
     TableRow,
+    useToast,
 } from "@nethack/ui";
+import { describeError } from "../../shared/errors.js";
 import { RequestError } from "../../shared/states.jsx";
-import { useEditionJudgingResults } from "../hooks.js";
+import { useEditionJudgingResults, useVoidEvaluation } from "../hooks.js";
 import { TeamFeedbackPanel } from "./team-feedback-panel.js";
 
 function scoreLabel(score: number | null): string {
     return score === null ? "Not scored" : `${score.toFixed(2)} / 100`;
+}
+
+interface VoidTarget {
+    readonly assignmentId: string;
+    readonly judgeDisplayName: string;
+    readonly projectTitle: string;
 }
 
 export function JudgingResultsPanel({
@@ -29,6 +38,9 @@ export function JudgingResultsPanel({
     readonly editionId: string;
 }): ReactNode {
     const results = useEditionJudgingResults(organizationId, editionId);
+    const voidEvaluation = useVoidEvaluation(organizationId, editionId);
+    const { toast } = useToast();
+    const [voidTarget, setVoidTarget] = useState<VoidTarget | null>(null);
     const [selectedTeam, setSelectedTeam] = useState<{
         readonly id: string;
         readonly name: string | null;
@@ -40,6 +52,23 @@ export function JudgingResultsPanel({
             result.displayScore !== null &&
             result.displayScore !== result.averageScore,
     );
+
+    const onConfirmVoid = async (): Promise<void> => {
+        if (voidTarget === null) {
+            return;
+        }
+        try {
+            await voidEvaluation.mutateAsync(voidTarget.assignmentId);
+            setVoidTarget(null);
+            toast({ title: "Evaluation voided", tone: "success" });
+        } catch (error) {
+            toast({
+                title: "Could not void the evaluation",
+                description: describeError(error),
+                tone: "critical",
+            });
+        }
+    };
 
     return (
         <section
@@ -91,20 +120,44 @@ export function JudgingResultsPanel({
                                         <span className="block text-xs text-ink-subtle">
                                             {result.teamName ?? "No team"}
                                         </span>
-                                        <span className="mt-1 flex flex-wrap gap-2">
+                                        <span className="mt-1 flex flex-wrap items-center gap-2">
                                             {result.evaluations.map((evaluation) => (
-                                                <Badge
+                                                <span
                                                     key={evaluation.assignmentId}
-                                                    tone={
-                                                        evaluation.status === "submitted"
-                                                            ? "primary"
-                                                            : "neutral"
-                                                    }
-                                                    size="sm"
+                                                    className="inline-flex items-center gap-1"
                                                 >
-                                                    {evaluation.judgeDisplayName}:{" "}
-                                                    {scoreLabel(evaluation.weightedScore)}
-                                                </Badge>
+                                                    <Badge
+                                                        tone={
+                                                            evaluation.status === "submitted"
+                                                                ? "primary"
+                                                                : "neutral"
+                                                        }
+                                                        size="sm"
+                                                    >
+                                                        {evaluation.judgeDisplayName}:{" "}
+                                                        {scoreLabel(evaluation.weightedScore)}
+                                                    </Badge>
+                                                    {evaluation.status === "submitted" ? (
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            aria-label={`Void evaluation by ${evaluation.judgeDisplayName} for ${result.projectTitle}`}
+                                                            onClick={() =>
+                                                                setVoidTarget({
+                                                                    assignmentId:
+                                                                        evaluation.assignmentId,
+                                                                    judgeDisplayName:
+                                                                        evaluation.judgeDisplayName,
+                                                                    projectTitle:
+                                                                        result.projectTitle,
+                                                                })
+                                                            }
+                                                        >
+                                                            Void
+                                                        </Button>
+                                                    ) : null}
+                                                </span>
                                             ))}
                                         </span>
                                     </TableCell>
@@ -161,6 +214,24 @@ export function JudgingResultsPanel({
                     teamName={selectedTeam.name}
                 />
             )}
+            <AlertDialog
+                open={voidTarget !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setVoidTarget(null);
+                    }
+                }}
+                title="Void evaluation"
+                description={
+                    voidTarget === null
+                        ? ""
+                        : `Remove ${voidTarget.judgeDisplayName}'s submitted evaluation for ${voidTarget.projectTitle}? The assignment becomes revoked and can be reassigned; standings recompute from the remaining evaluations.`
+                }
+                confirmLabel="Void evaluation"
+                tone="destructive"
+                loading={voidEvaluation.isPending}
+                onConfirm={onConfirmVoid}
+            />
         </section>
     );
 }

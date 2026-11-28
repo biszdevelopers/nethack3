@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import type { JudgeFlag, JudgingCalibration, JudgingCoverageJudge } from "@nethack/contracts";
 import {
+    Alert,
     Badge,
     Button,
     Card,
@@ -128,8 +129,38 @@ export function JudgingCoveragePanel({
                                 label: "Edition average",
                                 value: scoreLabel(data.editionAverageScore),
                             },
+                            {
+                                label: "Standard deviation",
+                                value: data.standardDeviation.toFixed(2),
+                            },
                         ]}
                     />
+                    {data.outliers.length === 0 ? null : (
+                        <Alert tone="warning" title="Calibration outliers">
+                            <ul className="flex flex-col gap-2">
+                                {data.outliers.map((outlier) => (
+                                    <li
+                                        key={outlier.judgeUserId}
+                                        className="flex flex-wrap items-center gap-2"
+                                    >
+                                        <Badge tone="outline">Outlier judge</Badge>
+                                        <span className="font-medium">
+                                            {outlier.judgeDisplayName}
+                                        </span>
+                                        <span>
+                                            {String(outlier.evaluationCount)} submitted evaluations
+                                        </span>
+                                        <span className="tabular-nums">
+                                            Average {scoreLabel(outlier.averageWeightedScore)}
+                                        </span>
+                                        <span className="tabular-nums">
+                                            {deltaLabel(outlier.calibrationDelta)} vs edition mean
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </Alert>
+                    )}
                     {data.judges.length === 0 ? (
                         <EmptyState
                             title="No judges assigned"

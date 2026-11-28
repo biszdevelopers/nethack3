@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { FIXTURE, USERS } from "../support/e2e/config.js";
+import { API_ORIGIN, FIXTURE, USERS } from "../support/e2e/config.js";
 import { chooseOption, expectToast, signIn } from "../support/e2e/app.js";
 
 function localDateTime(daysFromNow: number): string {
@@ -12,7 +12,7 @@ test.describe("organizer workflow", () => {
     test("creates an edition, schedules it, approves a registration, and assigns a judge", async ({
         page,
     }) => {
-        test.setTimeout(240_000);
+        test.setTimeout(300_000);
         const seriesName = "E2E Series";
         const editionName = "E2E Organizer Edition";
 
@@ -86,6 +86,70 @@ test.describe("organizer workflow", () => {
             await milestoneForm.getByLabel("Occurs at").fill(localDateTime(12));
             await milestoneForm.getByRole("button", { name: "Create milestone" }).click();
             await expectToast(page, "Milestone created");
+        });
+
+        await test.step("pause, resume, reopen stages, and reset the edition", async () => {
+            const editForm = page
+                .getByRole("button", { name: "Save edition" })
+                .locator("xpath=ancestor::form");
+
+            await page.getByRole("button", { name: "Pause edition" }).click();
+            await expectToast(page, "Edition paused");
+            await expect(page.getByText("This edition is paused")).toBeVisible();
+            const pausedPublic = await fetch(
+                `${API_ORIGIN}/api/v1/public/competitions/e2e-organizer-edition`,
+            );
+            expect(pausedPublic.status).toBe(404);
+            const publicList = await fetch(`${API_ORIGIN}/api/v1/public/competitions`);
+            const listed = (await publicList.json()) as {
+                items: { slug: string }[];
+            };
+            expect(listed.items.some((item) => item.slug === "e2e-organizer-edition")).toBe(false);
+
+            await page.getByRole("button", { name: "Resume edition" }).click();
+            await expectToast(page, "Edition resumed");
+            await expect(page.getByText("This edition is paused")).toHaveCount(0);
+
+            for (const status of ["Registration closed", "Active", "Judging"]) {
+                const saved = page.waitForResponse(
+                    (response) =>
+                        response.request().method() === "PATCH" &&
+                        response.url().endsWith(`/api/v1/competitions/${editionId}`),
+                );
+                await chooseOption(editForm.getByLabel("Status"), status);
+                await editForm.getByRole("button", { name: "Save edition" }).click();
+                expect((await saved).ok()).toBe(true);
+                await expect(page.getByText(status, { exact: true }).first()).toBeVisible();
+            }
+
+            await page.getByRole("button", { name: "Reopen voting" }).click();
+            await page
+                .getByRole("alertdialog")
+                .getByRole("button", { name: "Reopen voting" })
+                .click();
+            await expectToast(page, "Voting reopened");
+
+            await page.getByRole("button", { name: "Reopen judging" }).click();
+            await page
+                .getByRole("alertdialog")
+                .getByRole("button", { name: "Reopen judging" })
+                .click();
+            await expectToast(page, "Judging reopened");
+
+            await page.getByRole("button", { name: "Reopen submissions" }).click();
+            await page
+                .getByRole("alertdialog")
+                .getByRole("button", { name: "Reopen submissions" })
+                .click();
+            await expectToast(page, "Submissions reopened");
+
+            await page.getByRole("button", { name: "Reset to draft" }).click();
+            await page
+                .getByRole("alertdialog")
+                .getByRole("button", { name: "Reset to draft" })
+                .click();
+            await expectToast(page, "Edition reset to draft");
+            await expect(page.getByRole("button", { name: "Publish edition" })).toBeVisible();
         });
 
         await test.step("approve a pending registration", async () => {

@@ -10,6 +10,11 @@ test.describe("administration operations", () => {
             "update organization_memberships set role = 'participant' where organization_id = $1 and user_id = $2",
             [FIXTURE.organizationId, FIXTURE.participantId],
         );
+        await ownerTenantQuery(
+            FIXTURE.organizationId,
+            "update organization_memberships set role = 'judge' where organization_id = $1 and user_id = $2",
+            [FIXTURE.organizationId, FIXTURE.judgeId],
+        );
     });
 
     test("organizer manages users, teams, standings, and preflight", async ({ page }) => {
@@ -19,19 +24,33 @@ test.describe("administration operations", () => {
         await page.goto("/admin");
         await expect(page.getByRole("heading", { name: "Administration", level: 1 })).toBeVisible();
 
-        await test.step("update an organization member role", async () => {
+        await test.step("refuse a competing participant and promote a teamless judge", async () => {
             await page.getByRole("link", { name: "Users" }).click();
             await expect(page.getByRole("heading", { name: "Users", level: 1 })).toBeVisible();
-            const row = page.getByRole("row", { name: /Fixture Participant/ });
-            await expect(row).toBeVisible();
+            const participantRow = page.getByRole("row", { name: /Fixture Participant/ });
+            await expect(participantRow).toBeVisible();
             await expect(page.getByRole("button", { name: /Delete account for/ })).toHaveCount(0);
 
-            await row.getByLabel("Role for Fixture Participant").selectOption("judge");
-            await expectToast(page, "Member role updated");
-            await expect(row.getByLabel("Role for Fixture Participant")).toHaveValue("judge");
+            await participantRow.getByLabel("Role for Fixture Participant").selectOption("judge");
+            await expectToast(page, "Could not update the role");
+            await expect(
+                page
+                    .locator('[data-slot="toast"]')
+                    .filter({ hasText: "Could not update the role" })
+                    .first(),
+            ).toContainText(/cannot also be a judge or organizer/i);
+            await expect(participantRow.getByLabel("Role for Fixture Participant")).toHaveValue(
+                "participant",
+            );
 
-            await row.getByLabel("Role for Fixture Participant").selectOption("participant");
+            const judgeRow = page.getByRole("row", { name: /Fixture Judge/ });
+            await judgeRow.getByLabel("Role for Fixture Judge").selectOption("organizer");
             await expectToast(page, "Member role updated");
+            await expect(judgeRow.getByLabel("Role for Fixture Judge")).toHaveValue("organizer");
+
+            await judgeRow.getByLabel("Role for Fixture Judge").selectOption("judge");
+            await expectToast(page, "Member role updated");
+            await expect(judgeRow.getByLabel("Role for Fixture Judge")).toHaveValue("judge");
         });
 
         await test.step("inspect edition teams", async () => {
@@ -80,8 +99,13 @@ test.describe("administration operations", () => {
                 content += String(chunk);
             }
             expect(content.split("\n")[0]).toBe(
-                "rank,project,team,average_score,submitted,assignments,awards",
+                "team_id,team,pathway,status,score_exact,score,rank,awards,project_name,demo_url,repo_url,submitted",
             );
+            expect(content).toContain("Fixture Team");
+            expect(content).toContain("Open,ready");
+            expect(content).toContain("Fixture Project");
+            expect(content).toContain("https://example.com/fixture");
+            expect(content).toContain(",yes");
         });
         await test.step("review preflight warnings on the competition admin page", async () => {
             await page.goto(`/competitions/manage?edition=${FIXTURE.editionId}`);

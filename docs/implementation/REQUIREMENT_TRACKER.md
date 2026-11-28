@@ -269,7 +269,7 @@ Current distribution across 228 tracked requirements: 146 Verified, 71 Implement
 | ID | Requirement | Plan section | Implementation | Verification | Status |
 | --- | --- | --- | --- | --- | --- |
 | QA-001 | Stack: Vitest unit/integration/API injection, Playwright E2E, axe, k6 load, architecture checks, visual, dependency scanning, static analysis | 16.1 | tests + configs | Vitest, Playwright, axe, screenshots, architecture, k6 (executed), Lighthouse, audit, secret scan, and SBOM are wired. | Verified |
-| QA-002 | Every capability independently testable: domain, operations, contracts, persistence, authorization, events, errors, concurrency | 16.2 | capability tests | All 13 capabilities have local tests; 521 unit/architecture/UI tests and 84 integration/security/fuzz/worker tests pass. Cross-cutting dimensions are covered by integration suites. | Verified |
+| QA-002 | Every capability independently testable: domain, operations, contracts, persistence, authorization, events, errors, concurrency | 16.2 | capability tests | All 13 capabilities have local tests; 717 unit/architecture/UI tests and 84 integration/security/fuzz/worker tests pass. Cross-cutting dimensions are covered by integration suites. | Verified |
 | QA-003 | Architecture checks: private imports, cycles, DB access, server modules in browser, exposed secrets, duplicate contracts, unregistered deps, runtime imports | 16.3 | tests/architecture | Architecture suite passes | Verified |
 | QA-004 | Visual tests desktop/tablet/mobile/light/dark/loading/error/empty | 16.4 | tests/visual | Visual baselines cover desktop dark/light, tablet, mobile, loading, empty, error, not-found, and the component laboratory. | Verified |
 | QA-005 | Accessibility: keyboard, focus, labels, semantics, contrast, errors, dialogs, touch, reduced motion, zoom | 16.5 | E2E + axe | Full Playwright suite (including axe and mobile overflow checks) passes | Verified |
@@ -375,3 +375,16 @@ The final functional-only audit closed every remaining workflow gap.
 | Administration | Audit rows render reason and before/after values with redaction; database export supports JSON and CSV; global administrators can delete accounts with self/last-admin/ownership refusal and transactional cleanup | `13`, `20`; audit, CSV, and account-deletion unit tests |
 | Notifications and contact | Global unread notification bell with count polling; edition contact email/URL validated and published on the contact and competition pages | `13`, `14`; unread-count and contact-channel unit tests |
 | Persistence | Migration `0009_motionless_marvex.sql` adds `teams.status_reason`; `0010_strange_spiral.sql` adds edition contact fields and `team_members.left_at` with an active-membership unique index | Development and test databases migrate cleanly; integration, security, and E2E pass |
+
+## 24. Fifth parity wave
+
+The final functional audit closed result integrity, lifecycle recovery, and judging quality controls.
+
+| Area | Implementation | Verification |
+| --- | --- | --- |
+| Result integrity | Inactive teams receive no rank, score, podium slot, award display, or certificate; votes from inactive voter teams or for inactive submissions are excluded; People's Choice averages each team/teamless voter as one unit; ballots store the voter team at cast time | Judging, recognition, and voting unit tests; `11`, `24` E2E |
+| Edition lifecycle | Pause/resume, reopen submissions/judging/voting, and confirmed reset; paused editions are hidden publicly and frozen for judging/voting/submissions; every action audits prior/next status | `03` E2E; lifecycle and rules unit tests |
+| Judging controls | Organizers void submitted evaluations with full cleanup and re-assignment; calibration exposes standard deviation and ≥3-evaluation 2σ outliers; drafts autosave after 650 ms, flush on navigation, and protect unsaved work | `04`, `12` E2E; evaluation-void and calibration unit tests |
+| Administration | Standings CSV includes status, track, exact/display scores, live awards, links, and submitted state; competing participants cannot hold judge/organizer roles or join a team as a judge | `13`, `20` E2E; standings and role-conflict unit tests |
+| Public gallery | Public project list/detail require the edition to be in voting or a finished state | `06`, `21` E2E; project visibility tests |
+| Persistence | Migration `0011_amusing_virginia_dare.sql` adds the paused status, `status_before_pause`, and `ballots.voter_team_id` | Development and test databases migrate cleanly; integration, security, and E2E pass |

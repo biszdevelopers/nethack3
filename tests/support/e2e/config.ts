@@ -70,6 +70,7 @@ export const FIXTURE = {
     archiveEditionSlug: "fixture-archive-season",
     applicantId: "f2000000-0000-4000-8000-000000000021",
     applicantRegistrationId: "f2000000-0000-4000-8000-000000000022",
+    partnerId: "f2000000-0000-4000-8000-000000000023",
     disposableTeamId: "f2000000-0000-4000-8000-0000000000b1",
     disposableTeamName: "E2E Disposable Team",
     labRubricId: "f4000000-0000-4000-8000-000000000002",
@@ -111,6 +112,11 @@ export const USERS = {
         subject: "fixture-applicant",
         email: "applicant@fixture.invalid",
         name: "Fixture Applicant",
+    },
+    partner: {
+        subject: "fixture-partner",
+        email: "partner@fixture.invalid",
+        name: "Fixture Partner",
     },
     outsider: {
         subject: "fixture-outsider",

@@ -49,6 +49,12 @@ async function seedUsers(): Promise<void> {
             subject: USERS.applicant.subject,
         },
         {
+            id: FIXTURE.partnerId,
+            name: USERS.partner.name,
+            email: USERS.partner.email,
+            subject: USERS.partner.subject,
+        },
+        {
             id: AUTHOR_ID,
             name: "Fixture Author",
             email: "author@fixture.invalid",
@@ -80,8 +86,9 @@ async function seedUsers(): Promise<void> {
     }
     await ownerQuery(
         `insert into organization_memberships (organization_id, user_id, role)
-         values ($1, $2, 'participant'), ($1, $3, 'participant'), ($1, $4, 'participant')`,
-        [ORG, FIXTURE.applicantId, AUTHOR_ID, TEAM_ADMIN_ID],
+         values ($1, $2, 'participant'), ($1, $3, 'participant'),
+                ($1, $4, 'participant'), ($1, $5, 'participant')`,
+        [ORG, FIXTURE.applicantId, FIXTURE.partnerId, AUTHOR_ID, TEAM_ADMIN_ID],
     );
 }
 
@@ -188,6 +195,18 @@ async function seedOpenEdition(): Promise<void> {
                 "a".repeat(64),
                 TEAM_ADMIN_ID,
             ],
+        },
+        {
+            text: `insert into registrations
+                   (organization_id, edition_id, user_id, division_id, status,
+                    decided_by_user_id, decided_at)
+                   values ($1, $2, $3, $4, 'approved', $5, now())`,
+            values: [ORG, OPEN_EDITION, FIXTURE.partnerId, OPEN_DIVISION, FIXTURE.organizerId],
+        },
+        {
+            text: `insert into participants (organization_id, edition_id, user_id, division_id)
+                   values ($1, $2, $3, $4)`,
+            values: [ORG, OPEN_EDITION, FIXTURE.partnerId, OPEN_DIVISION],
         },
         {
             text: `insert into competition_editions

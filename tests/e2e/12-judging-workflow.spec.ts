@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { FIXTURE, USERS } from "../support/e2e/config.js";
-import { expectToast, newAppContext, signIn } from "../support/e2e/app.js";
+import { chooseOption, expectToast, newAppContext, signIn } from "../support/e2e/app.js";
 import { ownerQuery, ownerTenantBatch } from "../support/e2e/db.js";
 
 const PROJECT_ID = "f5000000-0000-4000-8000-000000000060";
@@ -94,14 +94,30 @@ test.describe("judging workflow", () => {
             ).toBeVisible();
         });
 
-        await test.step("saves a draft and submits the evaluation", async () => {
+        await test.step("autosaves the draft and submits the evaluation", async () => {
             await page.getByRole("radio", { name: "7 of 10 for Impact" }).check();
             await page.getByLabel("Comment on Impact").fill("Useful reach.");
             await page.getByRole("radio", { name: "8 of 10 for Craft" }).check();
             await page.getByLabel("Comment on Craft").fill("Solid execution.");
             await page.getByLabel("Overall comment").fill("Queue workflow evaluation.");
+
+            await expect(page.getByText(/Draft saved at/)).toBeVisible({ timeout: 15_000 });
+            await expect(page.getByText("Unsaved changes")).toBeHidden();
+
+            await page.reload();
+            await expect(
+                page.getByRole("heading", { name: PROJECT_TITLE, level: 1 }),
+            ).toBeVisible();
+            await expect(page.getByRole("radio", { name: "7 of 10 for Impact" })).toBeChecked();
+            await expect(page.getByRole("radio", { name: "8 of 10 for Craft" })).toBeChecked();
+            await expect(page.getByLabel("Overall comment")).toHaveValue(
+                "Queue workflow evaluation.",
+            );
+            await expect(page.getByText("Unsaved changes")).toBeHidden();
+
             await page.getByRole("button", { name: "Save draft" }).click();
             await expectToast(page, "Draft saved");
+
             await page.getByRole("button", { name: "Submit evaluation" }).click();
             const dialog = page.getByRole("alertdialog", { name: "Submit evaluation" });
             await expect(dialog).toBeVisible();
@@ -157,6 +173,7 @@ test.describe("judging workflow", () => {
                 await expect(
                     coverage.getByRole("columnheader", { name: "Calibration" }),
                 ).toBeVisible();
+                await expect(coverage.getByText("Standard deviation")).toBeVisible();
                 await expect(coverage.getByText("Fixture Judge").first()).toBeVisible();
                 const flagRow = coverage.getByRole("row", {
                     name: new RegExp(FLAG_REASON),
@@ -168,6 +185,29 @@ test.describe("judging workflow", () => {
                     organizerPage.getByRole("row", { name: new RegExp(FLAG_REASON) }),
                 ).toBeHidden();
                 await expect(organizerPage.getByText("No open flags")).toBeVisible();
+
+                await test.step("organizer voids the submitted evaluation from standings", async () => {
+                    await organizerPage.goto("/admin/standings");
+                    await chooseOption(
+                        organizerPage.getByLabel("Competition edition"),
+                        FIXTURE.editionName,
+                    );
+                    const results = organizerPage.getByRole("region", { name: "Results" });
+                    const voidButton = results.getByRole("button", {
+                        name: `Void evaluation by Fixture Judge for ${PROJECT_TITLE}`,
+                    });
+                    await expect(voidButton).toBeVisible({ timeout: 15_000 });
+                    await voidButton.click();
+                    const dialog = organizerPage.getByRole("alertdialog", {
+                        name: "Void evaluation",
+                    });
+                    await expect(dialog).toContainText("Fixture Judge");
+                    await expect(dialog).toContainText(PROJECT_TITLE);
+                    await dialog.getByRole("button", { name: "Void evaluation" }).click();
+                    await expectToast(organizerPage, "Evaluation voided");
+                    await expect(results.getByText("Fixture Judge: 75.00 / 100")).toBeHidden();
+                    await expect(results.getByText("Not scored").first()).toBeVisible();
+                });
 
                 await test.step("organizer receives the flag notification", async () => {
                     await expect

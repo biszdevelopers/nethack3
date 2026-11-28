@@ -293,6 +293,52 @@ export function useSubmitEvaluation(organizationId: string | null, assignmentId:
     });
 }
 
+export function useVoidEvaluation(organizationId: string | null, editionId: string | null) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (assignmentId: string) => {
+            if (organizationId === null) {
+                throw new Error("Select an organization first.");
+            }
+            return api.judging.voidEvaluation(organizationId, assignmentId);
+        },
+        onSuccess: async (_result, assignmentId) => {
+            const invalidations = [
+                queryClient.invalidateQueries({
+                    queryKey: queryKeys.judgingAssignment(assignmentId),
+                }),
+            ];
+            if (organizationId !== null) {
+                invalidations.push(
+                    queryClient.invalidateQueries({
+                        queryKey: queryKeys.judgingAssignments(organizationId),
+                    }),
+                    queryClient.invalidateQueries({
+                        queryKey: coverageKeyPrefix(organizationId),
+                    }),
+                    queryClient.invalidateQueries({
+                        queryKey: historyKeyPrefix(organizationId),
+                    }),
+                    queryClient.invalidateQueries({
+                        queryKey: ["judging", organizationId, "team-feedback"],
+                    }),
+                );
+            }
+            if (editionId !== null) {
+                invalidations.push(
+                    queryClient.invalidateQueries({
+                        queryKey: queryKeys.editionAssignments(editionId),
+                    }),
+                    queryClient.invalidateQueries({
+                        queryKey: queryKeys.editionJudgingResults(editionId),
+                    }),
+                );
+            }
+            await Promise.all(invalidations);
+        },
+    });
+}
+
 export function useDeclareConflict(organizationId: string | null, assignmentId: string | null) {
     const queryClient = useQueryClient();
     return useMutation({
