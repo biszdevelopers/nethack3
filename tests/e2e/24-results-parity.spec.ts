@@ -348,6 +348,16 @@ test.describe("public results parity", () => {
             ).toBeVisible();
         });
 
+        await test.step("project preview opens in a dialog", async () => {
+            await page.getByRole("button", { name: "Preview project" }).first().click();
+            const dialog = page.getByRole("dialog");
+            await expect(dialog).toBeVisible();
+            await expect(dialog.getByRole("heading", { level: 2 })).toBeVisible();
+            await expect(dialog.getByText("AI-use disclosure", { exact: true })).toBeVisible();
+            await page.keyboard.press("Escape");
+            await expect(dialog).toBeHidden();
+        });
+
         await test.step("project links open the public project page", async () => {
             await page.getByRole("link", { name: ENTRIES[0].projectTitle }).first().click();
             await expect(

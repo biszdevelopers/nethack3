@@ -13,8 +13,9 @@ import {
     EmptyState,
 } from "@nethack/ui/static";
 import { Reveal, StaggerReveal } from "@nethack/ui/motion";
-import { getCompetitions, PublicApiError } from "../../lib/public-api";
+import { getCompetitions, getAllProjects, PublicApiError } from "../../lib/public-api";
 import { getPublicResults } from "../../lib/recognition-api";
+import { ResultsProjectPreview } from "./project-preview";
 
 export const metadata: Metadata = {
     title: "Results",
@@ -143,6 +144,11 @@ export default async function ResultsPage(): Promise<ReactNode> {
 
     const pendingEdition = competitions.items[0] ?? null;
     const tracks = results === null ? [] : groupTracks(results);
+    const previewProjects =
+        results === null ? [] : await getAllProjects(results.edition.slug).catch(() => []);
+    const previewProjectById = new Map(
+        previewProjects.map((project) => [project.id, project] as const),
+    );
     const projectSlugById =
         results === null
             ? new Map<string, string>()
@@ -387,6 +393,9 @@ export default async function ResultsPage(): Promise<ReactNode> {
                                                         entry,
                                                         results.showRanking,
                                                     );
+                                                    const preview = previewProjectById.get(
+                                                        entry.projectId,
+                                                    );
                                                     return (
                                                         <Card
                                                             key={entry.submissionId}
@@ -431,6 +440,12 @@ export default async function ResultsPage(): Promise<ReactNode> {
                                                                         Certificate
                                                                     </Link>
                                                                 )}
+                                                                {preview === undefined ? null : (
+                                                                    <ResultsProjectPreview
+                                                                        project={preview}
+                                                                        certificateUrl={certificate}
+                                                                    />
+                                                                )}
                                                             </CardContent>
                                                         </Card>
                                                     );
@@ -445,6 +460,9 @@ export default async function ResultsPage(): Promise<ReactNode> {
                                                     const certificate = certificateHref(
                                                         entry,
                                                         results.showRanking,
+                                                    );
+                                                    const preview = previewProjectById.get(
+                                                        entry.projectId,
                                                     );
                                                     return (
                                                         <li
@@ -493,6 +511,12 @@ export default async function ResultsPage(): Promise<ReactNode> {
                                                                     >
                                                                         Certificate
                                                                     </Link>
+                                                                )}
+                                                                {preview === undefined ? null : (
+                                                                    <ResultsProjectPreview
+                                                                        project={preview}
+                                                                        certificateUrl={certificate}
+                                                                    />
                                                                 )}
                                                             </div>
                                                         </li>
