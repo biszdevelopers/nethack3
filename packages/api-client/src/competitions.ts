@@ -10,8 +10,10 @@ import {
     editionLifecycleRequestSchema,
     listResponseSchema,
     milestoneSchema,
+    organizerEditionSchema,
     publicCompetitionDetailSchema,
     publicCompetitionSchema,
+    updateEditionApprovalRequestSchema,
     updateEditionRequestSchema,
     type CompetitionEdition,
     type CompetitionEditionDetail,
@@ -24,8 +26,10 @@ import {
     type EditionLifecycleRequest,
     type ListResponse,
     type Milestone,
+    type OrganizerEdition,
     type PublicCompetition,
     type PublicCompetitionDetail,
+    type UpdateEditionApprovalRequest,
     type UpdateEditionRequest,
 } from "@nethack/contracts";
 import type { ApiClient } from "./client.js";
@@ -40,6 +44,7 @@ export interface PublicCompetitionQuery extends PageQuery {}
 const seriesListSchema = listResponseSchema(competitionSeriesSchema);
 const divisionListSchema = listResponseSchema(divisionSchema);
 const milestoneListSchema = listResponseSchema(milestoneSchema);
+const organizerEditionListSchema = listResponseSchema(organizerEditionSchema);
 const publicCompetitionListSchema = listResponseSchema(publicCompetitionSchema);
 
 export class CompetitionsApi {
@@ -80,6 +85,16 @@ export class CompetitionsApi {
         );
     }
 
+    async listEditions(
+        organizationId: string,
+        query: { readonly seriesId?: string; readonly limit?: number } = {},
+    ): Promise<ListResponse<OrganizerEdition>> {
+        return this.client.request("GET", `/api/v1/organizations/${organizationId}/editions`, {
+            query: { seriesId: query.seriesId, limit: query.limit ?? 100 },
+            schema: organizerEditionListSchema,
+        });
+    }
+
     async get(editionId: string): Promise<CompetitionEditionDetail> {
         return this.client.request("GET", `/api/v1/competitions/${editionId}`, {
             schema: competitionEditionDetailSchema,
@@ -89,6 +104,16 @@ export class CompetitionsApi {
     async update(editionId: string, input: UpdateEditionRequest): Promise<CompetitionEdition> {
         return this.client.request("PATCH", `/api/v1/competitions/${editionId}`, {
             body: updateEditionRequestSchema.parse(input),
+            schema: competitionEditionSchema,
+        });
+    }
+
+    async setApproval(
+        editionId: string,
+        input: UpdateEditionApprovalRequest,
+    ): Promise<CompetitionEdition> {
+        return this.client.request("PATCH", `/api/v1/competitions/${editionId}/approval`, {
+            body: updateEditionApprovalRequestSchema.parse(input),
             schema: competitionEditionSchema,
         });
     }

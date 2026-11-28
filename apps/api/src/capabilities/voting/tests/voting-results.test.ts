@@ -86,7 +86,7 @@ describe("tallyVoteUnits", () => {
         ]);
     });
 
-    it("treats every teamless voter as its own unit", () => {
+    it("treats every teamless judge or organizer as its own unit", () => {
         const result = tallyVoteUnits(
             [ballot("u1", { [ALPHA]: 5 }), ballot("u2", { [ALPHA]: 1 })],
             new Map(),
@@ -96,6 +96,26 @@ describe("tallyVoteUnits", () => {
         expect(result.tallies[0]?.averageStars).toBe(3);
         expect(result.tallies[0]?.votes).toBe(2);
         expect(result.tallies[0]?.totalStars).toBe(6);
+    });
+
+    it("drops a teamless participant from turnout and totals", () => {
+        const result = tallyVoteUnits(
+            [ballot("judge", { [ALPHA]: 5 }), ballot("participant", { [ALPHA]: 1 })],
+            new Map(),
+            new Set([ALPHA]),
+            new Map(),
+            new Set(["participant"]),
+        );
+
+        expect(result.totalBallots).toBe(1);
+        expect(result.tallies).toEqual([
+            {
+                submissionId: ALPHA,
+                votes: 1,
+                totalStars: 5,
+                averageStars: 5,
+            },
+        ]);
     });
 
     it("drops ballots from inactive voter teams out of turnout and totals", () => {

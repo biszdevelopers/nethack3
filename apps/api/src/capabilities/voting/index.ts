@@ -50,6 +50,8 @@ export const votingCapability: CapabilityDefinition = {
                 service.publishedResults(organizationId, editionId),
             closeOpenRoundsForResults: (session, organizationId, editionId, actorUserId) =>
                 service.closeOpenRoundsForResults(session, organizationId, editionId, actorUserId),
+            removeSubmissionVotes: (organizationId, submissionId) =>
+                service.removeSubmissionVotes(organizationId, submissionId),
         };
 
         return {

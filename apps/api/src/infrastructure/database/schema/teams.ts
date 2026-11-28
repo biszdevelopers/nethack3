@@ -38,6 +38,7 @@ export const teams = pgTable(
         description: text("description").notNull().default(""),
         status: teamStatusEnum("status").notNull().default("forming"),
         statusReason: text("status_reason").notNull().default(""),
+        lockedAt: timestamp("locked_at", { withTimezone: true }),
         captainUserId: uuid("captain_user_id")
             .notNull()
             .references(() => users.id, { onDelete: "restrict" }),

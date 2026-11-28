@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, lt, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, isNull, lt, sql, type SQL } from "drizzle-orm";
 import type { TeamRole, TeamStatus } from "@nethack/contracts";
 import type { DatabaseExecutor, DatabaseSession } from "../../../infrastructure/database/client.js";
 import {
@@ -20,6 +20,7 @@ export interface TeamRow {
     readonly description: string;
     readonly status: TeamStatus;
     readonly statusReason: string;
+    readonly lockedAt: Date | null;
     readonly captainUserId: string;
     readonly maxMembers: number;
     readonly createdAt: Date;
@@ -407,6 +408,46 @@ export class TeamRepository {
             throw new Error("The team could not be updated.");
         }
         return row;
+    }
+
+    async lock(
+        session: DatabaseSession,
+        organizationId: string,
+        teamId: string,
+        at: Date,
+    ): Promise<TeamRow | null> {
+        const [row] = await session.db
+            .update(teams)
+            .set({ lockedAt: at, updatedAt: at })
+            .where(
+                and(
+                    eq(teams.organizationId, organizationId),
+                    eq(teams.id, teamId),
+                    isNull(teams.lockedAt),
+                ),
+            )
+            .returning();
+        return row ?? null;
+    }
+
+    async unlock(
+        session: DatabaseSession,
+        organizationId: string,
+        teamId: string,
+        at: Date,
+    ): Promise<TeamRow | null> {
+        const [row] = await session.db
+            .update(teams)
+            .set({ lockedAt: null, updatedAt: at })
+            .where(
+                and(
+                    eq(teams.organizationId, organizationId),
+                    eq(teams.id, teamId),
+                    isNotNull(teams.lockedAt),
+                ),
+            )
+            .returning();
+        return row ?? null;
     }
 
     async delete(

@@ -41,6 +41,7 @@ All routes require authentication unless listed as public. `x-nethack-organizati
 | POST | `/api/v1/organizations/:organizationId/competitions/:seriesId/editions` | Owner or organizer |
 | GET | `/api/v1/competitions/:editionId` | Active organization member |
 | PATCH | `/api/v1/competitions/:editionId` | Owner or organizer |
+| PATCH | `/api/v1/competitions/:editionId/approval` | Owner or organizer |
 | POST | `/api/v1/competitions/:editionId/publish` | Owner or organizer |
 | GET | `/api/v1/competitions/:editionId/divisions` | Active organization member |
 | POST | `/api/v1/competitions/:editionId/divisions` | Owner or organizer |
@@ -58,6 +59,9 @@ All routes require authentication unless listed as public. `x-nethack-organizati
 
 - Edition status transitions are allowlisted: `draft -> published`, `published -> registration_open | archived`, `registration_open -> registration_closed | archived`, `registration_closed -> active | archived`, `active -> judging | completed | archived`, `judging -> voting | completed | archived`, `voting -> completed | archived`, `completed -> archived`. Anything else is a conflict.
 - `POST /publish` and a status change to `published` are allowed from `draft` only. Publishing sets `publishedAt` and emits `competitions.edition.published`.
+- `PATCH /approval` with `{ approved: boolean }` records `boardApprovedAt` and the caller, or clears both. It is separate from `requiresBoardApproval`, which is set on create/update. A blank shell defaults `requiresBoardApproval` to true.
+- Activation readiness is checked for both publish paths. A blank shell needs a theme name, `startsAt`, `endsAt`, and board approval. Any edition with `requiresBoardApproval` needs board approval. One `409 conflict` lists every missing item. Judging rubric readiness belongs to the judging capability, so it remains an administration preflight check rather than a publish blocker here.
+- Edition creation accepts `copyFromEditionId` to copy theme, schedule dates, timezone, team sizes, rules, contact fields, divisions, and milestones from another edition in the same series. It never copies registrations, teams, projects, results, or a judging rubric. `isBlankStart: true` creates only the shell and cannot be combined with a copy.
 - Team size bounds (`teamMinSize <= teamMaxSize`) and date ordering are validated on create and on update using the merged edition state. Division bounds use the same rule.
 - Edition lists are organizer views of every status, newest first, with cursor/limit pagination and an optional `seriesId` filter. `GET /organizations/:organizationId/competitions/:seriesId/editions` is the series-scoped equivalent.
 - Series slug is immutable. Series updates accept name and description only.
@@ -67,6 +71,7 @@ All routes require authentication unless listed as public. `x-nethack-organizati
 - Divisions are ordered by name, milestones by occurrence time.
 - Public listing and detail query without tenant context; the RLS public predicates hide drafts and non-showcased projects. Edition slugs are unique per organization, so the global public slug lookup returns the most recently published visible edition when the same slug exists in more than one organization.
 - Public organization pages require `organization_settings.public_showcase_enabled`.
+- Public list and detail reveal `themeName`/`themeDescription` only for `active`, `judging`, `voting`, `completed`, and `archived`. For `published`, `registration_open`, `registration_closed`, and `paused` the theme is masked to `null`; paused editions are also absent from public results. Organizer responses always include the theme.
 
 ## Audit and events
 
@@ -78,6 +83,8 @@ Audited organizer mutations:
 - `competition.edition.created`
 - `competition.edition.updated`
 - `competition.edition.published`
+- `competition.edition.approved`
+- `competition.edition.approval_revoked`
 - `competition.division.created`
 - `competition.division.updated`
 - `competition.division.deleted`
@@ -89,7 +96,7 @@ Published event: `competitions.edition.published` with `{ editionId, organizatio
 
 ## Tests
 
-`tests/competition-rules.test.ts` covers every allowed and forbidden status transition, publish eligibility, team-size bounds, date ordering, division bounds, and the series/division deletion guards. `tests/edition-theme.test.ts` covers the theme fields and results visibility flags in the create, update, and public contracts. `tests/contact-channels.test.ts` covers organizer contact validation and the public contact payload. The tests are pure and do not require a database.
+`tests/competition-rules.test.ts` covers every allowed and forbidden status transition, publish eligibility, team-size bounds, date ordering, division bounds, and the series/division deletion guards. `tests/edition-theme.test.ts` covers the theme fields and results visibility flags in the create, update, and public contracts. `tests/contact-channels.test.ts` covers organizer contact validation and the public contact payload. `tests/season-approval.test.ts` covers approval transitions, copy/blank-shell creation, activation blockers, and public theme masking. The tests are pure and do not require a database.
 
 ## Extraction
 

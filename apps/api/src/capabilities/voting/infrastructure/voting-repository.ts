@@ -273,6 +273,20 @@ export class VotingRepository {
             .where(and(eq(votes.organizationId, organizationId), eq(votes.ballotId, ballotId)));
     }
 
+    async deleteVotesForSubmission(
+        session: DatabaseSession,
+        organizationId: string,
+        submissionId: string,
+    ): Promise<number> {
+        const removed = await session.db
+            .delete(votes)
+            .where(
+                and(eq(votes.organizationId, organizationId), eq(votes.submissionId, submissionId)),
+            )
+            .returning({ id: votes.id });
+        return removed.length;
+    }
+
     async touchBallot(
         session: DatabaseSession,
         organizationId: string,

@@ -112,7 +112,7 @@ export const voteResultSchema = z.object({
     roundId: idSchema,
     roundName: z.string(),
     publishedAt: isoDateTimeSchema.nullable(),
-    /** Ballots from active teams or teamless voters; inactive voters are excluded. */
+    /** Ballots from active teams or teamless judges and organizers; inactive teams and teamless participants are excluded. */
     totalBallots: z.number().int().nonnegative(),
     entries: z.array(
         z.object({

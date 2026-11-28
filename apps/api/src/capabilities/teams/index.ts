@@ -104,6 +104,24 @@ export const teamsCapability: CapabilityDefinition = {
                     leftAt: row.leftAt === null ? null : row.leftAt.toISOString(),
                 }));
             },
+            async lockTeam(organizationId, teamId, at, session) {
+                if (session !== undefined) {
+                    await service.lockTeam(session, organizationId, teamId, at);
+                    return;
+                }
+                await context.database.transaction({ organizationId }, async (transaction) =>
+                    service.lockTeam(transaction, organizationId, teamId, at),
+                );
+            },
+            async unlockTeam(organizationId, teamId, at, session) {
+                if (session !== undefined) {
+                    await service.unlockTeam(session, organizationId, teamId, at);
+                    return;
+                }
+                await context.database.transaction({ organizationId }, async (transaction) =>
+                    service.unlockTeam(transaction, organizationId, teamId, at),
+                );
+            },
             async updateTeamStatus(actor, organizationId, editionId, teamId, status, reason) {
                 await service.updateTeamStatus(
                     actor,
@@ -138,6 +156,7 @@ function toSummary(team: TeamSummary): TeamSummary {
         description: team.description,
         status: team.status,
         statusReason: team.statusReason,
+        lockedAt: team.lockedAt,
         captainUserId: team.captainUserId,
         memberCount: team.memberCount,
         maxMembers: team.maxMembers,

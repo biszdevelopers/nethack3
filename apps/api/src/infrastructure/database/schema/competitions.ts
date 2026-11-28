@@ -11,6 +11,7 @@ import {
     uuid,
     foreignKey,
 } from "drizzle-orm/pg-core";
+import { users } from "./identity.js";
 import { organizations } from "./organizations.js";
 
 export const editionStatusEnum = pgEnum("edition_status", [
@@ -72,6 +73,12 @@ export const competitionEditions = pgTable(
         contactUrl: text("contact_url"),
         showScores: boolean("show_scores").notNull().default(false),
         showRanking: boolean("show_ranking").notNull().default(false),
+        requiresBoardApproval: boolean("requires_board_approval").notNull().default(false),
+        isBlankStart: boolean("is_blank_start").notNull().default(false),
+        boardApprovedAt: timestamp("board_approved_at", { withTimezone: true }),
+        boardApprovedByUserId: uuid("board_approved_by_user_id").references(() => users.id, {
+            onDelete: "set null",
+        }),
         status: editionStatusEnum("status").notNull().default("draft"),
         statusBeforePause: editionStatusEnum("status_before_pause"),
         timezone: text("timezone").notNull().default("UTC"),

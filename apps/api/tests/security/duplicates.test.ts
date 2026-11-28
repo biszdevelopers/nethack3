@@ -155,7 +155,9 @@ describe("duplicate and racing operations", () => {
     });
 
     it("allows exactly one duplicate team invitation and one duplicate membership", async () => {
-        await queryAsOwner("update teams set max_members = 10 where id = $1", [fixture.teamId]);
+        await queryAsOwner("update teams set max_members = 10, locked_at = null where id = $1", [
+            fixture.teamId,
+        ]);
         const email = emailOf(fixture.joinerA);
         const invites = await Promise.all([
             harness.authenticatedRequest(fixture.participant, {

@@ -129,6 +129,10 @@ export const competitionEditionSchema = z.object({
     contactUrl: z.string().nullable(),
     showScores: z.boolean(),
     showRanking: z.boolean(),
+    requiresBoardApproval: z.boolean(),
+    isBlankStart: z.boolean(),
+    boardApprovedAt: isoDateTimeSchema.nullable(),
+    boardApprovedByName: z.string().nullable(),
     status: competitionEditionStatusSchema,
     statusBeforePause: competitionEditionStatusSchema.nullable(),
     timezone: z.string(),
@@ -197,6 +201,7 @@ export const createEditionRequestSchema = z
         contactUrl: contactUrlValueSchema.nullable().default(null),
         showScores: z.boolean().default(false),
         showRanking: z.boolean().default(false),
+        requiresBoardApproval: z.boolean().default(false),
         timezone: timeZoneSchema,
         registrationOpensAt: isoDateTimeSchema.nullable().default(null),
         registrationClosesAt: isoDateTimeSchema.nullable().default(null),
@@ -207,8 +212,14 @@ export const createEditionRequestSchema = z
         maxParticipants: z.number().int().min(1).max(100000).nullable().default(null),
         rulesMarkdown: markdownSchema.default(""),
         resultsOpenAt: isoDateTimeSchema.nullable().default(null),
+        copyFromEditionId: idSchema.nullable().default(null),
+        isBlankStart: z.boolean().default(false),
     })
     .strict()
+    .refine((value) => value.copyFromEditionId === null || !value.isBlankStart, {
+        message: "A blank shell cannot copy from another edition.",
+        path: ["copyFromEditionId"],
+    })
     .refine((value) => value.teamMinSize <= value.teamMaxSize, {
         message: "Minimum team size cannot exceed maximum team size.",
         path: ["teamMinSize"],
@@ -248,6 +259,7 @@ export const updateEditionRequestSchema = z
         contactUrl: contactUrlValueSchema.nullable().optional(),
         showScores: z.boolean().optional(),
         showRanking: z.boolean().optional(),
+        requiresBoardApproval: z.boolean().optional(),
         status: competitionEditionStatusSchema.optional(),
         timezone: timeZoneSchema.optional(),
         registrationOpensAt: isoDateTimeSchema.nullable().optional(),
@@ -262,6 +274,13 @@ export const updateEditionRequestSchema = z
     })
     .strict();
 export type UpdateEditionRequest = z.infer<typeof updateEditionRequestSchema>;
+
+export const updateEditionApprovalRequestSchema = z
+    .object({
+        approved: z.boolean(),
+    })
+    .strict();
+export type UpdateEditionApprovalRequest = z.infer<typeof updateEditionApprovalRequestSchema>;
 
 export const updateSeriesRequestSchema = z
     .object({

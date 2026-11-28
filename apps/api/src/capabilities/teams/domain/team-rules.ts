@@ -153,6 +153,14 @@ export class TeamRules {
         }
     }
 
+    static assertNotLocked(lockedAt: Date | null): void {
+        if (lockedAt !== null) {
+            throw new ConflictError(
+                "The team is locked after its project was submitted. Ask an organizer to reopen the submission.",
+            );
+        }
+    }
+
     static assertStatusTransition(from: TeamStatus, to: TeamStatus): void {
         if (from === to) {
             return;

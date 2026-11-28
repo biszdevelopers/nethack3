@@ -17,6 +17,7 @@ import {
     publicCompetitionSchema,
     publicOrganizationSchema,
     updateDivisionRequestSchema,
+    updateEditionApprovalRequestSchema,
     updateEditionRequestSchema,
     updateMilestoneRequestSchema,
     updateSeriesRequestSchema,
@@ -263,6 +264,29 @@ export async function registerCompetitionRoutes(
             const access = await guard.requireOrganization(request, auth);
             guard.requireOrganizer(access);
             return service.update(
+                auth,
+                access.organizationId,
+                request.params.editionId,
+                request.body,
+                request.ip,
+            );
+        },
+    );
+
+    app.patch(
+        "/api/v1/competitions/:editionId/approval",
+        {
+            schema: {
+                params: editionParams,
+                body: updateEditionApprovalRequestSchema,
+                response: { 200: competitionEditionSchema },
+            },
+        },
+        async (request) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            guard.requireOrganizer(access);
+            return service.setBoardApproval(
                 auth,
                 access.organizationId,
                 request.params.editionId,

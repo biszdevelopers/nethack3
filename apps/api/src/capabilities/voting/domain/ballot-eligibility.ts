@@ -9,9 +9,10 @@ const INACTIVE_TEAM_STATUSES: ReadonlySet<TeamStatus> = new Set([
 ]);
 
 /**
- * The voter's ballot scope. A voter without a team (or whose team has no
+ * The voter's ballot scope. A teamless judge or organizer (or a team without a
  * division) cannot be narrowed down, so both ids stay null and the ballot lists
- * every votable submission except the voter's own team when one is known.
+ * every votable submission. Participants are rejected before this point unless
+ * they belong to an active team with a submitted project.
  */
 export interface BallotEligibility {
     readonly teamId: string | null;
@@ -35,8 +36,47 @@ const REASON_MESSAGES: Record<BallotIneligibilityReason, string> = {
     outside_division: "You can only score submissions from your own division.",
 };
 
+export type ParticipantBallotIneligibility = "no_team" | "inactive_team" | "no_submission";
+
+const PARTICIPANT_REASON_MESSAGES: Record<ParticipantBallotIneligibility, string> = {
+    no_team: "Only participants with an active team can vote in this round.",
+    inactive_team: "Your team is not active, so you cannot vote in this round.",
+    no_submission: "Only participants whose team has a submitted project can vote in this round.",
+};
+
 export function isActiveVotingTeam(status: TeamStatus): boolean {
     return !INACTIVE_TEAM_STATUSES.has(status);
+}
+
+/**
+ * Participant-only gate. A participant must belong to an active team of the
+ * edition and that team must carry at least one submission in a votable status.
+ * Judges and organizers never pass through here.
+ */
+export function participantBallotIneligibility(
+    team: { readonly status: TeamStatus } | null,
+    hasVotableSubmission: boolean,
+): ParticipantBallotIneligibility | null {
+    if (team === null) {
+        return "no_team";
+    }
+    if (!isActiveVotingTeam(team.status)) {
+        return "inactive_team";
+    }
+    if (!hasVotableSubmission) {
+        return "no_submission";
+    }
+    return null;
+}
+
+export function assertParticipantBallotEligible(
+    team: { readonly status: TeamStatus } | null,
+    hasVotableSubmission: boolean,
+): void {
+    const reason = participantBallotIneligibility(team, hasVotableSubmission);
+    if (reason !== null) {
+        throw new ForbiddenError(PARTICIPANT_REASON_MESSAGES[reason]);
+    }
 }
 
 export function toBallotEligibility(

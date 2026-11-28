@@ -1,4 +1,5 @@
 import type { TeamRole, TeamStatus } from "@nethack/contracts";
+import type { DatabaseSession } from "../../infrastructure/database/client.js";
 
 export interface TeamSummary {
     readonly id: string;
@@ -9,6 +10,7 @@ export interface TeamSummary {
     readonly description: string;
     readonly status: TeamStatus;
     readonly statusReason: string;
+    readonly lockedAt: string | null;
     readonly captainUserId: string;
     readonly memberCount: number;
     readonly maxMembers: number;
@@ -65,6 +67,20 @@ export interface TeamsContract {
         userId: string,
     ): Promise<TeamSummary | null>;
     countTeams(organizationId: string, editionId: string): Promise<number>;
+    /** Locks roster/metadata changes after the first submitted version. Idempotent. */
+    lockTeam(
+        organizationId: string,
+        teamId: string,
+        at: Date,
+        session?: DatabaseSession,
+    ): Promise<void>;
+    /** Unlocks a team when an organizer reopens its submission. Idempotent. */
+    unlockTeam(
+        organizationId: string,
+        teamId: string,
+        at: Date,
+        session?: DatabaseSession,
+    ): Promise<void>;
     /**
      * Every team the user has belonged to in the organization, including
      * memberships that ended. Active memberships have `leftAt === null`.

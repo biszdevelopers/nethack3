@@ -69,6 +69,7 @@ export const teamSchema = z.object({
     description: z.string(),
     status: teamStatusSchema,
     statusReason: z.string(),
+    lockedAt: isoDateTimeSchema.nullable(),
     captainUserId: idSchema,
     memberCount: z.number().int().nonnegative(),
     maxMembers: z.number().int().min(1),

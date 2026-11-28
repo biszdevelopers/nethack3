@@ -13,6 +13,7 @@ import type { ProjectsContract } from "../../projects/contracts.js";
 import type { RecognitionContract } from "../../recognition/contracts.js";
 import type { SubmissionSummary, SubmissionsContract } from "../../submissions/contracts.js";
 import type { TeamsContract } from "../../teams/contracts.js";
+import type { VotingContract } from "../../voting/contracts.js";
 import { AdministrationRules } from "../domain/administration-rules.js";
 import { standingsCsv, type StandingRow } from "./standings-csv.js";
 
@@ -29,6 +30,7 @@ export interface EditionAdministrationSources {
     readonly judging: Pick<JudgingContract, "listEditionResults">;
     readonly projects: Pick<ProjectsContract, "getProject">;
     readonly recognition: Pick<RecognitionContract, "getPublishedResults" | "listTeamAwardNames">;
+    readonly voting: Pick<VotingContract, "removeSubmissionVotes">;
 }
 
 /**
@@ -160,6 +162,11 @@ export class EditionAdministrationService {
         ip: string | null,
     ): Promise<void> {
         await this.requireEdition(organizationId, editionId);
+        const published = await this.sources.recognition.getPublishedResults(
+            organizationId,
+            editionId,
+        );
+        AdministrationRules.assertResultsNotPublished(published !== null);
         const submission = await this.sources.submissions.getSubmission(
             organizationId,
             submissionId,
@@ -170,6 +177,10 @@ export class EditionAdministrationService {
         const results = await this.sources.judging.listEditionResults(organizationId, editionId);
         const result = results.find((candidate) => candidate.submissionId === submissionId);
         AdministrationRules.assertNoSubmittedEvaluations(result?.submittedCount ?? 0);
+        // Clear People's Choice stars first so a resubmission cannot inherit the
+        // votes earned by the previous version. Reopening runs only after the
+        // cleanup commits.
+        await this.sources.voting.removeSubmissionVotes(organizationId, submissionId);
         await this.sources.submissions.reopenSubmission(
             { userId: auth.user.id, ip },
             organizationId,

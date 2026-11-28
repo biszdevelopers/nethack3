@@ -305,6 +305,14 @@ export class SubmissionService {
                             session,
                         );
                     }
+                    if (input.submit && row.teamId !== null) {
+                        await this.contracts.teams.lockTeam(
+                            organizationId,
+                            row.teamId,
+                            now,
+                            session,
+                        );
+                    }
                     await this.audit.record(session, {
                         organizationId,
                         actorUserId: auth.user.id,
@@ -527,6 +535,9 @@ export class SubmissionService {
                     now,
                     session,
                 );
+                if (row.teamId !== null) {
+                    await this.contracts.teams.unlockTeam(organizationId, row.teamId, now, session);
+                }
                 await this.audit.record(session, {
                     organizationId,
                     actorUserId: actor.userId,

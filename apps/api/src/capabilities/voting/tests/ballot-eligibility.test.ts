@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { TeamStatus } from "@nethack/contracts";
 import { ForbiddenError } from "../../../core/errors.js";
 import {
+    assertParticipantBallotEligible,
     assertSelectionsEligible,
     ineligibilityReason,
     isActiveVotingTeam,
     isSubmissionEligible,
+    participantBallotIneligibility,
     toBallotEligibility,
     type BallotEligibility,
     type SubmissionPlacement,
@@ -52,6 +54,36 @@ describe("toBallotEligibility", () => {
             expect(isActiveVotingTeam(status)).toBe(false);
             expect(toBallotEligibility(team(status)).active).toBe(false);
         }
+    });
+});
+
+describe("participant eligibility", () => {
+    it("rejects a teamless participant", () => {
+        expect(participantBallotIneligibility(null, true)).toBe("no_team");
+        expect(() => assertParticipantBallotEligible(null, true)).toThrow(ForbiddenError);
+        expect(() => assertParticipantBallotEligible(null, true)).toThrow(
+            "Only participants with an active team can vote in this round.",
+        );
+    });
+
+    it("rejects a participant whose team is inactive", () => {
+        expect(participantBallotIneligibility(team("withdrawn"), true)).toBe("inactive_team");
+        expect(() => assertParticipantBallotEligible(team("disqualified"), true)).toThrow(
+            "Your team is not active, so you cannot vote in this round.",
+        );
+    });
+
+    it("rejects an active participant with no submitted project", () => {
+        expect(participantBallotIneligibility(team("ready"), false)).toBe("no_submission");
+        expect(() => assertParticipantBallotEligible(team("forming"), false)).toThrow(
+            "Only participants whose team has a submitted project can vote in this round.",
+        );
+    });
+
+    it("accepts a participant on an active team with a submitted project", () => {
+        expect(participantBallotIneligibility(team("ready"), true)).toBeNull();
+        expect(participantBallotIneligibility(team("forming"), true)).toBeNull();
+        expect(() => assertParticipantBallotEligible(team("ready"), true)).not.toThrow();
     });
 });
 

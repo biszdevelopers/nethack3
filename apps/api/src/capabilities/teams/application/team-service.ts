@@ -196,6 +196,54 @@ export class TeamService {
         });
     }
 
+    async lockTeam(
+        session: DatabaseSession,
+        organizationId: string,
+        teamId: string,
+        at: Date,
+    ): Promise<void> {
+        const locked = await this.repository.lock(session, organizationId, teamId, at);
+        if (locked === null) {
+            const existing = await this.repository.findById(session.db, organizationId, teamId);
+            if (existing === null) {
+                throw new NotFoundError("The team was not found.");
+            }
+            return;
+        }
+        await this.audit.record(session, {
+            organizationId,
+            actorUserId: session.userId,
+            action: "team.locked",
+            entityType: "team",
+            entityId: teamId,
+            metadata: { lockedAt: at.toISOString() },
+        });
+    }
+
+    async unlockTeam(
+        session: DatabaseSession,
+        organizationId: string,
+        teamId: string,
+        at: Date,
+    ): Promise<void> {
+        const unlocked = await this.repository.unlock(session, organizationId, teamId, at);
+        if (unlocked === null) {
+            const existing = await this.repository.findById(session.db, organizationId, teamId);
+            if (existing === null) {
+                throw new NotFoundError("The team was not found.");
+            }
+            return;
+        }
+        await this.audit.record(session, {
+            organizationId,
+            actorUserId: session.userId,
+            action: "team.unlocked",
+            entityType: "team",
+            entityId: teamId,
+            metadata: { unlockedAt: at.toISOString() },
+        });
+    }
+
     async updateTeamStatus(
         actor: { readonly userId: string; readonly ip: string | null },
         organizationId: string,
@@ -428,6 +476,7 @@ export class TeamService {
                         isOrganizer(organizationRole),
                     );
                     TeamRules.assertActiveTeam(team.status);
+                    TeamRules.assertNotLocked(team.lockedAt);
                     const edition = await this.resolveEdition(organizationId, team.editionId);
                     const divisionId =
                         input.divisionId === undefined ? team.divisionId : input.divisionId;
@@ -521,6 +570,7 @@ export class TeamService {
                     }
                     TeamRules.assertCaptainOnly(team.captainUserId, auth.user.id);
                     TeamRules.assertActiveTeam(team.status);
+                    TeamRules.assertNotLocked(team.lockedAt);
                     if (auth.user.email !== null && auth.user.email.toLowerCase() === email) {
                         throw new ConflictError("You cannot invite yourself to your team.");
                     }
@@ -705,6 +755,7 @@ export class TeamService {
                         this.clock.now(),
                     );
                     TeamRules.assertActiveTeam(team.status);
+                    TeamRules.assertNotLocked(team.lockedAt);
                     await this.repository.lockRegistration(
                         session,
                         invitation.organizationId,
@@ -970,6 +1021,7 @@ export class TeamService {
                     );
                 }
                 TeamRules.assertNotRemovingCaptain(team.captainUserId, targetUserId);
+                TeamRules.assertNotLocked(team.lockedAt);
                 const removed = await this.repository.removeMember(
                     session,
                     teamId,
@@ -1117,6 +1169,7 @@ export class TeamService {
                 if (team === null) {
                     throw new NotFoundError("The team was not found.");
                 }
+                TeamRules.assertNotLocked(team.lockedAt);
                 if (team.captainUserId === auth.user.id) {
                     const memberCount = await this.repository.countMembers(session.db, teamId);
                     TeamRules.assertCaptainMayLeave(memberCount);
@@ -1309,6 +1362,7 @@ export function toTeam(team: TeamRow, memberCount: number): Team {
         description: team.description,
         status: team.status,
         statusReason: team.statusReason,
+        lockedAt: team.lockedAt === null ? null : team.lockedAt.toISOString(),
         captainUserId: team.captainUserId,
         memberCount,
         maxMembers: team.maxMembers,

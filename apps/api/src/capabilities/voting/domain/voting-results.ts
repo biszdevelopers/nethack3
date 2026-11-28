@@ -39,7 +39,7 @@ export interface VoteTally {
 }
 
 export interface VoteTallyResult {
-    /** Ballots from active teams or teamless voters; turnout excludes inactive teams. */
+    /** Ballots from active teams or teamless judges and organizers; other ballots are excluded. */
     readonly totalBallots: number;
     readonly tallies: readonly VoteTally[];
 }
@@ -62,15 +62,16 @@ export function isCountableSubmission(submission: CountableSubmission): boolean 
     return submission.teamStatus === null || isActiveVotingTeam(submission.teamStatus);
 }
 
-/** A voting unit is a team, or a single user when the voter has no team. */
+/** A voting unit is a team, or a single teamless judge or organizer. */
 export function votingUnitId(userId: string, teamId: string | null): string {
     return teamId === null ? `user:${userId}` : `team:${teamId}`;
 }
 
 /**
  * Tallies eligible ballots into unit-weighted submission results. Ballots from
- * inactive teams are dropped from turnout and totals. Scores for submissions
- * that are no longer votable, or whose team is inactive, are ignored.
+ * inactive teams and from teamless participants are dropped from turnout and
+ * totals. Scores for submissions that are no longer votable, or whose team is
+ * inactive, are ignored.
  */
 export function tallyVoteUnits(
     ballots: readonly BallotRowInput[],
@@ -79,6 +80,7 @@ export function tallyVoteUnits(
     teamsById: ReadonlyMap<string, VoterTeamMembership> = new Map(
         [...teamsByUserId.values()].map((membership) => [membership.teamId, membership] as const),
     ),
+    teamlessParticipantUserIds: ReadonlySet<string> = new Set(),
 ): VoteTallyResult {
     const bySubmission = new Map<
         string,
@@ -93,6 +95,9 @@ export function tallyVoteUnits(
     for (const ballot of ballots) {
         const currentMembership = teamsByUserId.get(ballot.userId);
         const voterTeamId = ballot.voterTeamId ?? currentMembership?.teamId ?? null;
+        if (voterTeamId === null && teamlessParticipantUserIds.has(ballot.userId)) {
+            continue;
+        }
         const membership = voterTeamId === null ? undefined : teamsById.get(voterTeamId);
         if (voterTeamId !== null && membership === undefined) {
             continue;

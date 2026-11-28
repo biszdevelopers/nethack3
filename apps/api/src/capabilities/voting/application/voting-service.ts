@@ -27,9 +27,10 @@ import type { CompetitionsContract, EditionSummary } from "../../competitions/co
 import type { OrganizationsContract } from "../../organizations/contracts.js";
 import type { ParticipantsContract } from "../../participants/contracts.js";
 import type { ProjectsContract } from "../../projects/contracts.js";
-import type { SubmissionsContract } from "../../submissions/contracts.js";
+import type { SubmissionSummary, SubmissionsContract } from "../../submissions/contracts.js";
 import type { TeamsContract } from "../../teams/contracts.js";
 import {
+    assertParticipantBallotEligible,
     assertSelectionsEligible,
     isActiveVotingTeam,
     toBallotEligibility,
@@ -37,7 +38,11 @@ import {
     type SubmissionPlacement,
     type TeamDivision,
 } from "../domain/ballot-eligibility.js";
-import { toVotableSubmissions, type VotableTeamInfo } from "../domain/votable-submissions.js";
+import {
+    hasVotableTeamSubmission,
+    toVotableSubmissions,
+    type VotableTeamInfo,
+} from "../domain/votable-submissions.js";
 import {
     isCountableSubmission,
     rankVoteTallies,
@@ -117,16 +122,24 @@ export class VotingService {
         userId: string,
     ): Promise<readonly VotableSubmission[]> {
         await this.requireEdition(organizationId, editionId);
-        await this.assertCanDiscoverVotableSubmissions(organizationId, editionId, role);
-        // Organizers manage the edition and may review every votable submission.
-        // Every other member gets the ballot scope: same division, own team excluded.
-        const eligibility = VotingRules.isOrganizerRole(role)
-            ? null
-            : await this.resolveBallotEligibility(organizationId, editionId, userId);
+        await this.assertCanDiscoverVotableSubmissions(organizationId, editionId, role, userId);
         const submissions = await this.submissions.listEditionSubmissions(
             organizationId,
             editionId,
         );
+        // Organizers manage the edition and may review every votable submission.
+        // Judges keep the ballot scope (same division, own team excluded) and may
+        // be teamless. Participants must have an active team with a submitted
+        // project before they reach the scope.
+        const eligibility = VotingRules.isOrganizerRole(role)
+            ? null
+            : await this.resolveVoterEligibility(
+                  organizationId,
+                  editionId,
+                  userId,
+                  role,
+                  submissions,
+              );
         const votableStatusSubmissions = submissions.filter((submission) =>
             VotingRules.isVotableSubmission(submission.status),
         );
@@ -371,6 +384,26 @@ export class VotingService {
         return closed.length;
     }
 
+    async removeSubmissionVotes(organizationId: string, submissionId: string): Promise<number> {
+        return this.database.transaction({ organizationId }, async (session) => {
+            const removed = await this.repository.deleteVotesForSubmission(
+                session,
+                organizationId,
+                submissionId,
+            );
+            await this.audit.record(session, {
+                organizationId,
+                actorUserId: null,
+                action: "voting.votes.cleared",
+                entityType: "submission",
+                entityId: submissionId,
+                metadata: { submissionId, removedVotes: removed },
+                ip: null,
+            });
+            return removed;
+        });
+    }
+
     async ballot(
         auth: AuthContext,
         organizationId: string,
@@ -418,14 +451,21 @@ export class VotingService {
         VotingRules.assertBallotWindow(round, now);
         VotingRules.assertScores(input.scores, round.maxSelections, round.maxVotesPerUser);
         await this.assertVoterEligible(organizationId, round, auth.user.id, role);
-        const eligibility = await this.resolveBallotEligibility(
+        const submissions = await this.submissions.listEditionSubmissions(
+            organizationId,
+            round.editionId,
+        );
+        const eligibility = await this.resolveVoterEligibility(
             organizationId,
             round.editionId,
             auth.user.id,
+            role,
+            submissions,
         );
         await this.assertSelectionsAreVotable(
             organizationId,
             round,
+            submissions,
             input.scores.map((score) => score.submissionId),
             eligibility,
         );
@@ -602,6 +642,34 @@ export class VotingService {
                 teamsByUserId.set(member.userId, { teamId: team.id, status: team.status });
             }
         }
+        // A participant without a team is ineligible since this round's rule, so
+        // any lingering teamless participant ballot must not form a voting unit.
+        // Teamless judges and organizers still count as one unit each.
+        const teamlessVoterIds = [
+            ...new Set(
+                ballots.flatMap((entry) => {
+                    const voterTeamId =
+                        entry.ballot.voterTeamId ??
+                        teamsByUserId.get(entry.ballot.userId)?.teamId ??
+                        null;
+                    return voterTeamId === null ? [entry.ballot.userId] : [];
+                }),
+            ),
+        ];
+        const teamlessParticipantUserIds = new Set<string>();
+        await Promise.all(
+            teamlessVoterIds.map(async (voterId) => {
+                if (
+                    await this.participants.isApprovedParticipant(
+                        organizationId,
+                        round.editionId,
+                        voterId,
+                    )
+                ) {
+                    teamlessParticipantUserIds.add(voterId);
+                }
+            }),
+        );
         const titles = new Map<string, string>();
         const teamNamesBySubmission = new Map<string, string | null>();
         const votableSubmissionIds = new Set<string>();
@@ -628,6 +696,7 @@ export class VotingService {
             teamsByUserId,
             votableSubmissionIds,
             teamMembershipsById,
+            teamlessParticipantUserIds,
         );
         return {
             ...emptyResult,
@@ -704,6 +773,7 @@ export class VotingService {
         organizationId: string,
         editionId: string,
         role: OrganizationRole,
+        userId: string,
     ): Promise<void> {
         const effective = VotingRules.effectiveRole(role);
         if (effective === "organizer") {
@@ -720,14 +790,33 @@ export class VotingService {
                 "Your organization role is not eligible in any voting round of this edition.",
             );
         }
+        if (effective === "participant") {
+            VotingRules.assertApprovedParticipant(
+                await this.participants.isApprovedParticipant(organizationId, editionId, userId),
+            );
+        }
     }
 
-    private async resolveBallotEligibility(
+    /**
+     * Participants must have an active team with a submitted project; judges
+     * keep the previous behavior, where a teamless judge sees every votable
+     * submission. Callers pass the edition submissions when they already have
+     * them so cast and discovery do not query twice.
+     */
+    private async resolveVoterEligibility(
         organizationId: string,
         editionId: string,
         userId: string,
+        role: OrganizationRole,
+        submissions?: readonly SubmissionSummary[],
     ): Promise<BallotEligibility> {
         const team = await this.teams.getTeamForUser(organizationId, editionId, userId);
+        if (VotingRules.effectiveRole(role) === "participant") {
+            const rows =
+                submissions ??
+                (await this.submissions.listEditionSubmissions(organizationId, editionId));
+            assertParticipantBallotEligible(team, hasVotableTeamSubmission(rows, team?.id ?? null));
+        }
         return toBallotEligibility(team);
     }
 
@@ -790,13 +879,10 @@ export class VotingService {
     private async assertSelectionsAreVotable(
         organizationId: string,
         round: VotingRoundRow,
+        submissions: readonly SubmissionSummary[],
         submissionIds: readonly string[],
         eligibility: BallotEligibility,
     ): Promise<void> {
-        const submissions = await this.submissions.listEditionSubmissions(
-            organizationId,
-            round.editionId,
-        );
         const byId = new Map(submissions.map((submission) => [submission.id, submission]));
         for (const submissionId of submissionIds) {
             const submission = byId.get(submissionId);

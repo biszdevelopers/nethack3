@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SubmissionStatus } from "@nethack/contracts";
 import type { BallotEligibility } from "../domain/ballot-eligibility.js";
 import {
+    hasVotableTeamSubmission,
     toVotableSubmissions,
     type VotableSubmissionSource,
     type VotableTeamInfo,
@@ -41,6 +42,33 @@ function source(
         ...overrides,
     };
 }
+
+describe("hasVotableTeamSubmission", () => {
+    it("accepts a team with submitted, under review, changes requested, or accepted work", () => {
+        for (const status of [
+            "submitted",
+            "under_review",
+            "changes_requested",
+            "accepted",
+        ] as const) {
+            expect(hasVotableTeamSubmission([{ teamId: TEAM_ID, status }], TEAM_ID)).toBe(true);
+        }
+    });
+
+    it("rejects a draft-only team and submissions from another team", () => {
+        expect(hasVotableTeamSubmission([{ teamId: TEAM_ID, status: "draft" }], TEAM_ID)).toBe(
+            false,
+        );
+        expect(
+            hasVotableTeamSubmission([{ teamId: OTHER_TEAM_ID, status: "submitted" }], TEAM_ID),
+        ).toBe(false);
+        expect(hasVotableTeamSubmission([], TEAM_ID)).toBe(false);
+    });
+
+    it("rejects a null team id", () => {
+        expect(hasVotableTeamSubmission([{ teamId: null, status: "submitted" }], null)).toBe(false);
+    });
+});
 
 describe("toVotableSubmissions", () => {
     it("keeps only submissions in a votable status", () => {
@@ -143,7 +171,7 @@ describe("toVotableSubmissions", () => {
         expect(result.map((submission) => submission.id)).toEqual(["same"]);
     });
 
-    it("falls back to every votable submission when the voter has no team", () => {
+    it("keeps a teamless judge's ballot unrestricted", () => {
         const result = toVotableSubmissions(
             [
                 source("a", "submitted", { teamId: TEAM_ID }),
@@ -155,7 +183,7 @@ describe("toVotableSubmissions", () => {
         expect(result.map((submission) => submission.id)).toEqual(["a", "b"]);
     });
 
-    it("falls back to every division but still excludes the own team when the team has none", () => {
+    it("keeps every division for a judge's team without one but still excludes the own team", () => {
         const result = toVotableSubmissions(
             [
                 source("own", "submitted", { teamId: TEAM_ID }),

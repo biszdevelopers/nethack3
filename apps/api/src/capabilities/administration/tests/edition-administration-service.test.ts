@@ -91,6 +91,7 @@ function team(): TeamWithMembers {
         description: "",
         status: "ready",
         statusReason: "",
+        lockedAt: null,
         captainUserId: userId,
         memberCount: 1,
         maxMembers: 4,
@@ -220,10 +221,12 @@ function sources(options: {
     readonly updateTeamStatus: ReturnType<typeof vi.fn>;
     readonly deleteTeam: ReturnType<typeof vi.fn>;
     readonly reopenSubmission: ReturnType<typeof vi.fn>;
+    readonly removeSubmissionVotes: ReturnType<typeof vi.fn>;
 } {
     const updateTeamStatus = vi.fn(async () => undefined);
     const deleteTeam = vi.fn(async () => undefined);
     const reopenSubmission = vi.fn(async () => undefined);
+    const removeSubmissionVotes = vi.fn(async () => 0);
     return {
         sources: {
             editions: {
@@ -256,10 +259,14 @@ function sources(options: {
                         award.teams.map((team) => ({ teamId: team.teamId, name: award.name })),
                     ),
             },
+            voting: {
+                removeSubmissionVotes,
+            },
         },
         updateTeamStatus,
         deleteTeam,
         reopenSubmission,
+        removeSubmissionVotes,
     };
 }
 
@@ -472,7 +479,11 @@ describe("EditionAdministrationService", () => {
     });
 
     it("blocks reopening after a submitted evaluation", async () => {
-        const { sources: contractSources, reopenSubmission } = sources({
+        const {
+            sources: contractSources,
+            reopenSubmission,
+            removeSubmissionVotes,
+        } = sources({
             results: [result(1)],
         });
 
@@ -486,11 +497,37 @@ describe("EditionAdministrationService", () => {
                 null,
             ),
         ).rejects.toBeInstanceOf(ConflictError);
+        expect(removeSubmissionVotes).not.toHaveBeenCalled();
         expect(reopenSubmission).not.toHaveBeenCalled();
     });
 
-    it("reopens a submission through the submissions contract", async () => {
-        const { sources: contractSources, reopenSubmission } = sources({
+    it("blocks reopening after results are published before changing anything", async () => {
+        const {
+            sources: contractSources,
+            reopenSubmission,
+            removeSubmissionVotes,
+        } = sources({ published: publishedResults() });
+
+        await expect(
+            new EditionAdministrationService(contractSources).reopenSubmission(
+                auth(),
+                organizationId,
+                editionId,
+                submissionId,
+                { status: "draft" },
+                null,
+            ),
+        ).rejects.toBeInstanceOf(ConflictError);
+        expect(removeSubmissionVotes).not.toHaveBeenCalled();
+        expect(reopenSubmission).not.toHaveBeenCalled();
+    });
+
+    it("clears the submission's votes before reopening it", async () => {
+        const {
+            sources: contractSources,
+            reopenSubmission,
+            removeSubmissionVotes,
+        } = sources({
             results: [result(0)],
         });
 
@@ -503,11 +540,15 @@ describe("EditionAdministrationService", () => {
             null,
         );
 
+        expect(removeSubmissionVotes).toHaveBeenCalledWith(organizationId, submissionId);
         expect(reopenSubmission).toHaveBeenCalledWith(
             { userId, ip: null },
             organizationId,
             submissionId,
             "changes_requested",
+        );
+        expect(removeSubmissionVotes.mock.invocationCallOrder[0]).toBeLessThan(
+            reopenSubmission.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
         );
     });
 });

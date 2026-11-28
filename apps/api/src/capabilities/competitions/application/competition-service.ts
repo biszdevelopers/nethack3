@@ -15,6 +15,7 @@ import type {
     PublicCompetitionDetail,
     PublicOrganization,
     UpdateDivisionRequest,
+    UpdateEditionApprovalRequest,
     UpdateEditionRequest,
     UpdateMilestoneRequest,
     UpdateSeriesRequest,
@@ -35,7 +36,11 @@ import type {
     DatabaseSession,
 } from "../../../infrastructure/database/client.js";
 import type { OrganizationSummary, OrganizationsContract } from "../../organizations/contracts.js";
-import { CompetitionRules, type EditionSchedule } from "../domain/competition-rules.js";
+import {
+    CompetitionRules,
+    isThemePublished,
+    type EditionSchedule,
+} from "../domain/competition-rules.js";
 import type {
     CompetitionRepository,
     DivisionRow,
@@ -43,6 +48,7 @@ import type {
     EditionUpdateValues,
     EditionWithSeriesRow,
     MilestoneRow,
+    OrganizerEditionRow,
     PublicEditionRow,
     SeriesRow,
 } from "../infrastructure/competition-repository.js";
@@ -224,15 +230,11 @@ export class CompetitionService {
         input: CreateEditionRequest,
         ip: string | null,
     ): Promise<CompetitionEdition> {
-        const schedule: EditionSchedule = {
-            teamMinSize: input.teamMinSize,
-            teamMaxSize: input.teamMaxSize,
-            registrationOpensAt: parseNullable(input.registrationOpensAt),
-            registrationClosesAt: parseNullable(input.registrationClosesAt),
-            startsAt: parseNullable(input.startsAt),
-            endsAt: parseNullable(input.endsAt),
-        };
-        CompetitionRules.assertEditionIsValid(schedule);
+        if (input.copyFromEditionId !== null && input.isBlankStart) {
+            throw new ValidationError("A blank shell cannot copy from another edition.", {
+                copyFromEditionId: ["A blank shell cannot copy from another edition."],
+            });
+        }
         try {
             const row = await this.database.transaction(
                 { organizationId, userId: auth.user.id },
@@ -245,36 +247,107 @@ export class CompetitionService {
                     if (series === null) {
                         throw new NotFoundError("The competition series was not found.");
                     }
+                    const source =
+                        input.copyFromEditionId === null
+                            ? null
+                            : await this.repository.findEdition(
+                                  session.db,
+                                  organizationId,
+                                  input.copyFromEditionId,
+                              );
+                    if (input.copyFromEditionId !== null && source?.seriesId !== seriesId) {
+                        throw new NotFoundError("The source edition was not found in this series.");
+                    }
+                    const schedule: EditionSchedule =
+                        source === null
+                            ? {
+                                  teamMinSize: input.teamMinSize,
+                                  teamMaxSize: input.teamMaxSize,
+                                  registrationOpensAt: parseNullable(input.registrationOpensAt),
+                                  registrationClosesAt: parseNullable(input.registrationClosesAt),
+                                  startsAt: parseNullable(input.startsAt),
+                                  endsAt: parseNullable(input.endsAt),
+                              }
+                            : {
+                                  teamMinSize: source.teamMinSize,
+                                  teamMaxSize: source.teamMaxSize,
+                                  registrationOpensAt: source.registrationOpensAt,
+                                  registrationClosesAt: source.registrationClosesAt,
+                                  startsAt: source.startsAt,
+                                  endsAt: source.endsAt,
+                              };
+                    CompetitionRules.assertEditionIsValid(schedule);
+
                     const edition = await this.repository.insertEdition(session, {
                         organizationId,
                         seriesId,
                         name: input.name,
                         slug: input.slug,
                         description: input.description,
-                        themeName: input.themeName,
-                        themeDescription: input.themeDescription,
-                        contactEmail: input.contactEmail,
-                        contactUrl: input.contactUrl,
+                        themeName: source === null ? input.themeName : source.themeName,
+                        themeDescription:
+                            source === null ? input.themeDescription : source.themeDescription,
+                        contactEmail: source === null ? input.contactEmail : source.contactEmail,
+                        contactUrl: source === null ? input.contactUrl : source.contactUrl,
                         showScores: input.showScores,
                         showRanking: input.showRanking,
-                        timezone: input.timezone,
+                        timezone: source === null ? input.timezone : source.timezone,
                         registrationOpensAt: schedule.registrationOpensAt,
                         registrationClosesAt: schedule.registrationClosesAt,
                         startsAt: schedule.startsAt,
                         endsAt: schedule.endsAt,
-                        teamMinSize: input.teamMinSize,
-                        teamMaxSize: input.teamMaxSize,
+                        teamMinSize: schedule.teamMinSize,
+                        teamMaxSize: schedule.teamMaxSize,
                         maxParticipants: input.maxParticipants,
-                        rulesMarkdown: input.rulesMarkdown,
-                        resultsOpenAt: parseNullable(input.resultsOpenAt),
+                        rulesMarkdown: source === null ? input.rulesMarkdown : source.rulesMarkdown,
+                        resultsOpenAt:
+                            source === null
+                                ? parseNullable(input.resultsOpenAt)
+                                : source.resultsOpenAt,
+                        requiresBoardApproval: input.isBlankStart || input.requiresBoardApproval,
+                        isBlankStart: input.isBlankStart,
+                        boardApprovedAt: null,
+                        boardApprovedByUserId: null,
                     });
+                    if (source !== null) {
+                        const [sourceDivisions, sourceMilestones] = await Promise.all([
+                            this.repository.listDivisions(session.db, organizationId, source.id),
+                            this.repository.listMilestones(session.db, organizationId, source.id),
+                        ]);
+                        for (const division of sourceDivisions) {
+                            await this.repository.insertDivision(session, {
+                                organizationId,
+                                editionId: edition.id,
+                                name: division.name,
+                                slug: division.slug,
+                                description: division.description,
+                                minTeamSize: division.minTeamSize,
+                                maxTeamSize: division.maxTeamSize,
+                            });
+                        }
+                        for (const milestone of sourceMilestones) {
+                            await this.repository.insertMilestone(session, {
+                                organizationId,
+                                editionId: edition.id,
+                                title: milestone.title,
+                                description: milestone.description,
+                                kind: milestone.kind,
+                                occursAt: milestone.occursAt,
+                            });
+                        }
+                    }
                     await this.audit.record(session, {
                         organizationId,
                         actorUserId: auth.user.id,
                         action: "competition.edition.created",
                         entityType: "competition_edition",
                         entityId: edition.id,
-                        metadata: { seriesId, slug: edition.slug },
+                        metadata: {
+                            seriesId,
+                            slug: edition.slug,
+                            copyFromEditionId: input.copyFromEditionId,
+                            isBlankStart: input.isBlankStart,
+                        },
                         ip,
                     });
                     return edition;
@@ -386,6 +459,9 @@ export class CompetitionService {
                 if (input.showRanking !== undefined) {
                     values.showRanking = input.showRanking;
                 }
+                if (input.requiresBoardApproval !== undefined) {
+                    values.requiresBoardApproval = input.requiresBoardApproval;
+                }
                 if (input.timezone !== undefined) {
                     values.timezone = input.timezone;
                 }
@@ -418,10 +494,26 @@ export class CompetitionService {
                 }
                 if (input.status !== undefined) {
                     CompetitionRules.assertTransition(current.status, input.status);
-                    values.status = input.status;
                     if (input.status === "published") {
+                        CompetitionRules.assertActivationReady({
+                            isBlankStart: current.isBlankStart,
+                            requiresBoardApproval:
+                                input.requiresBoardApproval ?? current.requiresBoardApproval,
+                            themeName:
+                                input.themeName === undefined ? current.themeName : input.themeName,
+                            startsAt:
+                                input.startsAt === undefined
+                                    ? current.startsAt
+                                    : parseNullable(input.startsAt),
+                            endsAt:
+                                input.endsAt === undefined
+                                    ? current.endsAt
+                                    : parseNullable(input.endsAt),
+                            boardApprovedAt: current.boardApprovedAt,
+                        });
                         values.publishedAt = now;
                     }
+                    values.status = input.status;
                 }
 
                 const row = await this.repository.updateEdition(
@@ -445,7 +537,10 @@ export class CompetitionService {
                 if (input.status === "published") {
                     await this.publishEvent(session, organizationId, auth.user.id, row);
                 }
-                return row;
+                return (
+                    (await this.repository.findEdition(session.db, organizationId, editionId)) ??
+                    row
+                );
             },
         );
         return toEdition(updated);
@@ -494,6 +589,55 @@ export class CompetitionService {
         }
     }
 
+    async setBoardApproval(
+        auth: AuthContext,
+        organizationId: string,
+        editionId: string,
+        input: UpdateEditionApprovalRequest,
+        ip: string | null,
+    ): Promise<CompetitionEdition> {
+        const now = this.clock.now();
+        const updated = await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const current = await this.repository.lockEdition(
+                    session,
+                    organizationId,
+                    editionId,
+                );
+                if (current === null) {
+                    throw new NotFoundError("The competition edition was not found.");
+                }
+                await this.repository.updateEdition(session, organizationId, editionId, {
+                    boardApprovedAt: input.approved ? now : null,
+                    boardApprovedByUserId: input.approved ? auth.user.id : null,
+                    updatedAt: now,
+                });
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: input.approved
+                        ? "competition.edition.approved"
+                        : "competition.edition.approval_revoked",
+                    entityType: "competition_edition",
+                    entityId: editionId,
+                    metadata: { approved: input.approved },
+                    ip,
+                });
+                const row = await this.repository.findEdition(
+                    session.db,
+                    organizationId,
+                    editionId,
+                );
+                if (row === null) {
+                    throw new NotFoundError("The competition edition was not found.");
+                }
+                return row;
+            },
+        );
+        return toEdition(updated);
+    }
+
     async publish(
         auth: AuthContext,
         organizationId: string,
@@ -504,8 +648,8 @@ export class CompetitionService {
         const published = await this.database.transaction(
             { organizationId, userId: auth.user.id },
             async (session) => {
-                const current = await this.repository.findEdition(
-                    session.db,
+                const current = await this.repository.lockEdition(
+                    session,
                     organizationId,
                     editionId,
                 );
@@ -513,6 +657,7 @@ export class CompetitionService {
                     throw new NotFoundError("The competition edition was not found.");
                 }
                 CompetitionRules.assertPublishable(current.status);
+                CompetitionRules.assertActivationReady(current);
                 const row = await this.repository.updateEdition(
                     session,
                     organizationId,
@@ -536,7 +681,10 @@ export class CompetitionService {
                     ip,
                 });
                 await this.publishEvent(session, organizationId, auth.user.id, row);
-                return row;
+                return (
+                    (await this.repository.findEdition(session.db, organizationId, editionId)) ??
+                    row
+                );
             },
         );
         return toEdition(published);
@@ -1147,7 +1295,9 @@ function toSeries(row: SeriesRow): CompetitionSeries {
     };
 }
 
-function toEdition(row: EditionRow): CompetitionEdition {
+function toEdition(
+    row: EditionWithSeriesRow | OrganizerEditionRow | EditionRow,
+): CompetitionEdition {
     return {
         id: row.id,
         organizationId: row.organizationId,
@@ -1161,6 +1311,11 @@ function toEdition(row: EditionRow): CompetitionEdition {
         contactUrl: row.contactUrl,
         showScores: row.showScores,
         showRanking: row.showRanking,
+        requiresBoardApproval: row.requiresBoardApproval,
+        isBlankStart: row.isBlankStart,
+        boardApprovedAt: nullableIso(row.boardApprovedAt),
+        boardApprovedByName:
+            "boardApprovedByName" in row ? (row.boardApprovedByName ?? null) : null,
         status: row.status,
         statusBeforePause: row.statusBeforePause,
         timezone: row.timezone,
@@ -1224,13 +1379,14 @@ function toPublicCompetition(
     organization: OrganizationSummary,
     publishedProjectCount: number,
 ): PublicCompetition {
+    const themeIsPublished = isThemePublished(row.status);
     return {
         editionId: row.id,
         name: row.name,
         slug: row.slug,
         description: row.description,
-        themeName: row.themeName,
-        themeDescription: row.themeDescription,
+        themeName: themeIsPublished ? row.themeName : null,
+        themeDescription: themeIsPublished ? row.themeDescription : null,
         contactEmail: row.contactEmail,
         contactUrl: row.contactUrl,
         showScores: row.showScores,

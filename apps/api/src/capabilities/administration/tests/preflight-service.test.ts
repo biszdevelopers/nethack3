@@ -70,6 +70,7 @@ function team(id: string, name: string): TeamSummary {
         description: "",
         status: "ready",
         statusReason: "",
+        lockedAt: null,
         captainUserId: "user",
         memberCount: 1,
         maxMembers: 4,

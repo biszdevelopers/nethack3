@@ -243,6 +243,12 @@ describe("TeamRules captain rules", () => {
         expect(() => TeamRules.assertActiveTeam("forming")).not.toThrow();
         expect(() => TeamRules.assertActiveTeam("ready")).not.toThrow();
     });
+
+    it("rejects roster and metadata changes after the team is locked", () => {
+        expect(() => TeamRules.assertNotLocked(null)).not.toThrow();
+        expect(() => TeamRules.assertNotLocked(new Date())).toThrow(ConflictError);
+        expect(() => TeamRules.assertNotLocked(new Date())).toThrow("locked");
+    });
 });
 
 describe("TeamRules status reasons", () => {

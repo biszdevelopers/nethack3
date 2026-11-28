@@ -7,6 +7,7 @@ import {
     divisions,
     milestones,
     organizations,
+    users,
     projects,
     registrations,
     submissions,
@@ -32,6 +33,9 @@ export type DivisionRow = typeof divisions.$inferSelect;
 export type MilestoneRow = typeof milestones.$inferSelect;
 
 export type EditionWithSeriesRow = EditionRow & { readonly seriesName: string };
+export type OrganizerEditionRow = EditionWithSeriesRow & {
+    readonly boardApprovedByName: string | null;
+};
 export type PublicEditionRow = EditionWithSeriesRow;
 export type OrganizationPublicRow = typeof organizations.$inferSelect;
 
@@ -79,6 +83,10 @@ export interface NewEditionValues {
     readonly maxParticipants: number | null;
     readonly rulesMarkdown: string;
     readonly resultsOpenAt: Date | null;
+    readonly requiresBoardApproval: boolean;
+    readonly isBlankStart: boolean;
+    readonly boardApprovedAt: Date | null;
+    readonly boardApprovedByUserId: string | null;
 }
 
 export interface EditionUpdateValues {
@@ -91,6 +99,9 @@ export interface EditionUpdateValues {
     readonly contactUrl?: string | null;
     readonly showScores?: boolean;
     readonly showRanking?: boolean;
+    readonly requiresBoardApproval?: boolean;
+    readonly boardApprovedAt?: Date | null;
+    readonly boardApprovedByUserId?: string | null;
     readonly status?: CompetitionEditionStatus;
     readonly statusBeforePause?: CompetitionEditionStatus | null;
     readonly timezone?: string;
@@ -255,11 +266,16 @@ export class CompetitionRepository {
         db: DatabaseExecutor,
         organizationId: string,
         editionId: string,
-    ): Promise<EditionWithSeriesRow | null> {
+    ): Promise<OrganizerEditionRow | null> {
         const rows = await db
-            .select({ edition: competitionEditions, seriesName: competitionSeries.name })
+            .select({
+                edition: competitionEditions,
+                seriesName: competitionSeries.name,
+                boardApprovedByName: users.displayName,
+            })
             .from(competitionEditions)
             .innerJoin(competitionSeries, eq(competitionSeries.id, competitionEditions.seriesId))
+            .leftJoin(users, eq(users.id, competitionEditions.boardApprovedByUserId))
             .where(
                 and(
                     eq(competitionEditions.organizationId, organizationId),
@@ -268,27 +284,61 @@ export class CompetitionRepository {
             )
             .limit(1);
         const row = rows[0];
-        return row === undefined ? null : { ...row.edition, seriesName: row.seriesName };
+        return row === undefined
+            ? null
+            : {
+                  ...row.edition,
+                  seriesName: row.seriesName,
+                  boardApprovedByName: row.boardApprovedByName,
+              };
+    }
+
+    async lockEdition(
+        session: DatabaseSession,
+        organizationId: string,
+        editionId: string,
+    ): Promise<EditionRow | null> {
+        const rows = await session.db
+            .select()
+            .from(competitionEditions)
+            .where(
+                and(
+                    eq(competitionEditions.organizationId, organizationId),
+                    eq(competitionEditions.id, editionId),
+                ),
+            )
+            .for("update")
+            .limit(1);
+        return rows[0] ?? null;
     }
 
     async listEditions(
         db: DatabaseExecutor,
         organizationId: string,
-    ): Promise<readonly EditionWithSeriesRow[]> {
+    ): Promise<readonly OrganizerEditionRow[]> {
         const rows = await db
-            .select({ edition: competitionEditions, seriesName: competitionSeries.name })
+            .select({
+                edition: competitionEditions,
+                seriesName: competitionSeries.name,
+                boardApprovedByName: users.displayName,
+            })
             .from(competitionEditions)
             .innerJoin(competitionSeries, eq(competitionSeries.id, competitionEditions.seriesId))
+            .leftJoin(users, eq(users.id, competitionEditions.boardApprovedByUserId))
             .where(eq(competitionEditions.organizationId, organizationId))
             .orderBy(desc(competitionEditions.createdAt), desc(competitionEditions.id));
-        return rows.map((row) => ({ ...row.edition, seriesName: row.seriesName }));
+        return rows.map((row) => ({
+            ...row.edition,
+            seriesName: row.seriesName,
+            boardApprovedByName: row.boardApprovedByName,
+        }));
     }
 
     async listEditionsPage(
         db: DatabaseExecutor,
         organizationId: string,
         options: EditionPageOptions,
-    ): Promise<readonly EditionWithSeriesRow[]> {
+    ): Promise<readonly OrganizerEditionRow[]> {
         const conditions = [eq(competitionEditions.organizationId, organizationId)];
         if (options.seriesId !== null) {
             conditions.push(eq(competitionEditions.seriesId, options.seriesId));
@@ -308,13 +358,22 @@ export class CompetitionRepository {
             }
         }
         const rows = await db
-            .select({ edition: competitionEditions, seriesName: competitionSeries.name })
+            .select({
+                edition: competitionEditions,
+                seriesName: competitionSeries.name,
+                boardApprovedByName: users.displayName,
+            })
             .from(competitionEditions)
             .innerJoin(competitionSeries, eq(competitionSeries.id, competitionEditions.seriesId))
+            .leftJoin(users, eq(users.id, competitionEditions.boardApprovedByUserId))
             .where(and(...conditions))
             .orderBy(desc(competitionEditions.createdAt), desc(competitionEditions.id))
             .limit(options.limit);
-        return rows.map((row) => ({ ...row.edition, seriesName: row.seriesName }));
+        return rows.map((row) => ({
+            ...row.edition,
+            seriesName: row.seriesName,
+            boardApprovedByName: row.boardApprovedByName,
+        }));
     }
 
     async insertEdition(session: DatabaseSession, values: NewEditionValues): Promise<EditionRow> {

@@ -68,4 +68,12 @@ export class AdministrationRules {
             throw new ConflictError("A submission with a submitted evaluation cannot be reopened.");
         }
     }
+
+    static assertResultsNotPublished(resultsPublished: boolean): void {
+        if (resultsPublished) {
+            throw new ConflictError(
+                "Results are published; unpublish the results before reopening a submission.",
+            );
+        }
+    }
 }

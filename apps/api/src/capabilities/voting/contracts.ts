@@ -14,6 +14,12 @@ export interface VotingContract {
         editionId: string,
         actorUserId: string,
     ): Promise<number>;
+    /**
+     * Removes every vote for a submission and audits `voting.votes.cleared`.
+     * Used by administration before reopening a submission so a resubmission
+     * cannot keep stars from the previous version.
+     */
+    removeSubmissionVotes(organizationId: string, submissionId: string): Promise<number>;
 }
 
 export const VOTING_CONTRACT = "voting.v1";

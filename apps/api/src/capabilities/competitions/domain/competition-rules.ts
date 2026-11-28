@@ -37,6 +37,28 @@ export interface EditionSchedule {
     readonly endsAt: Date | null;
 }
 
+export interface EditionActivationState {
+    readonly isBlankStart: boolean;
+    readonly requiresBoardApproval: boolean;
+    readonly themeName: string | null;
+    readonly startsAt: Date | null;
+    readonly endsAt: Date | null;
+    readonly boardApprovedAt: Date | null;
+}
+
+/** Public phases in which the edition theme is safe to reveal. */
+const THEME_PUBLISHED_STATUSES: ReadonlySet<CompetitionEditionStatus> = new Set([
+    "active",
+    "judging",
+    "voting",
+    "completed",
+    "archived",
+]);
+
+export function isThemePublished(status: CompetitionEditionStatus): boolean {
+    return THEME_PUBLISHED_STATUSES.has(status);
+}
+
 export class CompetitionRules {
     static canTransition(from: CompetitionEditionStatus, to: CompetitionEditionStatus): boolean {
         return TRANSITIONS[from].includes(to);
@@ -54,6 +76,40 @@ export class CompetitionRules {
     static assertPublishable(status: CompetitionEditionStatus): void {
         if (status !== "draft") {
             throw new ConflictError("Only a draft edition can be published.");
+        }
+    }
+
+    /**
+     * Missing details that block draft -> published. Judging rubric readiness is
+     * owned by the judging capability and is surfaced by administration
+     * preflight instead, so it cannot be checked here without a dependency cycle.
+     */
+    static activationBlockers(edition: EditionActivationState): readonly string[] {
+        const blockers: string[] = [];
+        if (edition.isBlankStart && !edition.themeName?.trim()) {
+            blockers.push("theme name");
+        }
+        if (edition.isBlankStart && edition.startsAt === null) {
+            blockers.push("start date");
+        }
+        if (edition.isBlankStart && edition.endsAt === null) {
+            blockers.push("end date");
+        }
+        if (
+            (edition.isBlankStart || edition.requiresBoardApproval) &&
+            edition.boardApprovedAt === null
+        ) {
+            blockers.push("board approval");
+        }
+        return blockers;
+    }
+
+    static assertActivationReady(edition: EditionActivationState): void {
+        const blockers = CompetitionRules.activationBlockers(edition);
+        if (blockers.length > 0) {
+            throw new ConflictError(
+                `The edition is not ready to publish. Missing: ${blockers.join(", ")}.`,
+            );
         }
     }
 

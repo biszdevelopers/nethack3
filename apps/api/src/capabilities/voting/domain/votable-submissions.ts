@@ -25,11 +25,34 @@ export interface VotableTeamInfo {
 }
 
 /**
+ * Whether the team has at least one submission the round may score. A
+ * draft-only team does not qualify; submitted, under review, changes requested,
+ * and accepted submissions do.
+ */
+export function hasVotableTeamSubmission(
+    submissions: readonly {
+        readonly teamId: string | null;
+        readonly status: SubmissionStatus;
+    }[],
+    teamId: string | null,
+): boolean {
+    if (teamId === null) {
+        return false;
+    }
+    return submissions.some(
+        (submission) =>
+            submission.teamId === teamId && VotingRules.isVotableSubmission(submission.status),
+    );
+}
+
+/**
  * Discovery and cast eligibility share this mapper. A null eligibility means
  * the caller is managing the edition (an owner or organizer), who may review
- * every votable submission. A voter with no team, or whose team has no
- * division, falls back to the whole votable set minus their own team; a voter
+ * every votable submission. A teamless judge, or a judge whose team has no
+ * division, falls back to the whole votable set minus their own team; a judge
  * whose team is withdrawn, disqualified, no_show, or disbanded gets no options.
+ * Participants are gated before this mapper (active team with a submitted
+ * project); they never reach discovery as a teamless voter.
  */
 export function toVotableSubmissions(
     submissions: readonly VotableSubmissionSource[],

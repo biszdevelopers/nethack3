@@ -81,6 +81,7 @@ export const administrationCapability: CapabilityDefinition = {
             judging: judgingContract,
             projects: context.contracts.get<ProjectsContract>(PROJECTS_CONTRACT),
             recognition: context.contracts.get<RecognitionContract>(RECOGNITION_CONTRACT),
+            voting: context.contracts.get<VotingContract>(VOTING_CONTRACT),
         });
         const preflight = new PreflightService(
             {

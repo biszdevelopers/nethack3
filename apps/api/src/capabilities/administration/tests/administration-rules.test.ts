@@ -34,4 +34,9 @@ describe("AdministrationRules submission guards", () => {
         expect(() => AdministrationRules.assertNoSubmittedEvaluations(1)).toThrow(ConflictError);
         expect(() => AdministrationRules.assertNoSubmittedEvaluations(0)).not.toThrow();
     });
+
+    it("refuses to reopen after results are published", () => {
+        expect(() => AdministrationRules.assertResultsNotPublished(true)).toThrow(ConflictError);
+        expect(() => AdministrationRules.assertResultsNotPublished(false)).not.toThrow();
+    });
 });
