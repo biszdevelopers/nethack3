@@ -33,6 +33,14 @@ export const users = pgTable(
     ],
 );
 
+export const userProfileThemes = pgTable("user_profile_themes", {
+    userId: uuid("user_id")
+        .primaryKey()
+        .references(() => users.id, { onDelete: "cascade" }),
+    theme: text("theme").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const externalIdentities = pgTable(
     "external_identities",
     {

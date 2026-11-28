@@ -47,6 +47,7 @@ import type {
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const ORGANIZER_ROLES: readonly OrganizationRole[] = ["owner", "organizer"];
+const ORGANIZER_ONLY_TEAM_STATUSES: ReadonlySet<TeamStatus> = new Set(["disqualified", "no_show"]);
 
 export class TeamService {
     private readonly database: DatabaseConnection;
@@ -141,6 +142,7 @@ export class TeamService {
                 if (team === null || team.editionId !== editionId) {
                     throw new NotFoundError("The team was not found in this edition.");
                 }
+                TeamRules.assertStatusTransition(team.status, status);
                 await this.repository.update(session, teamId, {
                     status,
                     updatedAt: this.clock.now(),
@@ -362,6 +364,17 @@ export class TeamService {
                         TeamRules.assertReady(memberCount, limits);
                     } else if (divisionId !== team.divisionId) {
                         TeamRules.assertWithinMax(memberCount, limits);
+                    }
+                    if (input.status !== undefined && input.status !== team.status) {
+                        if (
+                            !isOrganizer(organizationRole) &&
+                            ORGANIZER_ONLY_TEAM_STATUSES.has(input.status)
+                        ) {
+                            throw new ForbiddenError(
+                                "Only an organizer may disqualify a team or mark it as a no-show.",
+                            );
+                        }
+                        TeamRules.assertStatusTransition(team.status, input.status);
                     }
                     const updated = await this.repository.update(session, teamId, {
                         ...(input.name === undefined ? {} : { name: input.name }),

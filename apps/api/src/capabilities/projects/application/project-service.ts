@@ -571,6 +571,14 @@ export class ProjectService {
             throw new ValidationError("The team does not belong to this edition.");
         }
         if (
+            team.status === "withdrawn" ||
+            team.status === "disqualified" ||
+            team.status === "no_show" ||
+            team.status === "disbanded"
+        ) {
+            throw new ConflictError("This team is not active and cannot own a project.");
+        }
+        if (
             requireMembership &&
             !(await this.contracts.teams.isTeamMember(organizationId, teamId, userId))
         ) {

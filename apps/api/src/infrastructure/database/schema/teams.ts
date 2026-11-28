@@ -14,7 +14,14 @@ import { competitionEditions, divisions } from "./competitions.js";
 import { organizations } from "./organizations.js";
 import { users } from "./identity.js";
 
-export const teamStatusEnum = pgEnum("team_status", ["forming", "ready", "disbanded"]);
+export const teamStatusEnum = pgEnum("team_status", [
+    "forming",
+    "ready",
+    "withdrawn",
+    "disqualified",
+    "no_show",
+    "disbanded",
+]);
 export const teamMemberRoleEnum = pgEnum("team_member_role", ["captain", "member"]);
 
 export const teams = pgTable(

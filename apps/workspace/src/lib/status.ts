@@ -29,6 +29,7 @@ const CRITICAL_STATUSES = new Set([
     "rejected",
     "withdrawn",
     "disqualified",
+    "no_show",
     "disbanded",
     "deleted",
     "expired",

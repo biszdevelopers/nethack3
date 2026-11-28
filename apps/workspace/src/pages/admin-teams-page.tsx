@@ -34,12 +34,7 @@ import { EditionSelect } from "../capabilities/shared/edition-select.js";
 import { describeError } from "../capabilities/shared/errors.js";
 import { RequestError } from "../capabilities/shared/states.jsx";
 import { humanizeToken } from "../capabilities/shared/format.js";
-
-const STATUS_OPTIONS = [
-    { value: "forming", label: "Forming" },
-    { value: "ready", label: "Ready" },
-    { value: "disbanded", label: "Disbanded" },
-] as const;
+import { TEAM_STATUS_OPTIONS, teamStatusLabel } from "../capabilities/teams/status.js";
 
 interface PendingReopen {
     readonly team: AdministrationTeam;
@@ -113,7 +108,7 @@ export function AdminTeamsPage(): ReactNode {
                 onSuccess: () =>
                     toast({
                         title: "Team status updated",
-                        description: `${team.name} is now ${humanizeToken(parsed.data)}.`,
+                        description: `${team.name} is now ${teamStatusLabel(parsed.data)}.`,
                         tone: "success",
                     }),
                 onError: (error) =>
@@ -202,6 +197,10 @@ export function AdminTeamsPage(): ReactNode {
                             />
                         </div>
                     </Card>
+                    <p className="text-xs text-ink-muted">
+                        Withdrawn, disqualified, no show, and disbanded are final statuses and
+                        cannot be reopened.
+                    </p>
 
                     {editionId === "" ? (
                         <EmptyState
@@ -251,14 +250,14 @@ export function AdminTeamsPage(): ReactNode {
                                                     </label>
                                                     <select
                                                         id={`status-${team.id}`}
-                                                        className="h-9 w-32 rounded-md border border-line bg-app px-2 text-xs text-ink focus-visible:border-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/25"
+                                                        className="h-9 w-36 rounded-md border border-line bg-app px-2 text-xs text-ink focus-visible:border-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/25"
                                                         value={team.status}
                                                         disabled={updateStatus.isPending}
                                                         onChange={(event) =>
                                                             changeStatus(team, event.target.value)
                                                         }
                                                     >
-                                                        {STATUS_OPTIONS.map((option) => (
+                                                        {TEAM_STATUS_OPTIONS.map((option) => (
                                                             <option
                                                                 key={option.value}
                                                                 value={option.value}

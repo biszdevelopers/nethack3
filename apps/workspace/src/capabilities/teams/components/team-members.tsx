@@ -10,6 +10,7 @@ import {
     useTransferCaptain,
     useUpdateTeam,
 } from "../hooks/use-teams.js";
+import { isInactiveTeamStatus, teamStatusLabel, teamStatusTone } from "../status.js";
 import { InviteMemberForm } from "./invite-member-form.js";
 
 type PendingAction =
@@ -35,6 +36,7 @@ export function TeamMembers({
 
     const isCaptain = userId !== null && team.captainUserId === userId;
     const canManage = isCaptain || isOrganizer;
+    const activeTeam = !isInactiveTeamStatus(team.status);
     const currentMember =
         userId === null ? null : (team.members.find((member) => member.userId === userId) ?? null);
 
@@ -106,8 +108,8 @@ export function TeamMembers({
             )}
 
             <div className="flex flex-wrap items-center gap-2">
-                <Badge tone={statusBadgeTone(team.status)} size="sm">
-                    {humanizeStatus(team.status)}
+                <Badge tone={teamStatusTone(team.status)} size="sm">
+                    {teamStatusLabel(team.status)}
                 </Badge>
                 <span className="text-xs text-ink-subtle">
                     {team.memberCount} of {team.maxMembers} members
@@ -147,7 +149,7 @@ export function TeamMembers({
                             >
                                 {humanizeStatus(member.role)}
                             </Badge>
-                            {canManage && member.role !== "captain" ? (
+                            {canManage && activeTeam && member.role !== "captain" ? (
                                 <>
                                     <Button
                                         variant="outline"
@@ -182,7 +184,7 @@ export function TeamMembers({
                 ))}
             </ul>
 
-            {canManage ? (
+            {canManage && activeTeam ? (
                 <>
                     <Separator />
                     <div className="flex flex-col gap-2">
@@ -192,7 +194,7 @@ export function TeamMembers({
                 </>
             ) : null}
 
-            {canManage ? (
+            {canManage && activeTeam ? (
                 <>
                     <Separator />
                     <div className="flex flex-col gap-2">

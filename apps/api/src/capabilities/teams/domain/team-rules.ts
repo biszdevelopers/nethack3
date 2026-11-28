@@ -25,6 +25,35 @@ const TEAM_CREATION_STATUSES: readonly CompetitionEditionStatus[] = [
     "registration_open",
 ];
 
+type InactiveTeamStatus = "withdrawn" | "disqualified" | "no_show" | "disbanded";
+
+const INACTIVE_TEAM_STATUSES: ReadonlySet<TeamStatus> = new Set([
+    "withdrawn",
+    "disqualified",
+    "no_show",
+    "disbanded",
+]);
+
+/**
+ * Terminal statuses cannot be left, so a disqualified or withdrawn team keeps
+ * its historical outcome instead of being silently reactivated.
+ */
+export const TEAM_STATUS_TRANSITIONS: Readonly<Record<TeamStatus, readonly TeamStatus[]>> = {
+    forming: ["ready", "withdrawn", "disqualified", "no_show", "disbanded"],
+    ready: ["forming", "withdrawn", "disqualified", "no_show", "disbanded"],
+    withdrawn: [],
+    disqualified: [],
+    no_show: [],
+    disbanded: [],
+};
+
+const INACTIVE_MESSAGES: Readonly<Record<InactiveTeamStatus, string>> = {
+    withdrawn: "This team has withdrawn from the competition.",
+    disqualified: "This team has been disqualified.",
+    no_show: "This team did not participate.",
+    disbanded: "This team has been disbanded.",
+};
+
 export class TeamRules {
     static assertEditionAcceptsTeams(edition: EditionTeamPolicy, now: Date): void {
         if (!TEAM_CREATION_STATUSES.includes(edition.status)) {
@@ -86,8 +115,19 @@ export class TeamRules {
     }
 
     static assertActiveTeam(status: TeamStatus): void {
-        if (status === "disbanded") {
-            throw new ConflictError("This team has been disbanded.");
+        if (isInactiveTeamStatus(status)) {
+            throw new ConflictError(INACTIVE_MESSAGES[status]);
+        }
+    }
+
+    static assertStatusTransition(from: TeamStatus, to: TeamStatus): void {
+        if (from === to) {
+            return;
+        }
+        if (!TEAM_STATUS_TRANSITIONS[from].includes(to)) {
+            throw new ConflictError(
+                `A ${statusLabel(from)} team cannot move to ${statusLabel(to)}.`,
+            );
         }
     }
 
@@ -126,4 +166,12 @@ export class TeamRules {
             throw new ConflictError("Transfer captaincy or disband the team before leaving.");
         }
     }
+}
+
+function isInactiveTeamStatus(status: TeamStatus): status is InactiveTeamStatus {
+    return INACTIVE_TEAM_STATUSES.has(status);
+}
+
+function statusLabel(status: TeamStatus): string {
+    return status.replaceAll("_", " ");
 }

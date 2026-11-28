@@ -1,7 +1,14 @@
 import { z } from "zod";
 import { emailSchema, idSchema, isoDateTimeSchema } from "../common/schemas.js";
 
-export const teamStatusSchema = z.enum(["forming", "ready", "disbanded"]);
+export const teamStatusSchema = z.enum([
+    "forming",
+    "ready",
+    "withdrawn",
+    "disqualified",
+    "no_show",
+    "disbanded",
+]);
 export type TeamStatus = z.infer<typeof teamStatusSchema>;
 
 export const teamRoleSchema = z.enum(["captain", "member"]);

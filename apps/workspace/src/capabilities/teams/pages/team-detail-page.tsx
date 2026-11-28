@@ -1,16 +1,26 @@
 import type { ReactNode } from "react";
 import { Link, useParams } from "react-router";
-import { ActivityFeed, Badge, Button, Card, CardContent, CardHeader, CardTitle } from "@nethack/ui";
+import {
+    ActivityFeed,
+    Alert,
+    Badge,
+    Button,
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from "@nethack/ui";
 import { useActiveMembership, useSession } from "../../../application/session.js";
 import { OrganizationRequired } from "../../../components/organization-required.js";
 import { QueryErrorState, QueryLoading } from "../../../components/query-state.js";
 import { formatDateTime } from "../../../lib/format.js";
-import { humanizeStatus, statusBadgeTone } from "../../../lib/status.js";
+import { humanizeStatus } from "../../../lib/status.js";
 import { useEdition } from "../../competitions/hooks/use-competitions.js";
 import { useProjects } from "../../projects/hooks/use-projects.js";
 import { useSubmissions } from "../../submissions/hooks/use-submissions.js";
 import { TeamMembers } from "../components/team-members.js";
 import { useTeam, useTeamActivity } from "../hooks/use-teams.js";
+import { teamStatusLabel, teamStatusTone, teamSubmissionBlockMessage } from "../status.js";
 
 export function TeamDetailPage(): ReactNode {
     const { teamId } = useParams<{ teamId: string }>();
@@ -64,6 +74,7 @@ export function TeamDetailPage(): ReactNode {
             target: entry.entityType.replaceAll("_", " "),
             timestamp: new Date(entry.createdAt),
         })) ?? [];
+    const submissionBlock = teamSubmissionBlockMessage(detail.status);
 
     return (
         <div className="flex flex-col gap-6">
@@ -82,8 +93,8 @@ export function TeamDetailPage(): ReactNode {
                             {formatDateTime(detail.createdAt)}
                         </p>
                     </div>
-                    <Badge tone={statusBadgeTone(detail.status)} size="md">
-                        {humanizeStatus(detail.status)}
+                    <Badge tone={teamStatusTone(detail.status)} size="md">
+                        {teamStatusLabel(detail.status)}
                     </Badge>
                 </div>
                 {detail.description.length === 0 ? null : (
@@ -179,6 +190,11 @@ export function TeamDetailPage(): ReactNode {
                                 <CardTitle>Submission readiness</CardTitle>
                             </CardHeader>
                             <CardContent className="flex flex-col gap-3 text-sm">
+                                {submissionBlock === null ? null : (
+                                    <Alert tone="critical" title="Submissions blocked">
+                                        {submissionBlock}
+                                    </Alert>
+                                )}
                                 <div className="flex items-center justify-between gap-2">
                                     <span className="text-ink-muted">Project</span>
                                     <Badge
@@ -200,9 +216,11 @@ export function TeamDetailPage(): ReactNode {
                                     </Badge>
                                 </div>
                                 {teamProjects.length === 0 ? (
-                                    <Button asChild variant="outline" size="sm">
-                                        <Link to="/projects">Create a project</Link>
-                                    </Button>
+                                    submissionBlock === null ? (
+                                        <Button asChild variant="outline" size="sm">
+                                            <Link to="/projects">Create a project</Link>
+                                        </Button>
+                                    ) : null
                                 ) : (
                                     <Button asChild variant="outline" size="sm">
                                         <Link to={`/projects/${teamProjects[0]?.id ?? ""}`}>

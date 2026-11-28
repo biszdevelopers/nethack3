@@ -15,7 +15,7 @@ import {
     useColorMode,
     useLocale,
 } from "@nethack/ui";
-import { Sun, Moon, UserRound, ExternalLink } from "lucide-react";
+import { Sun, Moon, UserRound, ExternalLink, ArrowUpRight } from "lucide-react";
 import { useSession } from "../application/session.js";
 import { api } from "../application/api.js";
 import { useQueryClient } from "@tanstack/react-query";
@@ -128,9 +128,16 @@ export function SettingsPage(): ReactNode {
                                 />
                             </a>
                             <span className="text-xs text-ink-muted">
-                                Publishes your display name and avatar. Your email stays private.
+                                Publishes your display name, avatar, and profile theme. Your email
+                                stays private.
                             </span>
                         </div>
+                        <Button asChild variant="outline" size="sm" className="w-fit">
+                            <Link to="/profile">
+                                Manage profile theme
+                                <ArrowUpRight className="size-3.5" aria-hidden="true" />
+                            </Link>
+                        </Button>
                         <div className="flex flex-col gap-1.5">
                             <label htmlFor="display-name" className="text-sm font-medium">
                                 Display name

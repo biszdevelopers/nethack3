@@ -160,9 +160,50 @@ describe("TeamRules captain rules", () => {
         expect(() => TeamRules.assertCanLeave(captainUserId, memberUserId)).not.toThrow();
     });
 
-    it("refuses mutations on a disbanded team", () => {
+    it("refuses mutations on an inactive team", () => {
         expect(() => TeamRules.assertActiveTeam("disbanded")).toThrow(ConflictError);
+        expect(() => TeamRules.assertActiveTeam("withdrawn")).toThrow(ConflictError);
+        expect(() => TeamRules.assertActiveTeam("disqualified")).toThrow(ConflictError);
+        expect(() => TeamRules.assertActiveTeam("no_show")).toThrow(ConflictError);
         expect(() => TeamRules.assertActiveTeam("forming")).not.toThrow();
         expect(() => TeamRules.assertActiveTeam("ready")).not.toThrow();
+    });
+});
+
+describe("TeamRules status transitions", () => {
+    it("allows active teams to become ready or terminal", () => {
+        for (const status of [
+            "ready",
+            "withdrawn",
+            "disqualified",
+            "no_show",
+            "disbanded",
+        ] as const) {
+            expect(() => TeamRules.assertStatusTransition("forming", status)).not.toThrow();
+            expect(() => TeamRules.assertStatusTransition("ready", status)).not.toThrow();
+        }
+        expect(() => TeamRules.assertStatusTransition("ready", "forming")).not.toThrow();
+    });
+
+    it("allows re-applying the current status", () => {
+        for (const status of [
+            "forming",
+            "ready",
+            "withdrawn",
+            "disqualified",
+            "no_show",
+            "disbanded",
+        ] as const) {
+            expect(() => TeamRules.assertStatusTransition(status, status)).not.toThrow();
+        }
+    });
+
+    it("keeps terminal statuses closed", () => {
+        for (const status of ["withdrawn", "disqualified", "no_show", "disbanded"] as const) {
+            expect(() => TeamRules.assertStatusTransition(status, "forming")).toThrow(
+                ConflictError,
+            );
+            expect(() => TeamRules.assertStatusTransition(status, "ready")).toThrow(ConflictError);
+        }
     });
 });

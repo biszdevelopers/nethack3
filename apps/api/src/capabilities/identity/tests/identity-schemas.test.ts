@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { updateProfileRequestSchema } from "@nethack/contracts";
 import { callbackQuerySchema, loginQuerySchema } from "../domain/identity-schemas.js";
 
 describe("identity request schemas", () => {
@@ -32,5 +33,18 @@ describe("identity request schemas", () => {
         expect(callbackQuerySchema.safeParse({ error_description: "a".repeat(1025) }).success).toBe(
             false,
         );
+    });
+
+    it("accepts theme removal and rejects unsafe theme values", () => {
+        expect(updateProfileRequestSchema.safeParse({ profileTheme: null }).success).toBe(true);
+        expect(
+            updateProfileRequestSchema.safeParse({ profileTheme: "https://example.com/t.png" })
+                .success,
+        ).toBe(false);
+        expect(
+            updateProfileRequestSchema.safeParse({ profileTheme: "data:image/svg+xml;base64,AAA" })
+                .success,
+        ).toBe(false);
+        expect(updateProfileRequestSchema.safeParse({}).success).toBe(false);
     });
 });

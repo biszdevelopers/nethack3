@@ -169,6 +169,7 @@ export class SubmissionService {
             auth.user.id,
             input.projectId,
         );
+        await this.assertTeamAcceptsSubmission(organizationId, project.teamId);
         const now = this.clock.now();
         try {
             const row = await this.database.transaction(
@@ -272,6 +273,7 @@ export class SubmissionService {
                         throw new NotFoundError("The competition edition was not found.");
                     }
                     SubmissionRules.assertSubmissionWindow(edition, now);
+                    await this.assertTeamAcceptsSubmission(organizationId, row.teamId);
                     SubmissionRules.assertRevisable(row.status);
                     const version = row.currentVersion + 1;
                     const inserted = await this.repository.insertVersion(session, {
@@ -605,6 +607,25 @@ export class SubmissionService {
         throw new ForbiddenError(
             "Only the project owner, a project member, or an organizer may manage this submission.",
         );
+    }
+
+    private async assertTeamAcceptsSubmission(
+        organizationId: string,
+        teamId: string | null,
+    ): Promise<void> {
+        if (teamId === null) {
+            return;
+        }
+        const team = await this.contracts.teams.getTeam(organizationId, teamId);
+        if (
+            team !== null &&
+            (team.status === "withdrawn" ||
+                team.status === "disqualified" ||
+                team.status === "no_show" ||
+                team.status === "disbanded")
+        ) {
+            throw new ConflictError("This team is not active and cannot submit work.");
+        }
     }
 
     private async assertCanView(

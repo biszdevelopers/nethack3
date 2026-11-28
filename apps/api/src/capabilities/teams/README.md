@@ -28,6 +28,7 @@ All routes require authentication (`AuthGuard`). Except for invitation acceptanc
 
 - One team per participant per edition. Creation and acceptance lock the participant's `registrations` row (`SELECT ... FOR UPDATE`) and re-check `team_members` joined to `teams` inside the transaction. `participants.team_id` is kept in sync through the participants contract.
 - Division team-size limits override edition limits per field. The resolved maximum is stored on the team (`max_members`) at creation and when the division changes. `status: "ready"` requires the resolved minimum and maximum.
+- Team statuses are `forming`, `ready`, `withdrawn`, `disqualified`, `no_show`, and `disbanded`. Only `forming` and `ready` can change status; the other values are terminal. `disqualified` and `no_show` are organizer-only. Inactive teams reject updates, invitations, invitation acceptance, captain transfers, and readiness, while members may still leave.
 - Captaincy is always a team membership. Transfers update `teams.captain_user_id` and both `team_members.role` rows in one transaction. Removing or leaving as captain is rejected until captaincy is transferred.
 - Invitations use a 32-byte random token; only its SHA-256 hash is stored. Tokens expire after 7 days and are delivered through the outbox event, never in the API response.
 - PostgreSQL unique violations (`23505`) are mapped to `ConflictError` (team name, duplicate invitation, duplicate membership).

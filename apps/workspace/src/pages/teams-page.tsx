@@ -22,7 +22,7 @@ import { useActiveMembership } from "../application/session.js";
 import { OrganizationRequired } from "../components/organization-required.js";
 import { QueryErrorState, QueryLoading } from "../components/query-state.js";
 import { errorMessage } from "../lib/errors.js";
-import { humanizeStatus, statusBadgeTone } from "../lib/status.js";
+import { humanizeStatus } from "../lib/status.js";
 import {
     useEdition,
     useMyParticipations,
@@ -33,6 +33,7 @@ import {
     useEditionTeams,
     useMyTeams,
 } from "../capabilities/teams/hooks/use-teams.js";
+import { teamStatusLabel, teamStatusTone } from "../capabilities/teams/status.js";
 import { useProjects } from "../capabilities/projects/hooks/use-projects.js";
 import { useSubmissions } from "../capabilities/submissions/hooks/use-submissions.js";
 
@@ -184,11 +185,8 @@ export function TeamsPage(): ReactNode {
                                         <CardHeader>
                                             <div className="flex items-start justify-between gap-3">
                                                 <CardTitle>{team.name}</CardTitle>
-                                                <Badge
-                                                    tone={statusBadgeTone(team.status)}
-                                                    size="sm"
-                                                >
-                                                    {humanizeStatus(team.status)}
+                                                <Badge tone={teamStatusTone(team.status)} size="sm">
+                                                    {teamStatusLabel(team.status)}
                                                 </Badge>
                                             </div>
                                             <p className="text-xs text-ink-subtle">
@@ -300,8 +298,8 @@ export function TeamsPage(): ReactNode {
                                             {division === null ? "No division" : division.name}
                                         </TableCell>
                                         <TableCell>
-                                            <Badge tone={statusBadgeTone(team.status)} size="sm">
-                                                {humanizeStatus(team.status)}
+                                            <Badge tone={teamStatusTone(team.status)} size="sm">
+                                                {teamStatusLabel(team.status)}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="tabular-nums">

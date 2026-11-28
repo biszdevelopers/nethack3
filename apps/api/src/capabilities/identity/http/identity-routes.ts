@@ -8,6 +8,7 @@ import {
     sessionSchema,
     updateProfileRequestSchema,
     userSchema,
+    userWithProfileThemeSchema,
     type Session,
     type User,
 } from "@nethack/contracts";
@@ -19,6 +20,8 @@ import type { NethackServer } from "../../../http/types.js";
 import type { AuthContext, UserRow } from "../../../authentication/types.js";
 import { normalizeReturnTo } from "../../../authentication/login-service.js";
 import { callbackQuerySchema, loginQuerySchema } from "../domain/identity-schemas.js";
+import { normalizeProfileTheme, publicProfileTheme } from "../domain/profile-theme.js";
+import { ProfileThemeRepository } from "../infrastructure/profile-theme-repository.js";
 
 const publicUserParams = z.object({ userId: idSchema });
 
@@ -27,6 +30,7 @@ export async function registerIdentityRoutes(
     context: CapabilityContext,
 ): Promise<void> {
     const guard = new AuthGuard(context.config, context.auth.sessions, context.auth.bearer);
+    const profileThemes = new ProfileThemeRepository(context.database, context.clock);
 
     app.get(
         "/api/v1/auth/login",
@@ -137,16 +141,40 @@ export async function registerIdentityRoutes(
 
     app.patch(
         "/api/v1/me",
-        { schema: { body: updateProfileRequestSchema, response: { 200: userSchema } } },
+        {
+            schema: {
+                body: updateProfileRequestSchema,
+                response: { 200: userWithProfileThemeSchema },
+            },
+            // A 1 MB image becomes roughly 1.4 MB of base64 inside the JSON body.
+            bodyLimit: 2 * 1024 * 1024,
+        },
         async (request) => {
             const auth = await guard.require(request);
-            const updated = await context.auth.users.updateProfile(auth.user.id, {
-                ...(request.body.displayName === undefined
-                    ? {}
-                    : { displayName: request.body.displayName }),
-                ...(request.body.locale === undefined ? {} : { locale: request.body.locale }),
-            });
-            return toUserDto(updated);
+            let user = auth.user;
+            if (request.body.displayName !== undefined || request.body.locale !== undefined) {
+                user = await context.auth.users.updateProfile(auth.user.id, {
+                    ...(request.body.displayName === undefined
+                        ? {}
+                        : { displayName: request.body.displayName }),
+                    ...(request.body.locale === undefined ? {} : { locale: request.body.locale }),
+                });
+            }
+            if (request.body.profileTheme !== undefined) {
+                const theme =
+                    request.body.profileTheme === null
+                        ? null
+                        : normalizeProfileTheme(request.body.profileTheme);
+                await profileThemes.set(user.id, theme);
+                const refreshed = await context.auth.users.getById(user.id);
+                if (refreshed !== null) {
+                    user = refreshed;
+                }
+            }
+            return {
+                ...toUserDto(user),
+                profileTheme: publicProfileTheme(await profileThemes.get(user.id)),
+            };
         },
     );
 
@@ -163,11 +191,13 @@ export async function registerIdentityRoutes(
             if (user === null) {
                 throw new NotFoundError("The requested user was not found.");
             }
+            const theme = publicProfileTheme(await profileThemes.get(user.id));
             setPublicCache(reply);
             return {
                 id: user.id,
                 displayName: user.displayName,
                 avatarUrl: user.avatarUrl,
+                ...(theme === null ? {} : { profileTheme: theme }),
                 createdAt: user.createdAt.toISOString(),
             };
         },

@@ -22,6 +22,10 @@ function parseUserId(userId: string): string | null {
     return parsed.success ? parsed.data : null;
 }
 
+function formatJoined(value: string): string {
+    return new Intl.DateTimeFormat("en", { dateStyle: "long" }).format(new Date(value));
+}
+
 export async function generateMetadata({
     params,
 }: {
@@ -83,35 +87,50 @@ export default async function PublicUserPage({
                 </Link>
             </Reveal>
 
-            <Reveal className="grid gap-6 rounded-lg border border-line bg-panel/70 p-6 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center md:p-8">
-                <div className="relative size-24 shrink-0 overflow-hidden rounded-md border border-line bg-raised sm:size-28">
-                    {user.avatarUrl === null ? (
-                        <span
-                            aria-hidden="true"
-                            className="flex size-full items-center justify-center text-2xl font-bold text-ink-muted"
-                        >
-                            {fallback.length > 0 ? fallback : <UserRound className="size-8" />}
-                        </span>
-                    ) : (
-                        <img
-                            src={user.avatarUrl}
-                            alt=""
-                            width={112}
-                            height={112}
-                            className="size-full object-cover"
-                            referrerPolicy="no-referrer"
-                        />
-                    )}
-                </div>
-                <div className="flex min-w-0 flex-col gap-2">
-                    <span className="text-xs text-primary">Public profile</span>
-                    <h1 className="truncate text-3xl font-extrabold tracking-tight sm:text-4xl">
-                        {user.displayName}
-                    </h1>
-                    <p className="max-w-xl text-sm text-ink-muted">
-                        nethack publishes the display name and avatar of this account. Email
-                        addresses, sign-in activity, and organization memberships stay private.
-                    </p>
+            <Reveal className="relative overflow-hidden rounded-lg border border-line bg-panel/70">
+                {user.profileTheme === undefined ? null : (
+                    <img
+                        data-testid="profile-theme"
+                        src={user.profileTheme}
+                        alt=""
+                        aria-hidden="true"
+                        className="absolute inset-0 size-full object-cover opacity-30"
+                    />
+                )}
+                <div className="relative grid gap-6 p-6 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center md:p-8">
+                    <div className="relative size-24 shrink-0 overflow-hidden rounded-md border border-line bg-raised sm:size-28">
+                        {user.avatarUrl === null ? (
+                            <span
+                                aria-hidden="true"
+                                className="flex size-full items-center justify-center text-2xl font-bold text-ink-muted"
+                            >
+                                {fallback.length > 0 ? fallback : <UserRound className="size-8" />}
+                            </span>
+                        ) : (
+                            <img
+                                src={user.avatarUrl}
+                                alt=""
+                                width={112}
+                                height={112}
+                                className="size-full object-cover"
+                                referrerPolicy="no-referrer"
+                            />
+                        )}
+                    </div>
+                    <div className="flex min-w-0 flex-col gap-2">
+                        <span className="text-xs text-primary">Public profile</span>
+                        <h1 className="truncate text-3xl font-extrabold tracking-tight sm:text-4xl">
+                            {user.displayName}
+                        </h1>
+                        <p className="text-sm text-ink-muted">
+                            Joined {formatJoined(user.createdAt)}
+                        </p>
+                        <p className="max-w-xl text-sm text-ink-muted">
+                            nethack publishes the display name, avatar, and profile theme of this
+                            account. Email addresses, sign-in activity, and organization memberships
+                            stay private.
+                        </p>
+                    </div>
                 </div>
             </Reveal>
 
