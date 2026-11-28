@@ -5,6 +5,7 @@ export interface SubmissionSummary {
     readonly organizationId: string;
     readonly editionId: string;
     readonly projectId: string;
+    readonly projectSlug: string;
     readonly teamId: string | null;
     readonly status: SubmissionStatus;
     readonly currentVersion: number;

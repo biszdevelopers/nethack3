@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRight, Award, Star, Trophy } from "lucide-react";
-import type { PublicResultEntry } from "@nethack/contracts";
+import type { PublicResultEntry, PublicResults, PublicTeamAward } from "@nethack/contracts";
 import {
     Badge,
     Button,
@@ -32,6 +32,90 @@ function rankLabel(entry: PublicResultEntry): string {
     return entry.rank === null ? "Unranked" : `Rank #${String(entry.rank)}`;
 }
 
+function scoreLabel(entry: PublicResultEntry): string {
+    const score = entry.displayScore ?? entry.averageScore;
+    return score === null ? "Not scored" : `${score.toFixed(2)} / 100`;
+}
+
+function projectHref(entry: PublicResultEntry): string | null {
+    return entry.projectSlug.length === 0 ? null : `/projects/${entry.projectSlug}`;
+}
+
+function certificateHref(entry: PublicResultEntry, showRanking: boolean): string | null {
+    return entry.teamId !== null &&
+        (entry.awards.length > 0 || (showRanking && entry.rank !== null))
+        ? `/certificates/${entry.teamId}`
+        : null;
+}
+
+interface TrackResults {
+    readonly key: string;
+    readonly label: string;
+    readonly podium: readonly PublicResultEntry[];
+    readonly rest: readonly PublicResultEntry[];
+}
+
+function byRank(left: PublicResultEntry, right: PublicResultEntry): number {
+    return (
+        (left.rank ?? Number.MAX_SAFE_INTEGER) - (right.rank ?? Number.MAX_SAFE_INTEGER) ||
+        left.projectTitle.localeCompare(right.projectTitle)
+    );
+}
+
+function groupTracks(results: PublicResults): readonly TrackResults[] {
+    const groups = new Map<string, PublicResultEntry[]>();
+    for (const entry of results.judgingEntries) {
+        const label = entry.divisionName ?? "Overall";
+        const group = groups.get(label);
+        if (group === undefined) {
+            groups.set(label, [entry]);
+        } else {
+            group.push(entry);
+        }
+    }
+    return [...groups.entries()]
+        .toSorted(([left], [right]) => left.localeCompare(right))
+        .map(([label, entries], index) => {
+            if (!results.showRanking) {
+                // Rank order would still disclose standings; sort neutrally instead.
+                return {
+                    key: `track-${String(index)}`,
+                    label,
+                    podium: [],
+                    rest: entries.toSorted((left, right) =>
+                        left.projectTitle.localeCompare(right.projectTitle),
+                    ),
+                };
+            }
+            const podium = entries
+                .filter((entry) => entry.rank !== null)
+                .toSorted(byRank)
+                .slice(0, 3);
+            const podiumIds = new Set(podium.map((entry) => entry.submissionId));
+            return {
+                key: `track-${String(index)}`,
+                label,
+                podium,
+                rest: entries.filter((entry) => !podiumIds.has(entry.submissionId)),
+            };
+        });
+}
+
+function AwardBadges({ awards }: { readonly awards: readonly PublicTeamAward[] }): ReactNode {
+    if (awards.length === 0) {
+        return null;
+    }
+    return (
+        <div className="flex flex-wrap gap-1.5">
+            {awards.map((award) => (
+                <Badge key={award.id} variant="soft" color="primary" size="sm">
+                    {award.name}
+                </Badge>
+            ))}
+        </div>
+    );
+}
+
 export default async function ResultsPage(): Promise<ReactNode> {
     let competitions: Awaited<ReturnType<typeof getCompetitions>> = {
         items: [],
@@ -58,6 +142,22 @@ export default async function ResultsPage(): Promise<ReactNode> {
     }
 
     const pendingEdition = competitions.items[0] ?? null;
+    const tracks = results === null ? [] : groupTracks(results);
+    const projectSlugById =
+        results === null
+            ? new Map<string, string>()
+            : new Map(results.judgingEntries.map((entry) => [entry.projectId, entry.projectSlug]));
+    const peopleChoiceSubmissionId = results?.peopleChoice?.submissionId ?? null;
+    const peopleChoiceEntry =
+        results === null || peopleChoiceSubmissionId === null
+            ? undefined
+            : results.judgingEntries.find(
+                  (entry) => entry.submissionId === peopleChoiceSubmissionId,
+              );
+    const peopleChoiceHref =
+        peopleChoiceEntry === undefined || peopleChoiceEntry.projectSlug.length === 0
+            ? null
+            : `/projects/${peopleChoiceEntry.projectSlug}`;
 
     return (
         <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-10 px-4 py-10 sm:px-6 md:py-14 lg:px-8">
@@ -122,7 +222,16 @@ export default async function ResultsPage(): Promise<ReactNode> {
                                         People&apos;s Choice
                                     </div>
                                     <CardTitle className="text-xl">
-                                        {results.peopleChoice.projectTitle}
+                                        {peopleChoiceHref === null ? (
+                                            results.peopleChoice.projectTitle
+                                        ) : (
+                                            <Link
+                                                href={peopleChoiceHref}
+                                                className="transition-colors hover:text-primary"
+                                            >
+                                                {results.peopleChoice.projectTitle}
+                                            </Link>
+                                        )}
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="flex flex-col gap-1">
@@ -166,31 +275,50 @@ export default async function ResultsPage(): Promise<ReactNode> {
                                                 </p>
                                             ) : (
                                                 <ul className="flex flex-col divide-y divide-line">
-                                                    {award.teams.map((team) => (
-                                                        <li
-                                                            key={team.teamId}
-                                                            className="flex flex-wrap items-center justify-between gap-2 py-2"
-                                                        >
-                                                            <span className="min-w-0">
-                                                                <span className="block text-sm">
-                                                                    {team.projectTitle ??
-                                                                        team.teamName}
-                                                                </span>
-                                                                <span className="block text-xs text-ink-muted">
-                                                                    {team.teamName}
-                                                                    {team.note.length === 0
-                                                                        ? ""
-                                                                        : ` · ${team.note}`}
-                                                                </span>
-                                                            </span>
-                                                            <Link
-                                                                href={`/certificates/${team.teamId}`}
-                                                                className="text-sm text-primary transition-colors hover:text-primary-hover"
+                                                    {award.teams.map((team) => {
+                                                        const slug =
+                                                            team.projectId === null
+                                                                ? null
+                                                                : (projectSlugById.get(
+                                                                      team.projectId,
+                                                                  ) ?? null);
+                                                        return (
+                                                            <li
+                                                                key={team.teamId}
+                                                                className="flex flex-wrap items-center justify-between gap-2 py-2"
                                                             >
-                                                                Certificate
-                                                            </Link>
-                                                        </li>
-                                                    ))}
+                                                                <span className="min-w-0">
+                                                                    <span className="block text-sm">
+                                                                        {team.projectTitle ??
+                                                                            team.teamName}
+                                                                    </span>
+                                                                    <span className="block text-xs text-ink-muted">
+                                                                        {team.teamName}
+                                                                        {team.note.length === 0
+                                                                            ? ""
+                                                                            : ` · ${team.note}`}
+                                                                    </span>
+                                                                </span>
+                                                                <span className="flex flex-wrap items-center gap-3">
+                                                                    {slug === null ||
+                                                                    slug.length === 0 ? null : (
+                                                                        <Link
+                                                                            href={`/projects/${slug}`}
+                                                                            className="text-sm text-primary transition-colors hover:text-primary-hover"
+                                                                        >
+                                                                            Project
+                                                                        </Link>
+                                                                    )}
+                                                                    <Link
+                                                                        href={`/certificates/${team.teamId}`}
+                                                                        className="text-sm text-primary transition-colors hover:text-primary-hover"
+                                                                    >
+                                                                        Certificate
+                                                                    </Link>
+                                                                </span>
+                                                            </li>
+                                                        );
+                                                    })}
                                                 </ul>
                                             )}
                                         </CardContent>
@@ -200,14 +328,14 @@ export default async function ResultsPage(): Promise<ReactNode> {
                         </section>
                     )}
 
-                    <section className="flex flex-col gap-5" aria-labelledby="rankings-heading">
+                    <section className="flex flex-col gap-5" aria-labelledby="tracks-heading">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                             <h2
-                                id="rankings-heading"
+                                id="tracks-heading"
                                 className="flex items-center gap-2 text-2xl font-bold tracking-tight"
                             >
                                 <Trophy className="size-5 text-primary" aria-hidden="true" />
-                                Rankings
+                                Results by track
                             </h2>
                             <Button asChild variant="subtle" size="sm">
                                 <Link href={`/projects?competition=${results.edition.slug}`}>
@@ -216,69 +344,165 @@ export default async function ResultsPage(): Promise<ReactNode> {
                                 </Link>
                             </Button>
                         </div>
+
+                        {results.showRanking ? null : (
+                            <Card variant="outline">
+                                <CardContent className="flex flex-col gap-1 pt-5">
+                                    <p className="text-sm font-medium text-ink">
+                                        Rankings are not public for this edition
+                                    </p>
+                                    <p className="text-sm text-ink-muted">
+                                        Projects and awards are published, but the organizers have
+                                        kept detailed rankings hidden.
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        )}
+
                         {results.judgingEntries.length === 0 ? (
                             <EmptyState
-                                title="No ranked submissions"
-                                description="Judging results appear here when judges have submitted evaluations."
+                                title="No judged projects"
+                                description="Judged submissions appear here when organizers publish results for them."
                             />
                         ) : (
-                            <StaggerReveal className="flex flex-col gap-3">
-                                {results.judgingEntries.map((entry) => (
-                                    <Card key={entry.submissionId} variant="outline">
-                                        <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-5">
-                                            <div className="flex min-w-0 items-start gap-4">
-                                                <span className="shrink-0 text-sm font-semibold tabular-nums text-primary">
-                                                    {entry.rank === null
-                                                        ? "—"
-                                                        : `#${String(entry.rank)}`}
-                                                </span>
-                                                <div className="min-w-0">
-                                                    <p className="break-words font-medium text-ink">
-                                                        {entry.projectTitle}
-                                                    </p>
-                                                    <p className="break-words text-sm text-ink-muted">
-                                                        {entry.teamName ?? "Independent project"}
-                                                        {entry.divisionName === null
-                                                            ? ""
-                                                            : ` · ${entry.divisionName}`}
-                                                    </p>
-                                                    <div className="mt-2 flex flex-wrap gap-1.5">
-                                                        {entry.awards.map((award) => (
-                                                            <Badge
-                                                                key={award.id}
-                                                                variant="soft"
-                                                                color="primary"
-                                                                size="sm"
-                                                            >
-                                                                {award.name}
-                                                            </Badge>
-                                                        ))}
-                                                    </div>
-                                                </div>
+                            <div className="flex flex-col gap-8">
+                                {tracks.map((track) => (
+                                    <section
+                                        key={track.key}
+                                        className="flex flex-col gap-4"
+                                        aria-labelledby={`${track.key}-heading`}
+                                    >
+                                        <h3
+                                            id={`${track.key}-heading`}
+                                            className="text-xl font-bold tracking-tight"
+                                        >
+                                            {track.label}
+                                        </h3>
+
+                                        {track.podium.length === 0 ? null : (
+                                            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                                                {track.podium.map((entry) => {
+                                                    const project = projectHref(entry);
+                                                    const certificate = certificateHref(
+                                                        entry,
+                                                        results.showRanking,
+                                                    );
+                                                    return (
+                                                        <Card
+                                                            key={entry.submissionId}
+                                                            variant="outline"
+                                                        >
+                                                            <CardContent className="flex flex-col gap-2 pt-5">
+                                                                <p className="text-xs font-medium text-primary">
+                                                                    {rankLabel(entry)}
+                                                                </p>
+                                                                {project === null ? (
+                                                                    <span className="break-words text-lg font-semibold text-ink">
+                                                                        {entry.projectTitle}
+                                                                    </span>
+                                                                ) : (
+                                                                    <Link
+                                                                        href={project}
+                                                                        className="break-words text-lg font-semibold text-ink transition-colors hover:text-primary"
+                                                                    >
+                                                                        {entry.projectTitle}
+                                                                    </Link>
+                                                                )}
+                                                                <p className="break-words text-sm text-ink-muted">
+                                                                    {entry.teamName ??
+                                                                        "Independent project"}{" "}
+                                                                    ·{" "}
+                                                                    {entry.divisionName ??
+                                                                        "Overall"}
+                                                                </p>
+                                                                <AwardBadges
+                                                                    awards={entry.awards}
+                                                                />
+                                                                {results.showScores ? (
+                                                                    <p className="text-sm tabular-nums text-ink">
+                                                                        {scoreLabel(entry)}
+                                                                    </p>
+                                                                ) : null}
+                                                                {certificate === null ? null : (
+                                                                    <Link
+                                                                        href={certificate}
+                                                                        className="text-sm text-primary transition-colors hover:text-primary-hover"
+                                                                    >
+                                                                        Certificate
+                                                                    </Link>
+                                                                )}
+                                                            </CardContent>
+                                                        </Card>
+                                                    );
+                                                })}
                                             </div>
-                                            <div className="flex flex-col items-start gap-1 sm:items-end">
-                                                <span className="text-xs text-ink-subtle">
-                                                    {rankLabel(entry)}
-                                                </span>
-                                                <span className="text-sm tabular-nums text-ink">
-                                                    {entry.averageScore === null
-                                                        ? "Not scored"
-                                                        : `${entry.averageScore.toFixed(2)} / 100`}
-                                                </span>
-                                                {entry.teamId !== null &&
-                                                (entry.rank !== null || entry.awards.length > 0) ? (
-                                                    <Link
-                                                        href={`/certificates/${entry.teamId}`}
-                                                        className="text-sm text-primary transition-colors hover:text-primary-hover"
-                                                    >
-                                                        Certificate
-                                                    </Link>
-                                                ) : null}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
+                                        )}
+
+                                        {track.rest.length === 0 ? null : (
+                                            <ul className="divide-y divide-line rounded-lg border border-line">
+                                                {track.rest.map((entry) => {
+                                                    const project = projectHref(entry);
+                                                    const certificate = certificateHref(
+                                                        entry,
+                                                        results.showRanking,
+                                                    );
+                                                    return (
+                                                        <li
+                                                            key={entry.submissionId}
+                                                            className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+                                                        >
+                                                            <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+                                                                {results.showRanking ? (
+                                                                    <span className="text-sm text-ink-subtle">
+                                                                        {rankLabel(entry)}
+                                                                    </span>
+                                                                ) : null}
+                                                                {project === null ? (
+                                                                    <span className="break-words font-medium text-ink">
+                                                                        {entry.projectTitle}
+                                                                    </span>
+                                                                ) : (
+                                                                    <Link
+                                                                        href={project}
+                                                                        className="break-words font-medium text-ink transition-colors hover:text-primary"
+                                                                    >
+                                                                        {entry.projectTitle}
+                                                                    </Link>
+                                                                )}
+                                                                <span className="break-words text-sm text-ink-muted">
+                                                                    {entry.teamName ??
+                                                                        "Independent project"}{" "}
+                                                                    ·{" "}
+                                                                    {entry.divisionName ??
+                                                                        "Overall"}
+                                                                </span>
+                                                                <AwardBadges
+                                                                    awards={entry.awards}
+                                                                />
+                                                            </div>
+                                                            <div className="flex flex-wrap items-center gap-3">
+                                                                {results.showScores ? (
+                                                                    <span className="text-sm tabular-nums text-ink">
+                                                                        {scoreLabel(entry)}
+                                                                    </span>
+                                                                ) : null}
+                                                                {certificate === null ? null : (
+                                                                    <Link
+                                                                        href={certificate}
+                                                                        className="text-sm text-primary transition-colors hover:text-primary-hover"
+                                                                    >
+                                                                        Certificate
+                                                                    </Link>
+                                                                )}
+                                                            </div>
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        )}
+                                    </section>
                                 ))}
-                            </StaggerReveal>
+                            </div>
                         )}
                     </section>
 

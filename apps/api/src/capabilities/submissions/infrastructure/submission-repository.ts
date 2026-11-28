@@ -1,13 +1,15 @@
-import { and, desc, eq, inArray, lt, ne, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, inArray, lt, ne, or, sql, type SQL } from "drizzle-orm";
 import type { SubmissionStatus } from "@nethack/contracts";
 import type { DatabaseExecutor, DatabaseSession } from "../../../infrastructure/database/client.js";
 import {
+    projects,
     submissionFiles,
     submissions,
     submissionVersions,
 } from "../../../infrastructure/database/schema/index.js";
 
 export type SubmissionRow = typeof submissions.$inferSelect;
+export type SubmissionRowWithProject = SubmissionRow & { readonly projectSlug: string | null };
 export type SubmissionVersionRow = typeof submissionVersions.$inferSelect;
 export type SubmissionFileRow = typeof submissionFiles.$inferSelect;
 
@@ -25,7 +27,7 @@ export interface SubmissionListOptions {
 }
 
 export interface SubmissionWithVersionRow {
-    readonly submission: SubmissionRow;
+    readonly submission: SubmissionRowWithProject;
     readonly title: string | null;
     readonly summary: string | null;
 }
@@ -72,10 +74,20 @@ export class SubmissionRepository {
         db: DatabaseExecutor,
         organizationId: string,
         submissionId: string,
-    ): Promise<SubmissionRow | null> {
+    ): Promise<SubmissionRowWithProject | null> {
         const rows = await db
-            .select()
+            .select({
+                ...getTableColumns(submissions),
+                projectSlug: projects.slug,
+            })
             .from(submissions)
+            .leftJoin(
+                projects,
+                and(
+                    eq(projects.id, submissions.projectId),
+                    eq(projects.organizationId, submissions.organizationId),
+                ),
+            )
             .where(
                 and(
                     eq(submissions.organizationId, organizationId),
@@ -147,11 +159,21 @@ export class SubmissionRepository {
         }
         const query = db
             .select({
-                submission: submissions,
+                submission: {
+                    ...getTableColumns(submissions),
+                    projectSlug: projects.slug,
+                },
                 title: submissionVersions.title,
                 summary: submissionVersions.summary,
             })
             .from(submissions)
+            .leftJoin(
+                projects,
+                and(
+                    eq(projects.id, submissions.projectId),
+                    eq(projects.organizationId, submissions.organizationId),
+                ),
+            )
             .leftJoin(
                 submissionVersions,
                 and(

@@ -528,7 +528,7 @@ export class RecognitionService {
                 : {
                       teamId: team.id,
                       teamName: team.name,
-                      rank: currentView?.rank ?? null,
+                      rank: results?.showRanking === true ? (currentView?.rank ?? null) : null,
                       awards: [...(currentView?.awards ?? [])],
                   };
 
@@ -562,7 +562,7 @@ export class RecognitionService {
                         editionSlug: edition.slug,
                         teamId: pastTeam.id,
                         teamName: pastTeam.name,
-                        rank: view.rank,
+                        rank: pastResults.showRanking ? view.rank : null,
                         awards: [...view.awards],
                         publishedAt: pastRow.publishedAt.toISOString(),
                     };
@@ -604,7 +604,12 @@ export class RecognitionService {
         }
         const results = parseSnapshot(row.snapshot);
         const view = findTeamResult(results, teamId);
-        if (view === null || (view.rank === null && view.awards.length === 0)) {
+        if (view === null) {
+            throw new NotFoundError("The certificate was not found.");
+        }
+        // A rank-only certificate would disclose standings the organizers hid.
+        const rank = results.showRanking ? view.rank : null;
+        if (rank === null && view.awards.length === 0) {
             throw new NotFoundError("The certificate was not found.");
         }
         return {
@@ -618,7 +623,7 @@ export class RecognitionService {
                 startsAt: results.edition.startsAt,
                 endsAt: results.edition.endsAt,
             },
-            rank: view.rank,
+            rank,
             awards: [...view.awards],
             publishedAt: results.publishedAt,
         };
@@ -656,6 +661,8 @@ export class RecognitionService {
         );
         return assemblePublicResults({
             edition: toPublicEdition(edition, organization.name, organization.slug),
+            showScores: edition.showScores,
+            showRanking: edition.showRanking,
             judging: judgingRows,
             voting: votingRows,
             teams: teamRows.map((team) => ({
@@ -666,6 +673,7 @@ export class RecognitionService {
             submissions: submissionRows.map((submission) => ({
                 id: submission.id,
                 projectId: submission.projectId,
+                projectSlug: submission.projectSlug,
                 teamId: submission.teamId,
                 title: submission.title,
             })),

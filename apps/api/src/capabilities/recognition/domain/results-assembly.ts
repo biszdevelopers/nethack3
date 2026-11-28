@@ -20,6 +20,7 @@ export interface AssemblyTeam {
 export interface AssemblySubmission {
     readonly id: string;
     readonly projectId: string;
+    readonly projectSlug: string;
     readonly teamId: string | null;
     readonly title: string;
 }
@@ -46,6 +47,8 @@ export interface AssemblyTeamAward {
 
 export interface ResultAssemblyInput {
     readonly edition: PublicResultsEdition;
+    readonly showScores: boolean;
+    readonly showRanking: boolean;
     readonly judging: readonly JudgingResult[];
     readonly voting: readonly VoteResult[];
     readonly teams: readonly AssemblyTeam[];
@@ -112,9 +115,11 @@ export function assemblePublicResults(input: ResultAssemblyInput): PublicResults
     const judgingEntries: PublicResultEntry[] = input.judging
         .map((result) => {
             const team = result.teamId === null ? undefined : teamsById.get(result.teamId);
+            const submission = submissionsById.get(result.submissionId);
             return {
                 submissionId: result.submissionId,
                 projectId: result.projectId,
+                projectSlug: submission?.projectSlug ?? "",
                 projectTitle: result.projectTitle,
                 teamId: result.teamId,
                 teamName: result.teamName,
@@ -124,6 +129,7 @@ export function assemblePublicResults(input: ResultAssemblyInput): PublicResults
                         : (divisionsById.get(team.divisionId) ?? null),
                 rank: result.rank,
                 averageScore: result.averageScore,
+                displayScore: result.displayScore ?? null,
                 submittedCount: result.submittedCount,
                 assignmentCount: result.assignmentCount,
                 awards: result.teamId === null ? [] : (awardsByTeam.get(result.teamId) ?? []),
@@ -215,6 +221,8 @@ export function assemblePublicResults(input: ResultAssemblyInput): PublicResults
 
     return {
         edition: input.edition,
+        showScores: input.showScores,
+        showRanking: input.showRanking,
         judgingEntries,
         votingRounds,
         peopleChoice,

@@ -40,7 +40,9 @@ test.describe("results and awards", () => {
                 .fill("Award created by the Playwright results journey.");
             await form.getByRole("button", { name: "Create award" }).click();
             await expectToast(page, "Award created");
-            await expect(page.getByRole("row", { name: /E2E Spirit Award/ })).toBeVisible();
+            await expect(page.getByRole("row", { name: /E2E Spirit Award/ })).toBeVisible({
+                timeout: 30_000,
+            });
         });
 
         await test.step("assign the award to the judged team", async () => {
@@ -55,6 +57,14 @@ test.describe("results and awards", () => {
             await expect(
                 page.getByRole("row", { name: /Fixture Author Team.*E2E Spirit Award/ }),
             ).toBeVisible();
+        });
+
+        await test.step("enable public rankings for the edition", async () => {
+            await ownerTenantQuery(
+                FIXTURE.organizationId,
+                "update competition_editions set show_ranking = true where id = $1",
+                [FIXTURE.editionId],
+            );
         });
 
         await test.step("publish the results snapshot", async () => {

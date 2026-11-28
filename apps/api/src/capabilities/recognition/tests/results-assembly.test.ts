@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { JudgingResult, VoteResult } from "@nethack/contracts";
+import { publicResultsSchema, type JudgingResult, type VoteResult } from "@nethack/contracts";
 import {
     assemblePublicResults,
     awardsForTeam,
@@ -57,6 +57,8 @@ function input(overrides: Partial<ResultAssemblyInput> = {}): ResultAssemblyInpu
             startsAt: "2026-10-01T09:00:00.000Z",
             endsAt: "2026-10-03T18:00:00.000Z",
         },
+        showScores: true,
+        showRanking: true,
         judging: [],
         voting: [],
         teams: [
@@ -65,8 +67,20 @@ function input(overrides: Partial<ResultAssemblyInput> = {}): ResultAssemblyInpu
             { id: TEAM_C, name: "Gamma team", divisionId: null },
         ],
         submissions: [
-            { id: SUBMISSION_A, projectId: PROJECT_A, teamId: TEAM_A, title: "Alpha" },
-            { id: SUBMISSION_B, projectId: PROJECT_B, teamId: TEAM_B, title: "Beta" },
+            {
+                id: SUBMISSION_A,
+                projectId: PROJECT_A,
+                projectSlug: "alpha",
+                teamId: TEAM_A,
+                title: "Alpha",
+            },
+            {
+                id: SUBMISSION_B,
+                projectId: PROJECT_B,
+                projectSlug: "beta",
+                teamId: TEAM_B,
+                title: "Beta",
+            },
         ],
         divisions: [{ id: DIVISION, name: "Open" }],
         awards: [
@@ -130,6 +144,85 @@ describe("public results assembly", () => {
                 note: "Clear winner.",
             },
         ]);
+    });
+
+    it("copies project slugs, display scores, and visibility flags", () => {
+        const results = assemblePublicResults(
+            input({
+                showScores: false,
+                showRanking: false,
+                judging: [
+                    judging({
+                        submissionId: SUBMISSION_A,
+                        projectId: PROJECT_A,
+                        projectTitle: "Alpha",
+                        teamId: TEAM_A,
+                        teamName: "Alpha team",
+                        averageScore: 91.5,
+                        displayScore: 88,
+                        rank: 1,
+                    }),
+                ],
+            }),
+        );
+
+        expect(results.showScores).toBe(false);
+        expect(results.showRanking).toBe(false);
+        expect(results.judgingEntries[0]).toMatchObject({
+            projectSlug: "alpha",
+            displayScore: 88,
+        });
+    });
+
+    it("normalizes a missing display score to null", () => {
+        const results = assemblePublicResults(
+            input({
+                judging: [
+                    judging({
+                        submissionId: SUBMISSION_B,
+                        projectId: PROJECT_B,
+                        projectTitle: "Beta",
+                        teamId: TEAM_B,
+                        teamName: "Beta team",
+                        averageScore: 70,
+                        rank: 1,
+                    }),
+                ],
+            }),
+        );
+
+        expect(results.judgingEntries[0]?.displayScore).toBeNull();
+    });
+
+    it("parses legacy snapshots with visibility defaults and no entry slugs", () => {
+        const legacy = {
+            edition: input().edition,
+            judgingEntries: [
+                {
+                    submissionId: SUBMISSION_A,
+                    projectId: PROJECT_A,
+                    projectTitle: "Alpha",
+                    teamId: TEAM_A,
+                    teamName: "Alpha team",
+                    divisionName: "Open",
+                    rank: 1,
+                    averageScore: 91.5,
+                    submittedCount: 2,
+                    assignmentCount: 2,
+                    awards: [],
+                },
+            ],
+            votingRounds: [],
+            peopleChoice: null,
+            awards: [],
+            publishedAt: "2026-11-27T12:00:00.000Z",
+        };
+
+        const parsed = publicResultsSchema.parse(legacy);
+
+        expect(parsed.showScores).toBe(true);
+        expect(parsed.showRanking).toBe(true);
+        expect(parsed.judgingEntries[0]).toMatchObject({ projectSlug: "", displayScore: null });
     });
 
     it("enriches voting entries and picks the People's Choice winner", () => {

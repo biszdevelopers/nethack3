@@ -26,6 +26,7 @@ import type {
     SubmissionFileRow,
     SubmissionRepository,
     SubmissionRow,
+    SubmissionRowWithProject,
     SubmissionVersionRow,
     SubmissionWithVersionRow,
 } from "../infrastructure/submission-repository.js";
@@ -787,7 +788,7 @@ export function toSubmission(
 }
 
 export function toSubmissionSummary(
-    row: SubmissionRow,
+    row: SubmissionRowWithProject,
     version: { readonly title: string; readonly summary: string } | null,
 ): SubmissionSummary {
     return {
@@ -795,6 +796,7 @@ export function toSubmissionSummary(
         organizationId: row.organizationId,
         editionId: row.editionId,
         projectId: row.projectId,
+        projectSlug: row.projectSlug ?? "",
         teamId: row.teamId,
         status: row.status,
         currentVersion: row.currentVersion,

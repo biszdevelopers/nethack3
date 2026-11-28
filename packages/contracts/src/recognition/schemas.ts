@@ -103,12 +103,14 @@ export type PublicTeamAward = z.infer<typeof publicTeamAwardSchema>;
 export const publicResultEntrySchema = z.object({
     submissionId: idSchema,
     projectId: idSchema,
+    projectSlug: z.string().default(""),
     projectTitle: z.string(),
     teamId: idSchema.nullable(),
     teamName: z.string().nullable(),
     divisionName: z.string().nullable(),
     rank: z.number().int().positive().nullable(),
     averageScore: z.number().nullable(),
+    displayScore: z.number().nullable().default(null),
     submittedCount: z.number().int().nonnegative(),
     assignmentCount: z.number().int().nonnegative(),
     awards: z.array(publicTeamAwardSchema),
@@ -179,6 +181,9 @@ export type PublicResultsEdition = z.infer<typeof publicResultsEditionSchema>;
 
 export const publicResultsSchema = z.object({
     edition: publicResultsEditionSchema,
+    // Snapshots published before visibility flags existed exposed ranks and scores.
+    showScores: z.boolean().default(true),
+    showRanking: z.boolean().default(true),
     judgingEntries: z.array(publicResultEntrySchema),
     votingRounds: z.array(publicVotingRoundSchema),
     peopleChoice: publicPeopleChoiceSchema.nullable(),
