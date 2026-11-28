@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { JudgingResult, SubmissionStatus } from "@nethack/contracts";
 import type { AuthContext } from "../../../authentication/types.js";
-import type { EditionSummary } from "../../competitions/contracts.js";
+import type { DivisionSummary, EditionSummary } from "../../competitions/contracts.js";
 import type { SubmissionSummary } from "../../submissions/contracts.js";
 import type { TeamWithMembers } from "../../teams/contracts.js";
 import { ConflictError } from "../../../core/errors.js";
@@ -67,15 +67,29 @@ function edition(): EditionSummary {
     };
 }
 
+function division(): DivisionSummary {
+    return {
+        id: "66666666-6666-4666-8666-666666666667",
+        organizationId,
+        editionId,
+        name: "Open",
+        slug: "open",
+        description: "",
+        minTeamSize: null,
+        maxTeamSize: null,
+    };
+}
+
 function team(): TeamWithMembers {
     return {
         id: teamId,
         organizationId,
         editionId,
-        divisionId: null,
+        divisionId: division().id,
         name: "Fixture Team",
         description: "",
         status: "ready",
+        statusReason: "",
         captainUserId: userId,
         memberCount: 1,
         maxMembers: 4,
@@ -91,7 +105,10 @@ function team(): TeamWithMembers {
     };
 }
 
-function submission(status: SubmissionStatus): SubmissionSummary {
+function submission(
+    status: SubmissionStatus,
+    overrides: Partial<SubmissionSummary> = {},
+): SubmissionSummary {
     return {
         id: submissionId,
         organizationId,
@@ -104,10 +121,11 @@ function submission(status: SubmissionStatus): SubmissionSummary {
         submittedAt: "2026-01-02T00:00:00.000Z",
         title: "Fixture Project",
         summary: "",
+        ...overrides,
     };
 }
 
-function result(submittedCount: number): JudgingResult {
+function result(submittedCount: number, overrides: Partial<JudgingResult> = {}): JudgingResult {
     return {
         submissionId,
         projectId: "77777777-7777-4777-8777-777777777777",
@@ -119,12 +137,13 @@ function result(submittedCount: number): JudgingResult {
         averageScore: null,
         rank: null,
         evaluations: [],
+        ...overrides,
     };
 }
 
 function sources(options: {
     readonly team?: TeamWithMembers;
-    readonly submission?: SubmissionSummary | null;
+    readonly submissions?: readonly SubmissionSummary[];
     readonly results?: readonly JudgingResult[];
     readonly teamSubmissions?: number;
 }): {
@@ -138,15 +157,19 @@ function sources(options: {
     const reopenSubmission = vi.fn(async () => undefined);
     return {
         sources: {
-            editions: { getEdition: async () => edition() },
+            editions: {
+                getEdition: async () => edition(),
+                listDivisions: async () => [division()],
+            },
             teams: {
                 listEditionTeamsWithMembers: async () => [options.team ?? team()],
                 updateTeamStatus,
                 deleteTeam,
             },
             submissions: {
-                getSubmission: async () => options.submission ?? submission("submitted"),
-                listEditionSubmissions: async () => [submission("submitted")],
+                getSubmission: async () => options.submissions?.[0] ?? submission("submitted"),
+                listEditionSubmissions: async () =>
+                    options.submissions ?? [submission("submitted")],
                 countTeamSubmissions: async () => options.teamSubmissions ?? 0,
                 reopenSubmission,
             },
@@ -161,8 +184,10 @@ function sources(options: {
 }
 
 describe("EditionAdministrationService", () => {
-    it("composes teams, members, and submissions from contracts", async () => {
-        const { sources: contractSources } = sources({});
+    it("composes teams, members, divisions, submissions, and results from contracts", async () => {
+        const { sources: contractSources } = sources({
+            results: [result(2, { averageScore: 80, displayScore: 88, rank: 1 })],
+        });
         const teams = await new EditionAdministrationService(contractSources).listTeams(
             organizationId,
             editionId,
@@ -171,9 +196,58 @@ describe("EditionAdministrationService", () => {
         expect(teams).toHaveLength(1);
         expect(teams[0]?.members[0]?.displayName).toBe("Fixture Organizer");
         expect(teams[0]?.submissions[0]?.projectTitle).toBe("Fixture Project");
+        expect(teams[0]?.statusReason).toBe("");
+        expect(teams[0]?.divisionName).toBe("Open");
+        expect(teams[0]?.projectTitle).toBe("Fixture Project");
+        expect(teams[0]?.submittedAt).toBe("2026-01-02T00:00:00.000Z");
+        expect(teams[0]?.score).toBe(88);
+        expect(teams[0]?.rank).toBe(1);
     });
 
-    it("delegates team status changes with the acting user", async () => {
+    it("uses the latest submission and falls back to the average score", async () => {
+        const newerId = "88888888-8888-4888-8888-888888888888";
+        const { sources: contractSources } = sources({
+            submissions: [
+                submission("submitted", {
+                    title: "Older Project",
+                    submittedAt: "2026-01-01T00:00:00.000Z",
+                }),
+                submission("submitted", {
+                    id: newerId,
+                    title: "Newer Project",
+                    submittedAt: "2026-01-05T00:00:00.000Z",
+                    currentVersion: 2,
+                }),
+            ],
+            results: [result(2, { averageScore: 73.5 })],
+        });
+
+        const teams = await new EditionAdministrationService(contractSources).listTeams(
+            organizationId,
+            editionId,
+        );
+
+        expect(teams[0]?.projectTitle).toBe("Newer Project");
+        expect(teams[0]?.submittedAt).toBe("2026-01-05T00:00:00.000Z");
+        expect(teams[0]?.score).toBe(73.5);
+        expect(teams[0]?.rank).toBeNull();
+    });
+
+    it("reports null project and result fields when the team has neither", async () => {
+        const { sources: contractSources } = sources({ submissions: [], results: [] });
+
+        const teams = await new EditionAdministrationService(contractSources).listTeams(
+            organizationId,
+            editionId,
+        );
+
+        expect(teams[0]?.projectTitle).toBeNull();
+        expect(teams[0]?.submittedAt).toBeNull();
+        expect(teams[0]?.score).toBeNull();
+        expect(teams[0]?.rank).toBeNull();
+    });
+
+    it("delegates team status changes with the acting user and reason", async () => {
         const { sources: contractSources, updateTeamStatus } = sources({});
         await new EditionAdministrationService(contractSources).updateTeamStatus(
             auth(),
@@ -181,6 +255,7 @@ describe("EditionAdministrationService", () => {
             editionId,
             teamId,
             "disbanded",
+            "The team left the competition.",
             "127.0.0.1",
         );
 
@@ -190,6 +265,7 @@ describe("EditionAdministrationService", () => {
             editionId,
             teamId,
             "disbanded",
+            "The team left the competition.",
         );
     });
 

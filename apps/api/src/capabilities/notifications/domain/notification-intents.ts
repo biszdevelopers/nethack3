@@ -261,6 +261,7 @@ function resultsPublishedIntents(
         return [];
     }
     const editionName = readString(payload, "editionName");
+    const publishedAt = readString(payload, "publishedAt") ?? "unknown";
     const linkUrl = workspaceLink(origin, "/results", { edition: editionId });
     return readUuidArray(payload, "participantUserIds").map((userId) => ({
         userId,
@@ -270,7 +271,7 @@ function resultsPublishedIntents(
         title: "Results published",
         body: `${editionName ?? "Competition"} results are published. View your results.`,
         linkUrl,
-        dedupeKey: `recognition.results.published:${organizationId}:${editionId}:${userId}`,
+        dedupeKey: `recognition.results.published:${organizationId}:${editionId}:${publishedAt}:${userId}`,
     }));
 }
 

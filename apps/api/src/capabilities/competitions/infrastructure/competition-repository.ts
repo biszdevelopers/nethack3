@@ -65,6 +65,8 @@ export interface NewEditionValues {
     readonly description: string;
     readonly themeName: string | null;
     readonly themeDescription: string | null;
+    readonly contactEmail: string | null;
+    readonly contactUrl: string | null;
     readonly showScores: boolean;
     readonly showRanking: boolean;
     readonly timezone: string;
@@ -85,6 +87,8 @@ export interface EditionUpdateValues {
     readonly description?: string;
     readonly themeName?: string | null;
     readonly themeDescription?: string | null;
+    readonly contactEmail?: string | null;
+    readonly contactUrl?: string | null;
     readonly showScores?: boolean;
     readonly showRanking?: boolean;
     readonly status?: CompetitionEditionStatus;

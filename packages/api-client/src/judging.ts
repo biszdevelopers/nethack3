@@ -2,8 +2,10 @@ import {
     applyRubricTemplateRequestSchema,
     assignmentDetailSchema,
     assignmentHistorySchema,
+    bulkAssignmentResultSchema,
     conflictDeclarationRequestSchema,
     createAssignmentRequestSchema,
+    createBulkAssignmentRequestSchema,
     createJudgeFlagRequestSchema,
     createRubricRequestSchema,
     createRubricTemplateRequestSchema,
@@ -25,8 +27,10 @@ import {
     type ApplyRubricTemplateRequest,
     type AssignmentDetail,
     type AssignmentHistory,
+    type BulkAssignmentResult,
     type ConflictDeclarationRequest,
     type CreateAssignmentRequest,
+    type CreateBulkAssignmentRequest,
     type CreateJudgeFlagRequest,
     type CreateRubricRequest,
     type CreateRubricTemplateRequest,
@@ -258,6 +262,18 @@ export class JudgingApi {
         return this.client.request("POST", `/api/v1/competitions/${editionId}/assignments`, {
             body: createAssignmentRequestSchema.parse(input),
             schema: judgeAssignmentSchema,
+            headers: organizationHeader(organizationId),
+        });
+    }
+
+    async createBulkAssignments(
+        organizationId: string,
+        editionId: string,
+        input: CreateBulkAssignmentRequest,
+    ): Promise<BulkAssignmentResult> {
+        return this.client.request("POST", `/api/v1/competitions/${editionId}/assignments/bulk`, {
+            body: createBulkAssignmentRequestSchema.parse(input),
+            schema: bulkAssignmentResultSchema,
             headers: organizationHeader(organizationId),
         });
     }

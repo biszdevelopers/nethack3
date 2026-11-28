@@ -2,7 +2,9 @@ import type {
     ApplyRubricTemplateRequest,
     AssignmentDetail,
     AssignmentHistory,
+    BulkAssignmentResult,
     CreateAssignmentRequest,
+    CreateBulkAssignmentRequest,
     CreateRubricRequest,
     CreateRubricTemplateRequest,
     Criterion,
@@ -44,6 +46,7 @@ import type {
     DatabaseConnection,
     DatabaseSession,
 } from "../../../infrastructure/database/client.js";
+import type { JobQueue } from "../../../infrastructure/jobs/job-queue.js";
 import {
     isEditionResultsFrozen,
     type CompetitionsContract,
@@ -53,9 +56,18 @@ import type { OrganizationSummary, OrganizationsContract } from "../../organizat
 import type { ProjectsContract } from "../../projects/contracts.js";
 import type { SubmissionSummary, SubmissionsContract } from "../../submissions/contracts.js";
 import type { TeamsContract } from "../../teams/contracts.js";
+import {
+    planBulkAssignments,
+    selectBulkSubmissionIds,
+    type BulkSubmissionCandidate,
+} from "../domain/bulk-assignment.js";
 import { nextEvaluationRevision, toEvaluationVersion } from "../domain/evaluation-history.js";
 import { assertJudgeCommentReady } from "../domain/judge-comments.js";
-import { JudgeFlagRules } from "../domain/judge-flags.js";
+import {
+    flagNotificationDedupeKey,
+    flagNotificationRecipients,
+    JudgeFlagRules,
+} from "../domain/judge-flags.js";
 import { summarizeJudgeCoverage } from "../domain/judging-coverage.js";
 import { aggregateJudgingResults } from "../domain/judging-results.js";
 import { JudgingRules, type ScorableCriterion } from "../domain/judging-rules.js";
@@ -86,6 +98,7 @@ import {
     type ProjectDisclosure,
 } from "./project-disclosure.js";
 import type {
+    AssignmentRow,
     AssignmentView,
     CriterionRow,
     EvaluationRow,
@@ -103,28 +116,40 @@ export interface JudgingContracts {
     readonly projects: ProjectsContract;
 }
 
+/**
+ * The notifications capability owns delivery. Flags only publish its job so the
+ * organizer notification lands in the same transaction as the flag.
+ */
+const NOTIFICATION_DELIVERY_JOB = "notifications.deliver";
+
 export class JudgingService {
     private readonly database: DatabaseConnection;
     private readonly repository: JudgingRepository;
     private readonly contracts: JudgingContracts;
     private readonly events: OutboxPublisher;
+    private readonly jobs: JobQueue;
     private readonly audit: AuditLogger;
     private readonly clock: Clock;
+    private readonly workspaceOrigin: string;
 
     constructor(
         database: DatabaseConnection,
         repository: JudgingRepository,
         contracts: JudgingContracts,
         events: OutboxPublisher,
+        jobs: JobQueue,
         audit: AuditLogger,
         clock: Clock,
+        workspaceOrigin: string,
     ) {
         this.database = database;
         this.repository = repository;
         this.contracts = contracts;
         this.events = events;
+        this.jobs = jobs;
         this.audit = audit;
         this.clock = clock;
+        this.workspaceOrigin = workspaceOrigin;
     }
 
     async listRubrics(
@@ -813,6 +838,17 @@ export class JudgingService {
         }
         const judge = lookup.judge;
         JudgingRules.assertJudgeEligible(judge.role, judge.status);
+        if (submission.teamId !== null) {
+            const history = await this.contracts.teams.listUserTeamHistory(
+                organizationId,
+                judge.userId,
+            );
+            if (history.some((entry) => entry.teamId === submission.teamId)) {
+                throw new ConflictError(
+                    "That judge has been a member of this project's team and cannot be assigned to it.",
+                );
+            }
+        }
         const dueAt = input.dueAt === null ? null : new Date(input.dueAt);
         const now = this.clock.now();
         try {
@@ -925,6 +961,198 @@ export class JudgingService {
         }
     }
 
+    async createBulkAssignments(
+        auth: AuthContext,
+        organizationId: string,
+        editionId: string,
+        input: CreateBulkAssignmentRequest,
+        ip: string | null,
+    ): Promise<BulkAssignmentResult> {
+        this.assertOrganizer(auth, organizationId);
+        const edition = await this.requireEdition(organizationId, editionId);
+        const organization = await this.requireOrganization(organizationId);
+        const lookup = await this.database.transaction({ organizationId }, async (session) => ({
+            rubric: await this.repository.findRubric(session.db, organizationId, input.rubricId),
+            judge: await this.repository.findJudgeCandidate(
+                session.db,
+                organizationId,
+                input.judgeEmail,
+            ),
+        }));
+        if (lookup.rubric === null || lookup.rubric.rubric.editionId !== editionId) {
+            throw new NotFoundError(
+                "The judging rubric was not found for this competition edition.",
+            );
+        }
+        if (lookup.judge === null) {
+            throw new NotFoundError("No active judge was found with that email address.");
+        }
+        const judge = lookup.judge;
+        JudgingRules.assertJudgeEligible(judge.role, judge.status);
+
+        let divisionTeamIds: readonly string[] = [];
+        if (input.scope === "division") {
+            if (input.divisionId === undefined) {
+                throw new ValidationError("Choose the division to assign.");
+            }
+            await this.requireDivision(organizationId, editionId, input.divisionId);
+            const teams = await this.contracts.teams.listEditionTeams(organizationId, editionId);
+            divisionTeamIds = teams
+                .filter((team) => team.divisionId === input.divisionId)
+                .map((team) => team.id);
+        }
+        const submissions = await this.contracts.submissions.listEditionSubmissions(
+            organizationId,
+            editionId,
+        );
+        const candidates: readonly BulkSubmissionCandidate[] = submissions.map((submission) => ({
+            id: submission.id,
+            teamId: submission.teamId,
+            status: submission.status,
+        }));
+        const submittedIds = selectBulkSubmissionIds({
+            scope: input.scope,
+            submissions: candidates,
+            ...(input.submissionId === undefined ? {} : { submissionId: input.submissionId }),
+            ...(input.scope === "division" ? { divisionTeamIds } : {}),
+        });
+        const history = await this.contracts.teams.listUserTeamHistory(
+            organizationId,
+            judge.userId,
+        );
+        const formerTeamIds = new Set(history.map((entry) => entry.teamId));
+        const submissionIds = submittedIds.filter((submissionId) => {
+            const candidate = candidates.find((entry) => entry.id === submissionId);
+            return candidate?.teamId === null || candidate?.teamId === undefined
+                ? true
+                : !formerTeamIds.has(candidate.teamId);
+        });
+        const blockedByHistory = submittedIds.length - submissionIds.length;
+        if (input.scope === "submission" && submittedIds.length === 0) {
+            throw new NotFoundError("The submission was not found for this competition edition.");
+        }
+        if (input.scope === "submission" && submissionIds.length === 0) {
+            throw new ConflictError(
+                "That judge has been a member of this project's team and cannot be assigned to it.",
+            );
+        }
+
+        const dueAt = input.dueAt === null ? null : new Date(input.dueAt);
+        const now = this.clock.now();
+        try {
+            const created = await this.database.transaction(
+                { organizationId, userId: auth.user.id },
+                async (session) => {
+                    const active = await this.repository.listActiveSubmissionIdsForJudge(
+                        session.db,
+                        organizationId,
+                        editionId,
+                        judge.userId,
+                    );
+                    const plan = planBulkAssignments(submissionIds, new Set(active));
+                    const rows: AssignmentRow[] = [];
+                    for (const submissionId of plan.toAssign) {
+                        const existing = await this.repository.findAssignmentBySubmissionAndJudge(
+                            session.db,
+                            organizationId,
+                            submissionId,
+                            judge.userId,
+                        );
+                        if (existing === null) {
+                            rows.push(
+                                await this.repository.insertAssignment(session, {
+                                    organizationId,
+                                    editionId,
+                                    rubricId: input.rubricId,
+                                    submissionId,
+                                    judgeUserId: judge.userId,
+                                    status: "assigned",
+                                    assignmentNote: input.note,
+                                    dueAt,
+                                    assignedByUserId: auth.user.id,
+                                }),
+                            );
+                            continue;
+                        }
+                        const revived = await this.repository.updateAssignment(
+                            session,
+                            organizationId,
+                            existing.id,
+                            {
+                                status: "assigned",
+                                rubricId: input.rubricId,
+                                conflictNote: null,
+                                assignmentNote: input.note,
+                                dueAt,
+                                assignedByUserId: auth.user.id,
+                                assignedAt: now,
+                                updatedAt: now,
+                            },
+                        );
+                        if (revived === null) {
+                            throw new NotFoundError("The judging assignment was not found.");
+                        }
+                        rows.push(revived);
+                    }
+                    if (rows.length > 0) {
+                        await this.audit.record(session, {
+                            organizationId,
+                            actorUserId: auth.user.id,
+                            action: "judging.assignment.bulk_created",
+                            entityType: "competition_edition",
+                            entityId: editionId,
+                            metadata: {
+                                scope: input.scope,
+                                divisionId: input.divisionId ?? null,
+                                rubricId: input.rubricId,
+                                judgeUserId: judge.userId,
+                                assigned: rows.length,
+                                skipped: plan.skipped,
+                            },
+                            ip,
+                        });
+                        const first = rows[0];
+                        if (first !== undefined) {
+                            await this.events.publish(session, {
+                                type: domainEvents.judgeAssigned,
+                                organizationId,
+                                aggregateType: "judge_assignment",
+                                aggregateId: first.id,
+                                payload: {
+                                    assignmentId: first.id,
+                                    submissionId: first.submissionId,
+                                    projectTitle: `${String(rows.length)} submissions`,
+                                    judgeUserId: judge.userId,
+                                    judgeEmail: judge.email,
+                                    email: judge.email,
+                                    organizationId,
+                                    organizationName: organization.name,
+                                    editionId,
+                                    dueAt: dueAt === null ? null : dueAt.toISOString(),
+                                },
+                            });
+                        }
+                    }
+                    return { rows, skipped: plan.skipped + blockedByHistory };
+                },
+            );
+            const assigned = await this.toAssignments(
+                organizationId,
+                created.rows.map((assignment) => ({
+                    assignment,
+                    judgeDisplayName: judge.displayName,
+                })),
+                isEditionResultsFrozen(edition.status),
+            );
+            return { assigned: [...assigned], skipped: created.skipped };
+        } catch (error) {
+            if (isUniqueViolation(error)) {
+                throw new ConflictError("A judge is already assigned to one of these submissions.");
+            }
+            throw error;
+        }
+    }
+
     async listMyAssignments(
         auth: AuthContext,
         organizationId: string,
@@ -1008,6 +1236,35 @@ export class JudgingService {
                         },
                         ip,
                     });
+                    const recipients = flagNotificationRecipients(
+                        await this.repository.listFlagRecipientCandidates(
+                            session.db,
+                            organizationId,
+                        ),
+                        auth.user.id,
+                    );
+                    for (const recipient of recipients) {
+                        const dedupeKey = flagNotificationDedupeKey(
+                            organizationId,
+                            flag.id,
+                            recipient.userId,
+                        );
+                        await this.jobs.enqueue(session, {
+                            kind: NOTIFICATION_DELIVERY_JOB,
+                            payload: {
+                                userId: recipient.userId,
+                                email: null,
+                                organizationId,
+                                kind: "system",
+                                title: "Judging flag reported",
+                                body: "A judge flagged a project for organizer review.",
+                                linkUrl: new URL("/judging", this.workspaceOrigin).toString(),
+                                dedupeKey,
+                            },
+                            organizationId,
+                            dedupeKey: `notifications.deliver:${dedupeKey}`,
+                        });
+                    }
                     const view = await this.repository.findFlagViewById(
                         session.db,
                         organizationId,

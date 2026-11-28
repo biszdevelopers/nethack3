@@ -6,10 +6,12 @@ import {
     createTeamRequestSchema,
     inviteTeamMemberRequestSchema,
     listResponseSchema,
+    myTeamInvitationSchema,
     pageQuerySchema,
     teamDetailSchema,
     teamInvitationAcceptanceSchema,
-    teamInvitationSchema,
+    teamInvitationCreatedSchema,
+    teamInvitationLinkSchema,
     teamSchema,
     transferTeamCaptainRequestSchema,
     updateTeamRequestSchema,
@@ -24,6 +26,8 @@ import type { TeamService } from "../application/team-service.js";
 const editionParams = z.object({ editionId: z.uuid() });
 const teamParams = z.object({ teamId: z.uuid() });
 const teamMemberParams = z.object({ teamId: z.uuid(), userId: z.uuid() });
+const invitationParams = z.object({ invitationId: z.uuid() });
+const teamInvitationParams = z.object({ teamId: z.uuid(), invitationId: z.uuid() });
 const uuidSchema = z.uuid();
 
 function organizationContext(request: FastifyRequest): string {
@@ -126,7 +130,7 @@ export async function registerTeamRoutes(
             schema: {
                 params: teamParams,
                 body: inviteTeamMemberRequestSchema,
-                response: { 201: teamInvitationSchema },
+                response: { 201: teamInvitationCreatedSchema },
             },
         },
         async (request, reply) => {
@@ -155,6 +159,112 @@ export async function registerTeamRoutes(
             const auth = await guard.require(request);
             const organizationId = organizationContext(request);
             return service.acceptInvitation(auth, organizationId, request.body.token, request.ip);
+        },
+    );
+
+    app.get(
+        "/api/v1/me/team-invitations",
+        {
+            schema: {
+                response: { 200: listResponseSchema(myTeamInvitationSchema) },
+            },
+        },
+        async (request) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            const items = await service.listMyInvitations(auth, access.organizationId);
+            return { items: [...items], nextCursor: null };
+        },
+    );
+
+    app.post(
+        "/api/v1/team-invitations/:invitationId/accept",
+        {
+            schema: {
+                params: invitationParams,
+                response: { 200: teamInvitationAcceptanceSchema },
+            },
+        },
+        async (request) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            return service.acceptInvitationById(
+                auth,
+                access.organizationId,
+                request.params.invitationId,
+                request.ip,
+            );
+        },
+    );
+
+    app.post(
+        "/api/v1/team-invitations/:invitationId/decline",
+        { schema: { params: invitationParams } },
+        async (request, reply) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            await service.declineInvitation(
+                auth,
+                access.organizationId,
+                request.params.invitationId,
+                request.ip,
+            );
+            return reply.status(204).send();
+        },
+    );
+
+    app.post(
+        "/api/v1/teams/:teamId/invitations/:invitationId/link",
+        {
+            schema: {
+                params: teamInvitationParams,
+                response: { 200: teamInvitationLinkSchema },
+            },
+        },
+        async (request) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            return service.invitationLink(
+                auth,
+                access.organizationId,
+                request.params.teamId,
+                request.params.invitationId,
+                request.ip,
+            );
+        },
+    );
+
+    app.delete(
+        "/api/v1/teams/:teamId/invitations/:invitationId",
+        { schema: { params: teamInvitationParams } },
+        async (request, reply) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            await service.revokeInvitation(
+                auth,
+                access.organizationId,
+                request.params.teamId,
+                request.params.invitationId,
+                request.ip,
+            );
+            return reply.status(204).send();
+        },
+    );
+
+    app.delete(
+        "/api/v1/teams/:teamId",
+        { schema: { params: teamParams } },
+        async (request, reply) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            await service.disband(
+                auth,
+                access.organizationId,
+                request.params.teamId,
+                access.role,
+                request.ip,
+            );
+            return reply.status(204).send();
         },
     );
 

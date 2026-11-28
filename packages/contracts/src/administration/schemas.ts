@@ -116,18 +116,25 @@ export const administrationTeamSchema = z.object({
     name: z.string(),
     description: z.string(),
     status: teamStatusSchema,
+    statusReason: z.string(),
     divisionId: idSchema.nullable(),
+    divisionName: z.string().nullable(),
     captainUserId: idSchema,
     memberCount: z.number().int().nonnegative(),
     maxMembers: z.number().int().min(1),
     members: z.array(administrationTeamMemberSchema),
     submissions: z.array(administrationTeamSubmissionSchema),
+    projectTitle: z.string().nullable(),
+    submittedAt: isoDateTimeSchema.nullable(),
+    score: z.number().nullable(),
+    rank: z.number().int().positive().nullable(),
 });
 export type AdministrationTeam = z.infer<typeof administrationTeamSchema>;
 
 export const updateAdministrationTeamRequestSchema = z
     .object({
         status: teamStatusSchema,
+        reason: z.string().trim().max(500).optional(),
     })
     .strict();
 export type UpdateAdministrationTeamRequest = z.infer<typeof updateAdministrationTeamRequestSchema>;
@@ -145,6 +152,16 @@ export type ReopenAdministrationSubmissionRequest = z.infer<
     typeof reopenAdministrationSubmissionRequestSchema
 >;
 
+export const administrationPreflightTeamWarningSchema = z.object({
+    teamId: idSchema.nullable(),
+    teamName: z.string().nullable(),
+    projectTitle: z.string(),
+    submittedEvaluations: z.number().int().nonnegative(),
+});
+export type AdministrationPreflightTeamWarning = z.infer<
+    typeof administrationPreflightTeamWarningSchema
+>;
+
 export const administrationPreflightSchema = z.object({
     editionId: idSchema,
     teams: z.number().int().nonnegative(),
@@ -154,6 +171,10 @@ export const administrationPreflightSchema = z.object({
     submittedEvaluations: z.number().int().nonnegative(),
     openFlags: z.number().int().nonnegative(),
     publishedResults: z.boolean(),
+    teamsBelowMinimumEvaluations: z.number().int().nonnegative(),
+    belowMinimumTeams: z.array(administrationPreflightTeamWarningSchema),
+    scheduleWarnings: z.array(z.string()),
+    voteCapWarnings: z.array(z.string()),
     readiness: z.object({
         hasTeams: z.boolean(),
         hasSubmissions: z.boolean(),
@@ -253,5 +274,13 @@ export const debugAiExchangeSchema = z.object({
     assistantMessage: debugAiMessageSchema,
 });
 export type DebugAiExchange = z.infer<typeof debugAiExchangeSchema>;
+
+export const databaseExportFormatSchema = z.enum(["json", "csv"]);
+export type DatabaseExportFormat = z.infer<typeof databaseExportFormatSchema>;
+
+export const databaseExportQuerySchema = z.object({
+    format: databaseExportFormatSchema.default("json"),
+});
+export type DatabaseExportQuery = z.infer<typeof databaseExportQuerySchema>;
 
 export { reportSummarySchema };

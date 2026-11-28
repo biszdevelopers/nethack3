@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ConflictError, ForbiddenError } from "../../../core/errors.js";
+import { ConflictError, ForbiddenError, ValidationError } from "../../../core/errors.js";
 import { TeamRules, type EditionTeamPolicy, type TeamSizeLimits } from "../domain/team-rules.js";
 
 const openEdition: EditionTeamPolicy = {
@@ -43,6 +43,52 @@ describe("TeamRules capacity", () => {
 
     it("allows an invitation below capacity", () => {
         expect(() => TeamRules.assertCapacity(3, limits)).not.toThrow();
+    });
+});
+
+describe("TeamRules invitation capacity", () => {
+    it("allows an invitation while members plus pending invitations leave a seat", () => {
+        expect(() => TeamRules.assertInviteCapacity(2, 1, limits)).not.toThrow();
+        expect(() => TeamRules.assertInviteCapacity(1, 0, limits)).not.toThrow();
+    });
+
+    it("rejects an invitation that would fill the team with pending invitations", () => {
+        expect(() => TeamRules.assertInviteCapacity(2, 2, limits)).toThrow(ConflictError);
+        expect(() => TeamRules.assertInviteCapacity(4, 0, limits)).toThrow(ConflictError);
+    });
+});
+
+describe("TeamRules invitation lifecycle", () => {
+    const now = new Date("2026-01-01T00:00:00.000Z");
+
+    it("treats a pending invitation past its expiry as expired", () => {
+        expect(() =>
+            TeamRules.assertInvitationPending("pending", new Date("2025-12-31T23:59:59.000Z"), now),
+        ).toThrow(/expired/i);
+        expect(() =>
+            TeamRules.assertInvitationPending("pending", new Date("2026-01-02T00:00:00.000Z"), now),
+        ).not.toThrow();
+    });
+
+    it("rejects accepted, declined, and revoked invitations", () => {
+        for (const status of ["accepted", "declined", "revoked", "expired"] as const) {
+            expect(() =>
+                TeamRules.assertInvitationPending(
+                    status,
+                    new Date("2026-01-02T00:00:00.000Z"),
+                    now,
+                ),
+            ).toThrow(ConflictError);
+        }
+    });
+
+    it("only lets the addressed email respond", () => {
+        expect(() =>
+            TeamRules.assertInvitationMatchesEmail("Member@Example.com", "member@example.com"),
+        ).not.toThrow();
+        expect(() =>
+            TeamRules.assertInvitationMatchesEmail("other@example.com", "member@example.com"),
+        ).toThrow(ForbiddenError);
     });
 });
 
@@ -160,6 +206,16 @@ describe("TeamRules captain rules", () => {
         expect(() => TeamRules.assertCanLeave(captainUserId, memberUserId)).not.toThrow();
     });
 
+    it("lets a solo captain leave by disbanding and requires transfer otherwise", () => {
+        expect(() => TeamRules.assertCaptainMayLeave(1)).not.toThrow();
+        expect(() => TeamRules.assertCaptainMayLeave(2)).toThrow(/transfer captaincy/i);
+    });
+
+    it("refuses to disband a team with a submission", () => {
+        expect(() => TeamRules.assertCanDisband(false)).not.toThrow();
+        expect(() => TeamRules.assertCanDisband(true)).toThrow(ConflictError);
+    });
+
     it("refuses mutations on an inactive team", () => {
         expect(() => TeamRules.assertActiveTeam("disbanded")).toThrow(ConflictError);
         expect(() => TeamRules.assertActiveTeam("withdrawn")).toThrow(ConflictError);
@@ -167,6 +223,23 @@ describe("TeamRules captain rules", () => {
         expect(() => TeamRules.assertActiveTeam("no_show")).toThrow(ConflictError);
         expect(() => TeamRules.assertActiveTeam("forming")).not.toThrow();
         expect(() => TeamRules.assertActiveTeam("ready")).not.toThrow();
+    });
+});
+
+describe("TeamRules status reasons", () => {
+    it("clears the reason for active statuses", () => {
+        expect(TeamRules.statusReason("forming", "Stale reason")).toBe("");
+        expect(TeamRules.statusReason("ready", undefined)).toBe("");
+    });
+
+    it("requires a trimmed reason of 5 to 500 characters for terminal statuses", () => {
+        for (const status of ["withdrawn", "disqualified", "no_show", "disbanded"] as const) {
+            expect(() => TeamRules.statusReason(status, "")).toThrow(ValidationError);
+            expect(() => TeamRules.statusReason(status, "    ")).toThrow(ValidationError);
+            expect(() => TeamRules.statusReason(status, "four")).toThrow(ValidationError);
+            expect(() => TeamRules.statusReason(status, "x".repeat(501))).toThrow(ValidationError);
+            expect(TeamRules.statusReason(status, "  Left early  ")).toBe("Left early");
+        }
     });
 });
 

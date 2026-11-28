@@ -8,6 +8,7 @@ export interface TeamSummary {
     readonly name: string;
     readonly description: string;
     readonly status: TeamStatus;
+    readonly statusReason: string;
     readonly captainUserId: string;
     readonly memberCount: number;
     readonly maxMembers: number;
@@ -23,6 +24,16 @@ export interface TeamMemberSummary {
 
 export interface TeamWithMembers extends TeamSummary {
     readonly members: readonly TeamMemberSummary[];
+}
+
+export interface UserTeamHistory {
+    readonly teamId: string;
+    readonly teamName: string;
+    readonly editionId: string;
+    readonly editionName: string;
+    readonly editionSlug: string;
+    readonly joinedAt: string;
+    readonly leftAt: string | null;
 }
 
 /**
@@ -49,12 +60,21 @@ export interface TeamsContract {
         userId: string,
     ): Promise<TeamSummary | null>;
     countTeams(organizationId: string, editionId: string): Promise<number>;
+    /**
+     * Every team the user has belonged to in the organization, including
+     * memberships that ended. Active memberships have `leftAt === null`.
+     */
+    listUserTeamHistory(
+        organizationId: string,
+        userId: string,
+    ): Promise<readonly UserTeamHistory[]>;
     updateTeamStatus(
         actor: TeamAdministrationActor,
         organizationId: string,
         editionId: string,
         teamId: string,
         status: TeamStatus,
+        reason: string,
     ): Promise<void>;
     /**
      * Deletes a team with no members. Callers must also confirm through the

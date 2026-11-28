@@ -64,6 +64,20 @@
             "when": 1795847179476,
             "tag": "0008_last_micromacro",
             "breakpoints": true
+        },
+        {
+            "idx": 9,
+            "version": "7",
+            "when": 1795853276350,
+            "tag": "0009_motionless_marvex",
+            "breakpoints": true
+        },
+        {
+            "idx": 10,
+            "version": "7",
+            "when": 1795855732071,
+            "tag": "0010_strange_spiral",
+            "breakpoints": true
         }
     ]
 }

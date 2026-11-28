@@ -244,6 +244,69 @@ export const createAssignmentRequestSchema = z
     .strict();
 export type CreateAssignmentRequest = z.infer<typeof createAssignmentRequestSchema>;
 
+export const bulkAssignmentScopeSchema = z.enum(["all", "division", "submission"]);
+export type BulkAssignmentScope = z.infer<typeof bulkAssignmentScopeSchema>;
+
+export const createBulkAssignmentRequestSchema = z
+    .object({
+        judgeEmail: z.email(),
+        rubricId: idSchema,
+        scope: bulkAssignmentScopeSchema,
+        submissionId: idSchema.optional(),
+        divisionId: idSchema.optional(),
+        dueAt: isoDateTimeSchema.nullable().default(null),
+        note: z.string().max(2000).default(""),
+    })
+    .strict()
+    .superRefine(({ scope, submissionId, divisionId }, context) => {
+        if (scope === "submission") {
+            if (submissionId === undefined) {
+                context.addIssue({
+                    code: "custom",
+                    message: "Choose the submission to assign.",
+                    path: ["submissionId"],
+                });
+            }
+            if (divisionId !== undefined) {
+                context.addIssue({
+                    code: "custom",
+                    message: "A submission-scoped assignment cannot name a division.",
+                    path: ["divisionId"],
+                });
+            }
+        }
+        if (scope === "division") {
+            if (divisionId === undefined) {
+                context.addIssue({
+                    code: "custom",
+                    message: "Choose the division to assign.",
+                    path: ["divisionId"],
+                });
+            }
+            if (submissionId !== undefined) {
+                context.addIssue({
+                    code: "custom",
+                    message: "A division-scoped assignment cannot name a submission.",
+                    path: ["submissionId"],
+                });
+            }
+        }
+        if (scope === "all" && (submissionId !== undefined || divisionId !== undefined)) {
+            context.addIssue({
+                code: "custom",
+                message: "An edition-wide assignment cannot name a submission or division.",
+                path: ["scope"],
+            });
+        }
+    });
+export type CreateBulkAssignmentRequest = z.infer<typeof createBulkAssignmentRequestSchema>;
+
+export const bulkAssignmentResultSchema = z.object({
+    assigned: z.array(judgeAssignmentSchema),
+    skipped: z.number().int().nonnegative(),
+});
+export type BulkAssignmentResult = z.infer<typeof bulkAssignmentResultSchema>;
+
 export const conflictDeclarationRequestSchema = z
     .object({
         note: z.string().trim().min(5).max(2000),
@@ -445,6 +508,9 @@ export const judgingHistoryItemSchema = z.object({
     scores: z.array(judgingHistoryCriterionScoreSchema),
 });
 export type JudgingHistoryItem = z.infer<typeof judgingHistoryItemSchema>;
+
+/** Submitted evaluations a team needs before its written feedback is released. */
+export const TEAM_FEEDBACK_MINIMUM_EVALUATIONS = 3;
 
 export const teamFeedbackEntrySchema = z.object({
     comment: z.string(),

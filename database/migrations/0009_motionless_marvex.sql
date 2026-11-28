@@ -1,0 +1,1 @@
+ALTER TABLE "teams" ADD COLUMN "status_reason" text DEFAULT '' NOT NULL;

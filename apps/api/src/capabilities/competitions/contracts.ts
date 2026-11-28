@@ -1,4 +1,4 @@
-import type { CompetitionEditionStatus } from "@nethack/contracts";
+import type { CompetitionEditionStatus, Milestone } from "@nethack/contracts";
 import type { DatabaseSession } from "../../infrastructure/database/client.js";
 
 export interface EditionSummary {
@@ -49,6 +49,7 @@ export interface CompetitionsContract {
     getDivision(organizationId: string, divisionId: string): Promise<DivisionSummary | null>;
     listEditions(organizationId: string): Promise<readonly EditionSummary[]>;
     listDivisions(organizationId: string, editionId: string): Promise<readonly DivisionSummary[]>;
+    listMilestones(organizationId: string, editionId: string): Promise<readonly Milestone[]>;
     isPublicEdition(editionId: string): Promise<boolean>;
     /**
      * Results publication freeze. Moves the edition to `completed` inside the

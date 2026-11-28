@@ -2,11 +2,13 @@ import { randomUUID } from "node:crypto";
 import type {
     AuditLog,
     CreateTeamRequest,
+    MyTeamInvitation,
     OrganizationRole,
     Team,
     TeamDetail,
-    TeamInvitation,
     TeamInvitationAcceptance,
+    TeamInvitationCreated,
+    TeamInvitationLink,
     TeamInvitationStatus,
     TeamStatus,
     UpdateTeamRequest,
@@ -35,6 +37,7 @@ import type {
 } from "../../competitions/contracts.js";
 import type { ParticipantsContract } from "../../participants/contracts.js";
 import type { OrganizationsContract } from "../../organizations/contracts.js";
+import type { SubmissionsContract } from "../../submissions/contracts.js";
 import { TeamRules } from "../domain/team-rules.js";
 import type { TeamMemberSummary, TeamWithMembers } from "../contracts.js";
 import type {
@@ -58,6 +61,11 @@ export class TeamService {
     private readonly competitions: CompetitionsContract;
     private readonly participants: ParticipantsContract;
     private readonly organizations: OrganizationsContract;
+    /**
+     * Resolved lazily because submissions depends on teams; a declared dependency
+     * would form a cycle. Only disbanding reads it.
+     */
+    private readonly submissions: () => SubmissionsContract;
 
     constructor(
         database: DatabaseConnection,
@@ -68,6 +76,7 @@ export class TeamService {
         competitions: CompetitionsContract,
         participants: ParticipantsContract,
         organizations: OrganizationsContract,
+        submissions: () => SubmissionsContract,
     ) {
         this.database = database;
         this.repository = repository;
@@ -77,6 +86,7 @@ export class TeamService {
         this.competitions = competitions;
         this.participants = participants;
         this.organizations = organizations;
+        this.submissions = submissions;
     }
 
     async list(organizationId: string, editionId: string): Promise<readonly Team[]> {
@@ -92,6 +102,67 @@ export class TeamService {
             const rows = await this.repository.listForUser(session.db, organizationId, userId);
             return rows.map((row) => toTeam(row, row.memberCount));
         });
+    }
+
+    async listMyInvitations(
+        auth: AuthContext,
+        organizationId: string,
+    ): Promise<readonly MyTeamInvitation[]> {
+        if (auth.user.email === null) {
+            return [];
+        }
+        const now = this.clock.now();
+        const email = auth.user.email;
+        return this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const rows = await this.repository.listPendingInvitationsForEmail(
+                    session.db,
+                    organizationId,
+                    email,
+                    now,
+                );
+                const editions = new Map<string, EditionSummary>();
+                const divisions = new Map<string, DivisionSummary>();
+                const items: MyTeamInvitation[] = [];
+                for (const row of rows) {
+                    let edition = editions.get(row.editionId);
+                    if (edition === undefined) {
+                        edition = await this.resolveEdition(organizationId, row.editionId);
+                        editions.set(row.editionId, edition);
+                    }
+                    let divisionName: string | null = null;
+                    if (row.divisionId !== null) {
+                        let division = divisions.get(row.divisionId);
+                        if (division === undefined) {
+                            const loaded = await this.resolveDivision(
+                                organizationId,
+                                row.editionId,
+                                row.divisionId,
+                            );
+                            if (loaded !== null) {
+                                divisions.set(row.divisionId, loaded);
+                                division = loaded;
+                            }
+                        }
+                        divisionName = division?.name ?? null;
+                    }
+                    items.push({
+                        id: row.id,
+                        teamId: row.teamId,
+                        teamName: row.teamName,
+                        editionId: row.editionId,
+                        editionName: edition.name,
+                        divisionName,
+                        inviterDisplayName: row.inviterDisplayName,
+                        status: "pending",
+                        expiresAt: row.expiresAt.toISOString(),
+                        createdAt: row.createdAt.toISOString(),
+                    });
+                }
+                return items;
+            },
+        );
     }
 
     async listEditionTeamsWithMembers(
@@ -131,7 +202,9 @@ export class TeamService {
         editionId: string,
         teamId: string,
         status: TeamStatus,
+        reason: string,
     ): Promise<void> {
+        const statusReason = TeamRules.statusReason(status, reason);
         await this.database.transaction(
             { organizationId, userId: actor.userId },
             async (session) => {
@@ -146,6 +219,7 @@ export class TeamService {
                 TeamRules.assertStatusTransition(team.status, status);
                 await this.repository.update(session, teamId, {
                     status,
+                    statusReason,
                     updatedAt: this.clock.now(),
                 });
                 await this.audit.record(session, {
@@ -154,7 +228,7 @@ export class TeamService {
                     action: "team.updated",
                     entityType: "team",
                     entityId: teamId,
-                    metadata: { fields: ["status"], status },
+                    metadata: { fields: ["status", "statusReason"], status, reason: statusReason },
                     ip: actor.ip,
                 });
             },
@@ -377,12 +451,17 @@ export class TeamService {
                         }
                         TeamRules.assertStatusTransition(team.status, input.status);
                     }
+                    const statusReason =
+                        input.status === undefined
+                            ? undefined
+                            : TeamRules.statusReason(input.status, input.reason);
                     const updated = await this.repository.update(session, teamId, {
                         ...(input.name === undefined ? {} : { name: input.name }),
                         ...(input.description === undefined
                             ? {}
                             : { description: input.description }),
                         ...(input.status === undefined ? {} : { status: input.status }),
+                        ...(statusReason === undefined ? {} : { statusReason }),
                         ...(input.divisionId === undefined
                             ? {}
                             : { divisionId: input.divisionId, maxMembers: limits.max }),
@@ -419,7 +498,7 @@ export class TeamService {
         teamId: string,
         input: { readonly email: string },
         ip: string | null,
-    ): Promise<TeamInvitation> {
+    ): Promise<TeamInvitationCreated> {
         const now = this.clock.now();
         const email = input.email.toLowerCase();
         const token = randomToken(32);
@@ -443,7 +522,12 @@ export class TeamService {
                         throw new ConflictError("You cannot invite yourself to your team.");
                     }
                     const memberCount = await this.repository.countMembers(session.db, teamId);
-                    TeamRules.assertCapacity(memberCount, {
+                    const pendingCount = await this.repository.countPendingInvitations(
+                        session.db,
+                        teamId,
+                        now,
+                    );
+                    TeamRules.assertInviteCapacity(memberCount, pendingCount, {
                         min: 1,
                         max: team.maxMembers,
                     });
@@ -455,30 +539,45 @@ export class TeamService {
                     ) {
                         throw new ConflictError("That person is already a member of this team.");
                     }
+                    const existing = await this.repository.findInvitationByTeamAndEmail(
+                        session.db,
+                        teamId,
+                        email,
+                    );
                     if (
-                        (await this.repository.findInvitationByTeamAndEmail(
-                            session.db,
-                            teamId,
-                            email,
-                        )) !== null
+                        existing !== null &&
+                        existing.status === "pending" &&
+                        existing.expiresAt > now
                     ) {
                         throw new ConflictError("That email is already invited to this team.");
                     }
-                    const invitation = await this.repository.insertInvitation(session, {
-                        organizationId,
-                        teamId,
-                        email,
-                        tokenHash: sha256Hex(token),
-                        invitedByUserId: auth.user.id,
-                        expiresAt,
-                    });
+                    const tokenHash = sha256Hex(token);
+                    const invitation =
+                        existing === null
+                            ? await this.repository.insertInvitation(session, {
+                                  organizationId,
+                                  teamId,
+                                  email,
+                                  tokenHash,
+                                  invitedByUserId: auth.user.id,
+                                  expiresAt,
+                              })
+                            : await this.repository.reissueInvitation(session, existing.id, {
+                                  tokenHash,
+                                  invitedByUserId: auth.user.id,
+                                  expiresAt,
+                              });
                     await this.audit.record(session, {
                         organizationId,
                         actorUserId: auth.user.id,
                         action: "team.invitation.created",
                         entityType: "team",
                         entityId: teamId,
-                        metadata: { invitationId: invitation.id, role: "member" },
+                        metadata: {
+                            invitationId: invitation.id,
+                            role: "member",
+                            reissued: existing !== null,
+                        },
                         ip,
                     });
                     await this.events.publish(session, {
@@ -504,6 +603,8 @@ export class TeamService {
                         status: "pending",
                         expiresAt: expiresAt.toISOString(),
                         createdAt: invitation.createdAt.toISOString(),
+                        token,
+                        inviteUrl: invitationPath(token),
                     };
                 },
             );
@@ -525,17 +626,39 @@ export class TeamService {
         token: string,
         ip: string | null,
     ): Promise<TeamInvitationAcceptance> {
-        if (auth.user.email === null) {
-            throw new ForbiddenError("Your account has no email address to match an invitation.");
-        }
         const tokenHash = sha256Hex(token);
         const preview = await this.database.transaction({ organizationId }, async (session) =>
             this.repository.findInvitationByTokenHash(session.db, tokenHash),
         );
-        if (preview === null) {
+        return this.acceptInvitationRecord(auth, organizationId, preview, ip);
+    }
+
+    async acceptInvitationById(
+        auth: AuthContext,
+        organizationId: string,
+        invitationId: string,
+        ip: string | null,
+    ): Promise<TeamInvitationAcceptance> {
+        const preview = await this.database.transaction({ organizationId }, async (session) =>
+            this.repository.findInvitationById(session.db, organizationId, invitationId),
+        );
+        return this.acceptInvitationRecord(auth, organizationId, preview, ip);
+    }
+
+    private async acceptInvitationRecord(
+        auth: AuthContext,
+        organizationId: string,
+        preview: InvitationWithTeam | null,
+        ip: string | null,
+    ): Promise<TeamInvitationAcceptance> {
+        if (preview === null || preview.organizationId !== organizationId) {
             throw new NotFoundError("The team invitation was not found.");
         }
-        this.assertInvitationUsable(preview, auth.user.email, organizationId);
+        if (auth.user.email === null) {
+            throw new ForbiddenError("Your account has no email address to match an invitation.");
+        }
+        TeamRules.assertInvitationMatchesEmail(preview.email, auth.user.email);
+        TeamRules.assertInvitationPending(preview.status, preview.expiresAt, this.clock.now());
         if (
             !(await this.participants.isApprovedParticipant(
                 preview.organizationId,
@@ -553,22 +676,28 @@ export class TeamService {
             const acceptance = await this.database.transaction(
                 { organizationId: preview.organizationId, userId: auth.user.id },
                 async (session) => {
-                    const invitation = await this.repository.lockInvitationByTokenHash(
-                        session,
-                        tokenHash,
-                    );
-                    if (invitation === null) {
-                        throw new NotFoundError("The team invitation was not found.");
-                    }
-                    this.assertInvitationUsable(invitation, auth.user.email ?? "", organizationId);
                     const team = await this.repository.findByIdForUpdate(
                         session,
-                        invitation.organizationId,
-                        invitation.teamId,
+                        preview.organizationId,
+                        preview.teamId,
                     );
                     if (team === null) {
                         throw new NotFoundError("The team was not found.");
                     }
+                    const invitation = await this.repository.lockInvitationById(
+                        session,
+                        preview.organizationId,
+                        preview.id,
+                    );
+                    if (invitation === null) {
+                        throw new NotFoundError("The team invitation was not found.");
+                    }
+                    TeamRules.assertInvitationMatchesEmail(invitation.email, auth.user.email ?? "");
+                    TeamRules.assertInvitationPending(
+                        invitation.status,
+                        invitation.expiresAt,
+                        this.clock.now(),
+                    );
                     TeamRules.assertActiveTeam(team.status);
                     await this.repository.lockRegistration(
                         session,
@@ -662,6 +791,151 @@ export class TeamService {
         }
     }
 
+    async declineInvitation(
+        auth: AuthContext,
+        organizationId: string,
+        invitationId: string,
+        ip: string | null,
+    ): Promise<void> {
+        if (auth.user.email === null) {
+            throw new ForbiddenError("Your account has no email address to match an invitation.");
+        }
+        await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const invitation = await this.repository.lockInvitationById(
+                    session,
+                    organizationId,
+                    invitationId,
+                );
+                if (invitation === null) {
+                    throw new NotFoundError("The team invitation was not found.");
+                }
+                TeamRules.assertInvitationMatchesEmail(invitation.email, auth.user.email ?? "");
+                TeamRules.assertInvitationPending(
+                    invitation.status,
+                    invitation.expiresAt,
+                    this.clock.now(),
+                );
+                await this.repository.markInvitationStatus(session, invitation.id, "declined");
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: "team.invitation.declined",
+                    entityType: "team",
+                    entityId: invitation.teamId,
+                    metadata: { invitationId: invitation.id },
+                    ip,
+                });
+            },
+        );
+    }
+
+    async revokeInvitation(
+        auth: AuthContext,
+        organizationId: string,
+        teamId: string,
+        invitationId: string,
+        ip: string | null,
+    ): Promise<void> {
+        await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const team = await this.repository.findByIdForUpdate(
+                    session,
+                    organizationId,
+                    teamId,
+                );
+                if (team === null) {
+                    throw new NotFoundError("The team was not found.");
+                }
+                TeamRules.assertCaptainOnly(team.captainUserId, auth.user.id);
+                TeamRules.assertActiveTeam(team.status);
+                const invitation = await this.repository.lockInvitationById(
+                    session,
+                    organizationId,
+                    invitationId,
+                );
+                if (invitation === null || invitation.teamId !== teamId) {
+                    throw new NotFoundError("The team invitation was not found.");
+                }
+                TeamRules.assertInvitationPending(
+                    invitation.status,
+                    invitation.expiresAt,
+                    this.clock.now(),
+                );
+                await this.repository.markInvitationStatus(session, invitation.id, "revoked");
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: "team.invitation.revoked",
+                    entityType: "team",
+                    entityId: teamId,
+                    metadata: { invitationId: invitation.id, email: invitation.email },
+                    ip,
+                });
+            },
+        );
+    }
+
+    async invitationLink(
+        auth: AuthContext,
+        organizationId: string,
+        teamId: string,
+        invitationId: string,
+        ip: string | null,
+    ): Promise<TeamInvitationLink> {
+        return this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const team = await this.repository.findByIdForUpdate(
+                    session,
+                    organizationId,
+                    teamId,
+                );
+                if (team === null) {
+                    throw new NotFoundError("The team was not found.");
+                }
+                TeamRules.assertCaptainOnly(team.captainUserId, auth.user.id);
+                TeamRules.assertActiveTeam(team.status);
+                const invitation = await this.repository.lockInvitationById(
+                    session,
+                    organizationId,
+                    invitationId,
+                );
+                if (invitation === null || invitation.teamId !== teamId) {
+                    throw new NotFoundError("The team invitation was not found.");
+                }
+                TeamRules.assertInvitationPending(
+                    invitation.status,
+                    invitation.expiresAt,
+                    this.clock.now(),
+                );
+                const token = randomToken(32);
+                const updated = await this.repository.reissueInvitation(session, invitation.id, {
+                    tokenHash: sha256Hex(token),
+                    invitedByUserId: auth.user.id,
+                    expiresAt: invitation.expiresAt,
+                });
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: "team.invitation.link.rotated",
+                    entityType: "team",
+                    entityId: teamId,
+                    metadata: { invitationId: invitation.id },
+                    ip,
+                });
+                return {
+                    invitationId: updated.id,
+                    token,
+                    inviteUrl: invitationPath(token),
+                    expiresAt: invitation.expiresAt.toISOString(),
+                };
+            },
+        );
+    }
+
     async removeMember(
         auth: AuthContext,
         organizationId: string,
@@ -690,7 +964,12 @@ export class TeamService {
                     );
                 }
                 TeamRules.assertNotRemovingCaptain(team.captainUserId, targetUserId);
-                const removed = await this.repository.removeMember(session, teamId, targetUserId);
+                const removed = await this.repository.removeMember(
+                    session,
+                    teamId,
+                    targetUserId,
+                    this.clock.now(),
+                );
                 if (!removed) {
                     throw new NotFoundError("That person is not a member of this team.");
                 }
@@ -787,6 +1066,34 @@ export class TeamService {
         );
     }
 
+    async disband(
+        auth: AuthContext,
+        organizationId: string,
+        teamId: string,
+        organizationRole: OrganizationRole,
+        ip: string | null,
+    ): Promise<void> {
+        await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const team = await this.repository.findByIdForUpdate(
+                    session,
+                    organizationId,
+                    teamId,
+                );
+                if (team === null) {
+                    throw new NotFoundError("The team was not found.");
+                }
+                TeamRules.assertCaptainOrOrganizer(
+                    team.captainUserId,
+                    auth.user.id,
+                    isOrganizer(organizationRole),
+                );
+                await this.disbandTeam(session, team, auth.user.id, ip);
+            },
+        );
+    }
+
     async leave(
         auth: AuthContext,
         organizationId: string,
@@ -804,8 +1111,19 @@ export class TeamService {
                 if (team === null) {
                     throw new NotFoundError("The team was not found.");
                 }
+                if (team.captainUserId === auth.user.id) {
+                    const memberCount = await this.repository.countMembers(session.db, teamId);
+                    TeamRules.assertCaptainMayLeave(memberCount);
+                    await this.disbandTeam(session, team, auth.user.id, ip);
+                    return;
+                }
                 TeamRules.assertCanLeave(team.captainUserId, auth.user.id);
-                const removed = await this.repository.removeMember(session, teamId, auth.user.id);
+                const removed = await this.repository.removeMember(
+                    session,
+                    teamId,
+                    auth.user.id,
+                    this.clock.now(),
+                );
                 if (!removed) {
                     throw new NotFoundError("You are not a member of this team.");
                 }
@@ -875,20 +1193,52 @@ export class TeamService {
         });
     }
 
-    private assertInvitationUsable(
-        invitation: InvitationWithTeam,
-        email: string,
-        organizationId: string,
-    ): void {
-        if (invitation.organizationId !== organizationId) {
-            throw new NotFoundError("The team invitation was not found.");
+    /**
+     * Disbanding keeps the team row and its history but ends participation:
+     * pending invitations are revoked and every member is released.
+     */
+    private async disbandTeam(
+        session: DatabaseSession,
+        team: TeamRow,
+        actorUserId: string,
+        ip: string | null,
+    ): Promise<void> {
+        TeamRules.assertActiveTeam(team.status);
+        const submissionCount = await this.submissions().countTeamSubmissions(
+            team.organizationId,
+            team.editionId,
+            team.id,
+        );
+        TeamRules.assertCanDisband(submissionCount > 0);
+        const members = await this.repository.members(session.db, team.id);
+        await this.repository.update(session, team.id, {
+            status: "disbanded",
+            statusReason: "The team was disbanded.",
+            updatedAt: this.clock.now(),
+        });
+        const revokedInvitations = await this.repository.revokePendingInvitations(session, team.id);
+        await this.repository.deleteAllMembers(session, team.id, this.clock.now());
+        for (const member of members) {
+            await this.participants.setParticipantTeam(
+                team.organizationId,
+                team.editionId,
+                member.userId,
+                null,
+            );
         }
-        if (invitation.status !== "pending" || invitation.expiresAt <= this.clock.now()) {
-            throw new ConflictError("The team invitation is no longer valid.");
-        }
-        if (invitation.email.toLowerCase() !== email.toLowerCase()) {
-            throw new ForbiddenError("This invitation was issued to a different email address.");
-        }
+        await this.audit.record(session, {
+            organizationId: team.organizationId,
+            actorUserId,
+            action: "team.disbanded",
+            entityType: "team",
+            entityId: team.id,
+            metadata: {
+                name: team.name,
+                memberCount: members.length,
+                revokedInvitations,
+            },
+            ip,
+        });
     }
 
     private async buildDetail(
@@ -952,6 +1302,7 @@ export function toTeam(team: TeamRow, memberCount: number): Team {
         name: team.name,
         description: team.description,
         status: team.status,
+        statusReason: team.statusReason,
         captainUserId: team.captainUserId,
         memberCount,
         maxMembers: team.maxMembers,
@@ -1002,6 +1353,10 @@ function invitationStatus(invitation: TeamInvitationRow, now: Date): TeamInvitat
 
 function isOrganizer(role: OrganizationRole): boolean {
     return ORGANIZER_ROLES.includes(role);
+}
+
+function invitationPath(token: string): string {
+    return `/invitations?token=${encodeURIComponent(token)}`;
 }
 
 function uniqueConstraint(error: unknown): string | null {

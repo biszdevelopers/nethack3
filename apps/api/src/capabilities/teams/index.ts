@@ -2,6 +2,7 @@ import type { CapabilityDefinition } from "../../core/capability.js";
 import { COMPETITIONS_CONTRACT, type CompetitionsContract } from "../competitions/contracts.js";
 import { PARTICIPANTS_CONTRACT, type ParticipantsContract } from "../participants/contracts.js";
 import { ORGANIZATIONS_CONTRACT, type OrganizationsContract } from "../organizations/contracts.js";
+import { SUBMISSIONS_CONTRACT, type SubmissionsContract } from "../submissions/contracts.js";
 import { TeamService, toTeam } from "./application/team-service.js";
 import { TeamRepository } from "./infrastructure/team-repository.js";
 import { registerTeamRoutes } from "./http/team-routes.js";
@@ -25,6 +26,7 @@ export const teamsCapability: CapabilityDefinition = {
             competitions,
             participants,
             organizations,
+            () => context.contracts.get<SubmissionsContract>(SUBMISSIONS_CONTRACT),
         );
 
         const contract: TeamsContract = {
@@ -81,8 +83,31 @@ export const teamsCapability: CapabilityDefinition = {
                     repository.countByEdition(session.db, organizationId, editionId),
                 );
             },
-            async updateTeamStatus(actor, organizationId, editionId, teamId, status) {
-                await service.updateTeamStatus(actor, organizationId, editionId, teamId, status);
+            async listUserTeamHistory(organizationId, userId) {
+                const rows = await context.database.transaction(
+                    { organizationId, userId },
+                    async (session) =>
+                        repository.listUserTeamHistory(session.db, organizationId, userId),
+                );
+                return rows.map((row) => ({
+                    teamId: row.teamId,
+                    teamName: row.teamName,
+                    editionId: row.editionId,
+                    editionName: row.editionName,
+                    editionSlug: row.editionSlug,
+                    joinedAt: row.joinedAt.toISOString(),
+                    leftAt: row.leftAt === null ? null : row.leftAt.toISOString(),
+                }));
+            },
+            async updateTeamStatus(actor, organizationId, editionId, teamId, status, reason) {
+                await service.updateTeamStatus(
+                    actor,
+                    organizationId,
+                    editionId,
+                    teamId,
+                    status,
+                    reason,
+                );
             },
             async deleteTeam(actor, organizationId, editionId, teamId) {
                 await service.deleteTeam(actor, organizationId, editionId, teamId);
@@ -107,6 +132,7 @@ function toSummary(team: TeamSummary): TeamSummary {
         name: team.name,
         description: team.description,
         status: team.status,
+        statusReason: team.statusReason,
         captainUserId: team.captainUserId,
         memberCount: team.memberCount,
         maxMembers: team.maxMembers,

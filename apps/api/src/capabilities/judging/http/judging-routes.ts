@@ -3,8 +3,10 @@ import {
     applyRubricTemplateRequestSchema,
     assignmentDetailSchema,
     assignmentHistorySchema,
+    bulkAssignmentResultSchema,
     conflictDeclarationRequestSchema,
     createAssignmentRequestSchema,
+    createBulkAssignmentRequestSchema,
     createJudgeFlagRequestSchema,
     createRubricRequestSchema,
     createRubricTemplateRequestSchema,
@@ -500,6 +502,30 @@ export async function registerJudgingRoutes(
                 request.ip,
             );
             return reply.status(201).send(assignment);
+        },
+    );
+
+    app.post(
+        "/api/v1/competitions/:editionId/assignments/bulk",
+        {
+            schema: {
+                params: editionParams,
+                body: createBulkAssignmentRequestSchema,
+                response: { 201: bulkAssignmentResultSchema },
+            },
+        },
+        async (request, reply) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            guard.requireOrganizer(access);
+            const result = await service.createBulkAssignments(
+                auth,
+                access.organizationId,
+                request.params.editionId,
+                request.body,
+                request.ip,
+            );
+            return reply.status(201).send(result);
         },
     );
 

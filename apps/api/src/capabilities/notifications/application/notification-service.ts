@@ -65,6 +65,10 @@ export class NotificationService {
         });
     }
 
+    async unreadCount(userId: string): Promise<number> {
+        return this.repository.countUnreadForUser(this.database.db, userId);
+    }
+
     async preferences(userId: string): Promise<NotificationPreferences> {
         const row = await this.repository.preferences(this.database.db, userId);
         return row === null

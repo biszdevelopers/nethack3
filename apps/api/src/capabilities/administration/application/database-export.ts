@@ -1,4 +1,5 @@
 import type { Clock } from "../../../core/clock.js";
+import { csvCell } from "./standings-csv.js";
 
 const PAGE_SIZE = 500;
 
@@ -191,6 +192,102 @@ export class DatabaseExportService {
             }
         }
     }
+
+    /**
+     * The CSV archive emits one header row per non-empty section, followed by
+     * that section's rows. It uses the same snapshot and redaction rules as the
+     * JSON archive.
+     */
+    async *streamCsv(): AsyncGenerator<string> {
+        const snapshot = await this.source.open();
+        let failed = true;
+        try {
+            const organizations = await readAll(snapshot, "organizations");
+            const organizationIds = organizations.flatMap((organization) =>
+                typeof organization.id === "string" ? [organization.id] : [],
+            );
+
+            yield* csvRows(organizations);
+
+            for (const section of TENANT_EXPORT_SECTIONS) {
+                let header: readonly string[] | null = null;
+                for (const organizationId of organizationIds) {
+                    await snapshot.useOrganization(organizationId);
+                    let offset = 0;
+                    for (;;) {
+                        const rows = await snapshot.read(section, offset, PAGE_SIZE);
+                        for (const row of rows) {
+                            const stripped = stripForbiddenFields(row) as Record<string, unknown>;
+                            if (header === null) {
+                                header = Object.keys(stripped);
+                                yield csvLine(header);
+                            }
+                            yield csvLine(header.map((key) => csvValue(stripped[key])));
+                        }
+                        if (rows.length < PAGE_SIZE) {
+                            break;
+                        }
+                        offset += rows.length;
+                    }
+                }
+            }
+
+            let header: readonly string[] | null = null;
+            let notificationOffset = 0;
+            for (;;) {
+                const rows = await snapshot.read("notifications", notificationOffset, PAGE_SIZE);
+                for (const row of rows) {
+                    const stripped = stripForbiddenFields(
+                        row,
+                        NOTIFICATION_FORBIDDEN_KEYS,
+                    ) as Record<string, unknown>;
+                    if (header === null) {
+                        header = Object.keys(stripped);
+                        yield csvLine(header);
+                    }
+                    yield csvLine(header.map((key) => csvValue(stripped[key])));
+                }
+                if (rows.length < PAGE_SIZE) {
+                    break;
+                }
+                notificationOffset += rows.length;
+            }
+
+            failed = false;
+        } finally {
+            if (failed) {
+                await snapshot.abort().catch(() => undefined);
+            } else {
+                await snapshot.close();
+            }
+        }
+    }
+}
+
+function csvRows(rows: readonly Record<string, unknown>[]): readonly string[] {
+    const stripped = rows.map((row) => stripForbiddenFields(row) as Record<string, unknown>);
+    const header = stripped[0] === undefined ? null : Object.keys(stripped[0]);
+    if (header === null) {
+        return [];
+    }
+    return [
+        csvLine(header),
+        ...stripped.map((row) => csvLine(header.map((key) => csvValue(row[key])))),
+    ];
+}
+
+function csvLine(values: readonly unknown[]): string {
+    return values.map(csvCell).join(",") + "\n";
+}
+
+function csvValue(value: unknown): unknown {
+    if (value instanceof Date) {
+        return value.toISOString();
+    }
+    if (typeof value === "object" && value !== null) {
+        return JSON.stringify(value);
+    }
+    return value;
 }
 
 async function readAll(

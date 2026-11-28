@@ -8,7 +8,7 @@ Owns judging rubrics, criteria, judge assignments, evaluations, evaluation score
 - `competitions` (`competitions.v1`) for edition existence inside the organization.
 - `organizations` (`organizations.v1`) for the organization name in assignment events.
 - `teams` (`teams.v1`) for team names in edition results.
-- Core services: database transactions, clock, audit log, transactional outbox.
+- Core services: database transactions, clock, audit log, transactional outbox, job queue. Flag notifications enqueue the notifications capability's `notifications.deliver` job instead of writing notification tables directly.
 
 ## Public contract
 
@@ -66,6 +66,7 @@ All routes require authentication. Routes without an organization in the path us
 | GET | `/api/v1/competitions/:editionId/judging-results` | Owner or organizer; ranked mean of submitted evaluations |
 | GET | `/api/v1/competitions/:editionId/teams/:teamId/judging-feedback` | Owner or organizer; anonymous written feedback, withheld below three submitted evaluations |
 | POST | `/api/v1/competitions/:editionId/assignments` | Owner or organizer |
+| POST | `/api/v1/competitions/:editionId/assignments/bulk` | Owner or organizer; `scope` is `all`, `division`, or `submission` |
 | GET | `/api/v1/judging/assignments?status=` | Active organization member; returns only the caller's assignments |
 | GET | `/api/v1/judging/history?editionId=` | Active organization member; returns only the caller's submitted evaluations |
 | GET | `/api/v1/competitions/:editionId/judging-coverage` | Owner or organizer; per-judge progress, calibration, open flags |
@@ -90,6 +91,7 @@ The assignment is the scoring authority. An organizer who is not the assigned ju
 - Applying a template creates a new rubric version in a new family from the selected track. The template's criteria weights must total 100.
 - Creating an assignment resolves the judge by email, requires an active `owner`, `organizer`, or `judge` membership, requires the submission to belong to the edition and organization, and requires the rubric to belong to the edition. The assignment pins the rubric version row it was created with.
 - Duplicate active assignment (`submission_id`, `judge_user_id`) is a `409 conflict`. A previously revoked assignment is revived in place so the unique index remains valid.
+- Bulk assignment (`scope: all | division | submission`) covers every submitted or accepted submission in the edition, those whose team belongs to the chosen division, or one named submission. It skips submissions the judge already holds an active assignment for, revives revoked ones, returns `{ assigned, skipped }`, and publishes one `judge.assignment.created` summary event when anything was assigned. Duplicate candidates are assigned once.
 - `judge.assignment.created` is published with `{ assignmentId, submissionId, projectTitle, judgeUserId, judgeEmail, email, organizationId, organizationName, editionId, dueAt }`. `email` duplicates `judgeEmail` because the notification handler reads `email`.
 - A judge can declare a conflict while the assignment is `assigned` or `in_progress`. The note is stored and the status becomes `conflict_declared`. Conflicted assignments cannot be evaluated.
 - Revoking sets `revoked` and prevents any later evaluation. Revocation is idempotent and does not delete a submitted evaluation.
@@ -112,6 +114,7 @@ The assignment is the scoring authority. An organizer who is not the assigned ju
 - `GET /competitions/:editionId/teams/:teamId/judging-feedback` returns `{ teamId, threshold, submittedCount, withheld, feedback }`. `feedback` contains only `{ comment, weightedScore, submittedAt }`; judge identity is never returned. Below three submitted evaluations the endpoint returns `withheld: true` and an empty list, and `judging.v1.listTeamFeedback` returns an empty list.
 - `GET /judging-coverage` aggregates non-revoked assignments per judge: assignment count, submitted count, recusals, open flags, and the mean submitted weighted score. Calibration compares each judge's average with the edition average; a delta of at least 10 points is `above`, at most -10 is `below`, otherwise `in_line`. Judges without submitted scores are `insufficient_data`.
 - A flag requires the caller to be the assigned judge and an assignment that is `assigned`, `in_progress`, or `submitted`. Resolving an already-resolved flag returns the existing flag without a second audit record.
+- Reporting a flag enqueues an in-app `notifications.deliver` job for every active owner and organizer except the reporting judge. The notification title is `Judging flag reported` and its body names neither the judge nor the reason.
 
 ## Audit
 

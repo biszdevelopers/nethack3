@@ -158,4 +158,55 @@ describe("DatabaseExportService", () => {
         expect(snapshot.abortCalls).toBe(1);
         expect(snapshot.closeCalls).toBe(0);
     });
+
+    it("writes quoted CSV with headers and the same redactions", async () => {
+        const snapshot = new FakeSnapshot({
+            organizations: [
+                {
+                    id: "11111111-1111-4111-8111-111111111111",
+                    name: 'Organization, "One"',
+                    tokenHash: "must-not-leak",
+                },
+            ],
+            teams: [
+                {
+                    id: "22222222-2222-4222-8222-222222222222",
+                    name: "Team\nTwo",
+                    description: "=SUM(A1:A2)",
+                    captainUserId: "33333333-3333-4333-8333-333333333333",
+                },
+            ],
+            notifications: [
+                {
+                    id: "44444444-4444-4444-8444-444444444444",
+                    title: "Results, published",
+                    body: "private body",
+                    dedupeKey: "private-dedupe",
+                },
+            ],
+        });
+        const service = new DatabaseExportService(
+            sourceFor(snapshot),
+            new FixedClock(new Date("2026-01-02T03:04:05.000Z")),
+        );
+
+        let output = "";
+        for await (const chunk of service.streamCsv()) {
+            output += chunk;
+        }
+        const lines = output.split("\n");
+
+        expect(lines[0]).toBe("id,name");
+        expect(lines[1]).toBe('11111111-1111-4111-8111-111111111111,"Organization, ""One"""');
+        expect(output).not.toContain("must-not-leak");
+        expect(output).toContain("id,name,description,captainUserId");
+        expect(output).toContain('"Team\nTwo"');
+        expect(output).toContain("'=SUM(A1:A2)");
+        expect(output).toContain("id,title");
+        expect(output).toContain('44444444-4444-4444-8444-444444444444,"Results, published"');
+        expect(output).not.toContain("private body");
+        expect(output).not.toContain("private-dedupe");
+        expect(snapshot.closeCalls).toBe(1);
+        expect(snapshot.abortCalls).toBe(0);
+    });
 });

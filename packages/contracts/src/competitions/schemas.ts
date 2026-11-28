@@ -1,11 +1,38 @@
 import { z } from "zod";
 import {
+    emailSchema,
     idSchema,
     isoDateTimeSchema,
     markdownSchema,
     slugSchema,
     timeZoneSchema,
 } from "../common/schemas.js";
+
+function isHttpsUrl(value: string): boolean {
+    try {
+        return new URL(value).protocol === "https:";
+    } catch {
+        return false;
+    }
+}
+
+const contactEmailValueSchema = z
+    .string()
+    .trim()
+    .max(254)
+    .refine((value) => value === "" || emailSchema.safeParse(value).success, {
+        message: "Enter a valid email address.",
+    })
+    .transform((value) => (value === "" ? null : value));
+
+const contactUrlValueSchema = z
+    .string()
+    .trim()
+    .max(2048)
+    .refine((value) => value === "" || isHttpsUrl(value), {
+        message: "Use an https URL.",
+    })
+    .transform((value) => (value === "" ? null : value));
 
 export const competitionEditionStatusSchema = z.enum([
     "draft",
@@ -75,6 +102,8 @@ export const competitionEditionSchema = z.object({
     description: z.string(),
     themeName: z.string().nullable(),
     themeDescription: z.string().nullable(),
+    contactEmail: z.string().nullable(),
+    contactUrl: z.string().nullable(),
     showScores: z.boolean(),
     showRanking: z.boolean(),
     status: competitionEditionStatusSchema,
@@ -140,6 +169,8 @@ export const createEditionRequestSchema = z
             .nullable()
             .default(null)
             .transform((value) => (value === "" ? null : value)),
+        contactEmail: contactEmailValueSchema.nullable().default(null),
+        contactUrl: contactUrlValueSchema.nullable().default(null),
         showScores: z.boolean().default(false),
         showRanking: z.boolean().default(false),
         timezone: timeZoneSchema,
@@ -189,6 +220,8 @@ export const updateEditionRequestSchema = z
             .nullable()
             .optional()
             .transform((value) => (value === "" ? null : value)),
+        contactEmail: contactEmailValueSchema.nullable().optional(),
+        contactUrl: contactUrlValueSchema.nullable().optional(),
         showScores: z.boolean().optional(),
         showRanking: z.boolean().optional(),
         status: competitionEditionStatusSchema.optional(),

@@ -7,12 +7,13 @@ Owns `notifications` and `notification_preferences`. Dependencies: `identity` (n
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/api/v1/notifications?unread=true` | Caller's notifications, newest first |
+| GET | `/api/v1/notifications/unread-count` | Caller's unread notification count |
 | POST | `/api/v1/notifications/:notificationId/read` | Mark one notification read (idempotent) |
 | POST | `/api/v1/notifications/read-all` | Mark all of the caller's notifications read |
 | GET | `/api/v1/notifications/preferences` | Read email and in-app preferences |
 | PATCH | `/api/v1/notifications/preferences` | Update both preferences |
 
-Listing uses cursor pagination on `createdAt`. Missing preference rows default to `emailEnabled = true` and `inAppEnabled = true`.
+Listing uses cursor pagination on `createdAt`. Missing preference rows default to `emailEnabled = true` and `inAppEnabled = true`. `unread-count` returns `{ count }` for the authenticated user only; the workspace header bell reads it and mark-read actions invalidate the query.
 
 ## Events
 

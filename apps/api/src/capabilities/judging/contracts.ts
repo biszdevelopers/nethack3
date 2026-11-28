@@ -1,3 +1,4 @@
+import { TEAM_FEEDBACK_MINIMUM_EVALUATIONS } from "@nethack/contracts";
 import type {
     Evaluation,
     JudgeAssignment,
@@ -34,3 +35,6 @@ export interface JudgingContract {
 }
 
 export const JUDGING_CONTRACT = "judging.v1";
+
+/** Submitted evaluations a team needs before its feedback becomes visible. */
+export { TEAM_FEEDBACK_MINIMUM_EVALUATIONS };

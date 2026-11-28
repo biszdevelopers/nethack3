@@ -516,21 +516,36 @@ export class RecognitionService {
         editionId: string,
     ): Promise<MyResults> {
         await this.requireEdition(organizationId, editionId);
-        const [team, row] = await Promise.all([
+        const [activeTeam, history, row] = await Promise.all([
             this.teams.getTeamForUser(organizationId, editionId, auth.user.id),
+            this.teams.listUserTeamHistory(organizationId, auth.user.id),
             this.database.transaction({ organizationId }, (session) =>
                 this.repository.findResults(session.db, organizationId, editionId),
             ),
         ]);
         const results = row === null ? null : parseSnapshot(row.snapshot);
+        const currentHistory = history.find(
+            (entry) =>
+                entry.editionId === editionId &&
+                results !== null &&
+                findTeamResult(results, entry.teamId) !== null,
+        );
+        const currentTeam =
+            activeTeam === null
+                ? currentHistory === undefined
+                    ? null
+                    : { id: currentHistory.teamId, name: currentHistory.teamName }
+                : { id: activeTeam.id, name: activeTeam.name };
         const currentView =
-            team === null || results === null ? null : findTeamResult(results, team.id);
+            currentTeam === null || results === null
+                ? null
+                : findTeamResult(results, currentTeam.id);
         const current =
-            team === null
+            currentTeam === null
                 ? null
                 : {
-                      teamId: team.id,
-                      teamName: team.name,
+                      teamId: currentTeam.id,
+                      teamName: currentTeam.name,
                       score:
                           results?.showScores === true && currentView !== null
                               ? (currentView.displayScore ?? currentView.averageScore)
@@ -543,45 +558,50 @@ export class RecognitionService {
                       awards: [...(currentView?.awards ?? [])],
                   };
 
-        const editions = await this.competitions.listEditions(organizationId);
+        const pastByEdition = new Map<string, (typeof history)[number]>();
+        for (const entry of history) {
+            if (entry.editionId === editionId) {
+                continue;
+            }
+            const existing = pastByEdition.get(entry.editionId);
+            if (
+                existing === undefined ||
+                (existing.leftAt !== null && entry.leftAt === null) ||
+                (existing.leftAt === entry.leftAt && entry.joinedAt > existing.joinedAt)
+            ) {
+                pastByEdition.set(entry.editionId, entry);
+            }
+        }
         const pastEntries = await Promise.all(
-            editions
-                .filter((edition) => edition.id !== editionId)
-                .map(async (edition): Promise<MyResults["past"][number] | null> => {
-                    const pastTeam = await this.teams.getTeamForUser(
-                        organizationId,
-                        edition.id,
-                        auth.user.id,
-                    );
-                    if (pastTeam === null) {
-                        return null;
-                    }
+            [...pastByEdition.values()].map(
+                async (pastTeam): Promise<MyResults["past"][number] | null> => {
                     const pastRow = await this.database.transaction({ organizationId }, (session) =>
-                        this.repository.findResults(session.db, organizationId, edition.id),
+                        this.repository.findResults(session.db, organizationId, pastTeam.editionId),
                     );
                     if (pastRow === null) {
                         return null;
                     }
                     const pastResults = parseSnapshot(pastRow.snapshot);
-                    const view = findTeamResult(pastResults, pastTeam.id);
+                    const view = findTeamResult(pastResults, pastTeam.teamId);
                     if (view === null) {
                         return null;
                     }
                     return {
-                        editionId: edition.id,
-                        editionName: edition.name,
-                        editionSlug: edition.slug,
-                        teamId: pastTeam.id,
-                        teamName: pastTeam.name,
+                        editionId: pastTeam.editionId,
+                        editionName: pastTeam.editionName,
+                        editionSlug: pastTeam.editionSlug,
+                        teamId: pastTeam.teamId,
+                        teamName: pastTeam.teamName,
                         score: pastResults.showScores
                             ? (view.displayScore ?? view.averageScore)
                             : null,
                         rank: pastResults.showRanking ? view.rank : null,
-                        feedback: await this.teamFeedback(organizationId, edition.id, view),
+                        feedback: await this.teamFeedback(organizationId, pastTeam.editionId, view),
                         awards: [...view.awards],
                         publishedAt: pastRow.publishedAt.toISOString(),
                     };
-                }),
+                },
+            ),
         );
         const past = pastEntries
             .flatMap((entry) => (entry === null ? [] : [entry]))

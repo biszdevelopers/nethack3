@@ -12,7 +12,9 @@ import { ConflictError, NotFoundError } from "../../../core/errors.js";
 import type { AuditLogger } from "../../../infrastructure/audit/audit-logger.js";
 import type { DatabaseConnection } from "../../../infrastructure/database/client.js";
 import type { OrganizationsContract } from "../../organizations/contracts.js";
+import { redactAuditMetadata } from "./audit-metadata.js";
 import { AdministrationRules } from "../domain/administration-rules.js";
+import type { AccountDeletionRepository } from "../infrastructure/account-deletion-repository.js";
 import type {
     AdministrationRepository,
     AuditRow,
@@ -23,6 +25,7 @@ import type {
 export class AdministrationService {
     private readonly database: DatabaseConnection;
     private readonly repository: AdministrationRepository;
+    private readonly accountDeletion: AccountDeletionRepository;
     private readonly audit: AuditLogger;
     private readonly clock: Clock;
     private readonly organizations: OrganizationsContract;
@@ -30,12 +33,14 @@ export class AdministrationService {
     constructor(
         database: DatabaseConnection,
         repository: AdministrationRepository,
+        accountDeletion: AccountDeletionRepository,
         audit: AuditLogger,
         clock: Clock,
         organizations: OrganizationsContract,
     ) {
         this.database = database;
         this.repository = repository;
+        this.accountDeletion = accountDeletion;
         this.audit = audit;
         this.clock = clock;
         this.organizations = organizations;
@@ -174,6 +179,49 @@ export class AdministrationService {
             role,
         );
     }
+
+    async deleteUserAccount(
+        auth: AuthContext,
+        targetUserId: string,
+        ip: string | null,
+    ): Promise<void> {
+        AdministrationRules.assertNotSelfDeletion(auth.user.id, targetUserId);
+        await this.database.transaction(
+            { organizationId: null, userId: auth.user.id },
+            async (session) => {
+                const target = await this.accountDeletion.findUser(session.db, targetUserId);
+                if (target === null) {
+                    throw new NotFoundError("No user account matches that identifier.");
+                }
+                const isAdministrator =
+                    (await this.repository.findAdministrator(session.db, targetUserId)) !== null;
+                const administratorCount = isAdministrator
+                    ? await this.repository.lockAdministratorCount(session)
+                    : 0;
+                AdministrationRules.assertCanDeleteAdministrator(
+                    isAdministrator,
+                    administratorCount,
+                );
+                const organizationIds = await this.repository.listOrganizationIds(session.db);
+                const blockers = await this.accountDeletion.countBlockers(
+                    session.db,
+                    targetUserId,
+                    organizationIds,
+                );
+                AdministrationRules.assertCanDeleteAccount(blockers);
+                await this.audit.record(session, {
+                    organizationId: null,
+                    actorUserId: auth.user.id,
+                    action: "administration.user.deleted",
+                    entityType: "user",
+                    entityId: targetUserId,
+                    metadata: { displayName: target.displayName, email: target.email },
+                    ip,
+                });
+                await this.accountDeletion.deleteDependents(session, targetUserId, organizationIds);
+            },
+        );
+    }
 }
 
 function toAuditLog(row: AuditRow): AuditLog {
@@ -185,7 +233,7 @@ function toAuditLog(row: AuditRow): AuditLog {
         action: row.action,
         entityType: row.entityType,
         entityId: row.entityId,
-        metadata: row.metadata,
+        metadata: redactAuditMetadata(row.metadata),
         createdAt: row.createdAt.toISOString(),
     };
 }

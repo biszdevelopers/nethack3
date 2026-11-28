@@ -4,6 +4,7 @@ import {
     administrationUserSchema,
     auditLogSchema,
     createDebugAiSessionRequestSchema,
+    databaseExportQuerySchema,
     debugAiExchangeSchema,
     debugAiSessionDetailSchema,
     debugAiSessionListSchema,
@@ -24,6 +25,7 @@ import {
     type AdministrationUser,
     type AuditLog,
     type CreateDebugAiSessionRequest,
+    type DatabaseExportFormat,
     type DebugAiExchange,
     type DebugAiSession,
     type DebugAiSessionDetail,
@@ -86,6 +88,10 @@ export class AdministrationApi {
         await this.client.request("DELETE", `/api/v1/admin/global-administrators/${userId}`, {
             body: revokeGlobalAdministratorRequestSchema.parse(input),
         });
+    }
+
+    async deleteUser(userId: string): Promise<void> {
+        await this.client.request("DELETE", `/api/v1/admin/users/${userId}`);
     }
 
     async audit(organizationId: string, query: AuditQuery = {}): Promise<ListResponse<AuditLog>> {
@@ -160,12 +166,13 @@ export class AdministrationApi {
         editionId: string,
         teamId: string,
         status: TeamStatus,
+        reason?: string,
     ): Promise<void> {
         await this.client.request(
             "PATCH",
             `/api/v1/administration/editions/${editionId}/teams/${teamId}`,
             {
-                body: updateAdministrationTeamRequestSchema.parse({ status }),
+                body: updateAdministrationTeamRequestSchema.parse({ status, reason }),
                 headers: organizationHeader(organizationId),
             },
         );
@@ -254,20 +261,30 @@ export class AdministrationApi {
     }
 
     /**
-     * The database export is a large JSON attachment. It bypasses the JSON
-     * request path so the browser receives a streamed Blob.
+     * The database export is a large attachment. It bypasses the JSON request
+     * path so the browser receives a streamed Blob.
      */
-    async databaseExport(): Promise<{ blob: Blob; fileName: string }> {
-        const response = await fetch(this.client.buildUrl("/api/v1/admin/database/export"), {
-            method: "GET",
-            credentials: "include",
-            headers: { Accept: "application/json" },
-        });
+    async databaseExport(format: DatabaseExportFormat = "json"): Promise<{
+        blob: Blob;
+        fileName: string;
+    }> {
+        const query = databaseExportQuerySchema.parse({ format });
+        const response = await fetch(
+            this.client.buildUrl("/api/v1/admin/database/export", { format: query.format }),
+            {
+                method: "GET",
+                credentials: "include",
+                headers: {
+                    Accept: query.format === "csv" ? "text/csv" : "application/json",
+                },
+            },
+        );
         if (!response.ok) {
             throw new Error(`The database export could not be generated (${response.status}).`);
         }
         const disposition = response.headers.get("content-disposition") ?? "";
-        const fileName = /filename="([^"]+)"/.exec(disposition)?.[1] ?? "nethack-export.json";
+        const fileName =
+            /filename="([^"]+)"/.exec(disposition)?.[1] ?? `nethack-export.${query.format}`;
         return { blob: await response.blob(), fileName };
     }
 

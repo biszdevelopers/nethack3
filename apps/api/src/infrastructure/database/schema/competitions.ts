@@ -67,6 +67,8 @@ export const competitionEditions = pgTable(
         description: text("description").notNull().default(""),
         themeName: text("theme_name"),
         themeDescription: text("theme_description"),
+        contactEmail: text("contact_email"),
+        contactUrl: text("contact_url"),
         showScores: boolean("show_scores").notNull().default(false),
         showRanking: boolean("show_ranking").notNull().default(false),
         status: editionStatusEnum("status").notNull().default("draft"),

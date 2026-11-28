@@ -738,6 +738,52 @@ export class JudgingRepository {
         return rows[0] ?? null;
     }
 
+    async listActiveSubmissionIdsForJudge(
+        db: DatabaseExecutor,
+        organizationId: string,
+        editionId: string,
+        judgeUserId: string,
+    ): Promise<readonly string[]> {
+        const rows = await db
+            .select({ submissionId: judgeAssignments.submissionId })
+            .from(judgeAssignments)
+            .where(
+                and(
+                    eq(judgeAssignments.organizationId, organizationId),
+                    eq(judgeAssignments.editionId, editionId),
+                    eq(judgeAssignments.judgeUserId, judgeUserId),
+                    ne(judgeAssignments.status, "revoked"),
+                ),
+            );
+        return rows.map((row) => row.submissionId);
+    }
+
+    async listFlagRecipientCandidates(
+        db: DatabaseExecutor,
+        organizationId: string,
+    ): Promise<
+        readonly {
+            readonly userId: string;
+            readonly role: OrganizationRole;
+            readonly status: "active" | "suspended";
+        }[]
+    > {
+        return db
+            .select({
+                userId: organizationMemberships.userId,
+                role: organizationMemberships.role,
+                status: organizationMemberships.status,
+            })
+            .from(organizationMemberships)
+            .where(
+                and(
+                    eq(organizationMemberships.organizationId, organizationId),
+                    inArray(organizationMemberships.role, ["owner", "organizer"]),
+                ),
+            )
+            .orderBy(asc(organizationMemberships.userId));
+    }
+
     async insertAssignment(
         session: DatabaseSession,
         values: NewAssignmentValues,

@@ -27,6 +27,8 @@ export const publicCompetitionSchema = z.object({
     description: z.string(),
     themeName: z.string().nullable(),
     themeDescription: z.string().nullable(),
+    contactEmail: z.string().nullable(),
+    contactUrl: z.string().nullable(),
     status: z.string(),
     organizationName: z.string(),
     organizationSlug: z.string(),

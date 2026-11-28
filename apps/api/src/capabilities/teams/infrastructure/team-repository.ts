@@ -1,8 +1,9 @@
-import { and, desc, eq, lt, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, lt, sql, type SQL } from "drizzle-orm";
 import type { TeamRole, TeamStatus } from "@nethack/contracts";
 import type { DatabaseExecutor, DatabaseSession } from "../../../infrastructure/database/client.js";
 import {
     auditLogs,
+    competitionEditions,
     registrations,
     teamInvitations,
     teamMembers,
@@ -18,6 +19,7 @@ export interface TeamRow {
     readonly name: string;
     readonly description: string;
     readonly status: TeamStatus;
+    readonly statusReason: string;
     readonly captainUserId: string;
     readonly maxMembers: number;
     readonly createdAt: Date;
@@ -40,6 +42,16 @@ export interface EditionTeamMemberRow extends TeamMemberRow {
     readonly teamId: string;
 }
 
+export interface UserTeamHistoryRow {
+    readonly teamId: string;
+    readonly teamName: string;
+    readonly editionId: string;
+    readonly editionName: string;
+    readonly editionSlug: string;
+    readonly joinedAt: Date;
+    readonly leftAt: Date | null;
+}
+
 export interface TeamInvitationRow {
     readonly id: string;
     readonly teamId: string;
@@ -59,6 +71,18 @@ export interface InvitationWithTeam extends TeamInvitationRow {
     readonly maxMembers: number;
 }
 
+export interface MyInvitationRow {
+    readonly id: string;
+    readonly teamId: string;
+    readonly teamName: string;
+    readonly editionId: string;
+    readonly divisionId: string | null;
+    readonly inviterDisplayName: string;
+    readonly status: string;
+    readonly expiresAt: Date;
+    readonly createdAt: Date;
+}
+
 export interface TeamAuditRow {
     readonly id: string;
     readonly organizationId: string | null;
@@ -73,7 +97,7 @@ export interface TeamAuditRow {
 
 const memberCountColumn = sql<number>`(
     select count(*)::int from ${teamMembers}
-    where ${teamMembers.teamId} = ${teams.id}
+    where ${teamMembers.teamId} = ${teams.id} and ${teamMembers.leftAt} is null
 )`;
 
 const invitationSelection = {
@@ -141,6 +165,7 @@ export class TeamRepository {
                     eq(teams.organizationId, organizationId),
                     eq(teams.editionId, editionId),
                     eq(teamMembers.userId, userId),
+                    isNull(teamMembers.leftAt),
                 ),
             )
             .limit(1);
@@ -175,9 +200,49 @@ export class TeamRepository {
                     eq(teamMembers.organizationId, teams.organizationId),
                 ),
             )
-            .where(and(eq(teams.organizationId, organizationId), eq(teamMembers.userId, userId)))
+            .where(
+                and(
+                    eq(teams.organizationId, organizationId),
+                    eq(teamMembers.userId, userId),
+                    isNull(teamMembers.leftAt),
+                ),
+            )
             .orderBy(desc(teams.createdAt));
         return rows.map((row) => ({ ...row.team, memberCount: row.memberCount }));
+    }
+
+    async listUserTeamHistory(
+        db: DatabaseExecutor,
+        organizationId: string,
+        userId: string,
+    ): Promise<readonly UserTeamHistoryRow[]> {
+        return db
+            .select({
+                teamId: teams.id,
+                teamName: teams.name,
+                editionId: teams.editionId,
+                editionName: competitionEditions.name,
+                editionSlug: competitionEditions.slug,
+                joinedAt: teamMembers.joinedAt,
+                leftAt: teamMembers.leftAt,
+            })
+            .from(teamMembers)
+            .innerJoin(
+                teams,
+                and(
+                    eq(teams.id, teamMembers.teamId),
+                    eq(teams.organizationId, teamMembers.organizationId),
+                ),
+            )
+            .innerJoin(
+                competitionEditions,
+                and(
+                    eq(competitionEditions.id, teams.editionId),
+                    eq(competitionEditions.organizationId, teams.organizationId),
+                ),
+            )
+            .where(and(eq(teams.organizationId, organizationId), eq(teamMembers.userId, userId)))
+            .orderBy(desc(teamMembers.joinedAt));
     }
 
     async countByEdition(
@@ -196,7 +261,7 @@ export class TeamRepository {
         const rows = await db
             .select({ count: sql<number>`count(*)::int` })
             .from(teamMembers)
-            .where(eq(teamMembers.teamId, teamId));
+            .where(and(eq(teamMembers.teamId, teamId), isNull(teamMembers.leftAt)));
         return rows[0]?.count ?? 0;
     }
 
@@ -211,7 +276,7 @@ export class TeamRepository {
             })
             .from(teamMembers)
             .innerJoin(users, eq(users.id, teamMembers.userId))
-            .where(eq(teamMembers.teamId, teamId))
+            .where(and(eq(teamMembers.teamId, teamId), isNull(teamMembers.leftAt)))
             .orderBy(
                 sql`case when ${teamMembers.role} = 'captain' then 0 else 1 end`,
                 teamMembers.joinedAt,
@@ -241,7 +306,13 @@ export class TeamRepository {
                     eq(teams.organizationId, teamMembers.organizationId),
                 ),
             )
-            .where(and(eq(teams.organizationId, organizationId), eq(teams.editionId, editionId)))
+            .where(
+                and(
+                    eq(teams.organizationId, organizationId),
+                    eq(teams.editionId, editionId),
+                    isNull(teamMembers.leftAt),
+                ),
+            )
             .orderBy(
                 sql`case when ${teamMembers.role} = 'captain' then 0 else 1 end`,
                 teamMembers.joinedAt,
@@ -263,7 +334,13 @@ export class TeamRepository {
             })
             .from(teamMembers)
             .innerJoin(users, eq(users.id, teamMembers.userId))
-            .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)))
+            .where(
+                and(
+                    eq(teamMembers.teamId, teamId),
+                    eq(teamMembers.userId, userId),
+                    isNull(teamMembers.leftAt),
+                ),
+            )
             .limit(1);
         return rows[0] ?? null;
     }
@@ -295,6 +372,7 @@ export class TeamRepository {
             name?: string;
             description?: string;
             status?: TeamStatus;
+            statusReason?: string;
             divisionId?: string | null;
             captainUserId?: string;
             maxMembers?: number;
@@ -352,17 +430,48 @@ export class TeamRepository {
         const rows = await session.db
             .update(teamMembers)
             .set({ role })
-            .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)))
+            .where(
+                and(
+                    eq(teamMembers.teamId, teamId),
+                    eq(teamMembers.userId, userId),
+                    isNull(teamMembers.leftAt),
+                ),
+            )
             .returning({ id: teamMembers.id });
         return rows.length > 0;
     }
 
-    async removeMember(session: DatabaseSession, teamId: string, userId: string): Promise<boolean> {
+    async removeMember(
+        session: DatabaseSession,
+        teamId: string,
+        userId: string,
+        at: Date,
+    ): Promise<boolean> {
         const rows = await session.db
-            .delete(teamMembers)
-            .where(and(eq(teamMembers.teamId, teamId), eq(teamMembers.userId, userId)))
+            .update(teamMembers)
+            .set({ leftAt: at })
+            .where(
+                and(
+                    eq(teamMembers.teamId, teamId),
+                    eq(teamMembers.userId, userId),
+                    isNull(teamMembers.leftAt),
+                ),
+            )
             .returning({ id: teamMembers.id });
         return rows.length > 0;
+    }
+
+    async deleteAllMembers(
+        session: DatabaseSession,
+        teamId: string,
+        at: Date,
+    ): Promise<readonly string[]> {
+        const rows = await session.db
+            .update(teamMembers)
+            .set({ leftAt: at })
+            .where(and(eq(teamMembers.teamId, teamId), isNull(teamMembers.leftAt)))
+            .returning({ userId: teamMembers.userId });
+        return rows.map((row) => row.userId);
     }
 
     /** Locks the participant's registration row so concurrent team joins serialize. */
@@ -443,6 +552,160 @@ export class TeamRepository {
             throw new Error("The invitation could not be created.");
         }
         return row;
+    }
+
+    async reissueInvitation(
+        session: DatabaseSession,
+        invitationId: string,
+        values: {
+            tokenHash: string;
+            invitedByUserId: string;
+            expiresAt: Date;
+        },
+    ): Promise<{ id: string; createdAt: Date }> {
+        const [row] = await session.db
+            .update(teamInvitations)
+            .set({
+                tokenHash: values.tokenHash,
+                invitedByUserId: values.invitedByUserId,
+                expiresAt: values.expiresAt,
+                status: "pending",
+                acceptedByUserId: null,
+                acceptedAt: null,
+            })
+            .where(eq(teamInvitations.id, invitationId))
+            .returning({ id: teamInvitations.id, createdAt: teamInvitations.createdAt });
+        if (row === undefined) {
+            throw new Error("The invitation could not be reissued.");
+        }
+        return row;
+    }
+
+    async countPendingInvitations(
+        db: DatabaseExecutor,
+        teamId: string,
+        now: Date,
+    ): Promise<number> {
+        const rows = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(teamInvitations)
+            .where(
+                and(
+                    eq(teamInvitations.teamId, teamId),
+                    eq(teamInvitations.status, "pending"),
+                    gt(teamInvitations.expiresAt, now),
+                ),
+            );
+        return rows[0]?.count ?? 0;
+    }
+
+    async listPendingInvitationsForEmail(
+        db: DatabaseExecutor,
+        organizationId: string,
+        email: string,
+        now: Date,
+    ): Promise<readonly MyInvitationRow[]> {
+        return db
+            .select({
+                id: teamInvitations.id,
+                teamId: teamInvitations.teamId,
+                teamName: teams.name,
+                editionId: teams.editionId,
+                divisionId: teams.divisionId,
+                inviterDisplayName: users.displayName,
+                status: teamInvitations.status,
+                expiresAt: teamInvitations.expiresAt,
+                createdAt: teamInvitations.createdAt,
+            })
+            .from(teamInvitations)
+            .innerJoin(
+                teams,
+                and(
+                    eq(teams.id, teamInvitations.teamId),
+                    eq(teams.organizationId, teamInvitations.organizationId),
+                ),
+            )
+            .innerJoin(users, eq(users.id, teamInvitations.invitedByUserId))
+            .where(
+                and(
+                    eq(teamInvitations.organizationId, organizationId),
+                    sql`lower(${teamInvitations.email}) = ${email.toLowerCase()}`,
+                    eq(teamInvitations.status, "pending"),
+                    gt(teamInvitations.expiresAt, now),
+                ),
+            )
+            .orderBy(desc(teamInvitations.createdAt));
+    }
+
+    async findInvitationById(
+        db: DatabaseExecutor,
+        organizationId: string,
+        invitationId: string,
+    ): Promise<InvitationWithTeam | null> {
+        const rows = await db
+            .select(invitationSelection)
+            .from(teamInvitations)
+            .innerJoin(
+                teams,
+                and(
+                    eq(teams.id, teamInvitations.teamId),
+                    eq(teams.organizationId, teamInvitations.organizationId),
+                ),
+            )
+            .where(
+                and(
+                    eq(teamInvitations.organizationId, organizationId),
+                    eq(teamInvitations.id, invitationId),
+                ),
+            )
+            .limit(1);
+        return rows[0] ?? null;
+    }
+
+    async lockInvitationById(
+        session: DatabaseSession,
+        organizationId: string,
+        invitationId: string,
+    ): Promise<InvitationWithTeam | null> {
+        const rows = await session.db
+            .select(invitationSelection)
+            .from(teamInvitations)
+            .innerJoin(
+                teams,
+                and(
+                    eq(teams.id, teamInvitations.teamId),
+                    eq(teams.organizationId, teamInvitations.organizationId),
+                ),
+            )
+            .where(
+                and(
+                    eq(teamInvitations.organizationId, organizationId),
+                    eq(teamInvitations.id, invitationId),
+                ),
+            )
+            .limit(1)
+            .for("update", { of: teamInvitations });
+        return rows[0] ?? null;
+    }
+
+    async markInvitationStatus(
+        session: DatabaseSession,
+        invitationId: string,
+        status: "declined" | "revoked",
+    ): Promise<void> {
+        await session.db
+            .update(teamInvitations)
+            .set({ status })
+            .where(eq(teamInvitations.id, invitationId));
+    }
+
+    async revokePendingInvitations(session: DatabaseSession, teamId: string): Promise<number> {
+        const rows = await session.db
+            .update(teamInvitations)
+            .set({ status: "revoked" })
+            .where(and(eq(teamInvitations.teamId, teamId), eq(teamInvitations.status, "pending")))
+            .returning({ id: teamInvitations.id });
+        return rows.length;
     }
 
     async findInvitationByTokenHash(

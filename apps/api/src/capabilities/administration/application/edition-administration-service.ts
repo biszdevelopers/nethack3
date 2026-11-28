@@ -1,6 +1,7 @@
 import type {
     AdministrationTeam,
     AdministrationTeamSubmission,
+    JudgingResult,
     ReopenAdministrationSubmissionRequest,
     TeamStatus,
 } from "@nethack/contracts";
@@ -8,13 +9,13 @@ import type { AuthContext } from "../../../authentication/types.js";
 import { ConflictError, NotFoundError } from "../../../core/errors.js";
 import type { CompetitionsContract } from "../../competitions/contracts.js";
 import type { JudgingContract } from "../../judging/contracts.js";
-import type { SubmissionsContract } from "../../submissions/contracts.js";
+import type { SubmissionSummary, SubmissionsContract } from "../../submissions/contracts.js";
 import type { TeamsContract } from "../../teams/contracts.js";
 import { AdministrationRules } from "../domain/administration-rules.js";
 import { standingsCsv } from "./standings-csv.js";
 
 export interface EditionAdministrationSources {
-    readonly editions: Pick<CompetitionsContract, "getEdition">;
+    readonly editions: Pick<CompetitionsContract, "getEdition" | "listDivisions">;
     readonly teams: Pick<
         TeamsContract,
         "listEditionTeamsWithMembers" | "updateTeamStatus" | "deleteTeam"
@@ -43,11 +44,14 @@ export class EditionAdministrationService {
         editionId: string,
     ): Promise<readonly AdministrationTeam[]> {
         await this.requireEdition(organizationId, editionId);
-        const [teams, submissions] = await Promise.all([
+        const [teams, submissions, divisions, results] = await Promise.all([
             this.sources.teams.listEditionTeamsWithMembers(organizationId, editionId),
             this.sources.submissions.listEditionSubmissions(organizationId, editionId),
+            this.sources.editions.listDivisions(organizationId, editionId),
+            this.sources.judging.listEditionResults(organizationId, editionId),
         ]);
         const submissionsByTeam = new Map<string, AdministrationTeamSubmission[]>();
+        const latestByTeam = new Map<string, SubmissionSummary>();
         for (const submission of submissions) {
             if (submission.teamId === null) {
                 continue;
@@ -59,20 +63,46 @@ export class EditionAdministrationService {
                 status: submission.status,
             });
             submissionsByTeam.set(submission.teamId, list);
+            const latest = latestByTeam.get(submission.teamId);
+            if (latest === undefined || isNewerSubmission(submission, latest)) {
+                latestByTeam.set(submission.teamId, submission);
+            }
         }
-        return teams.map((team) => ({
-            id: team.id,
-            editionId: team.editionId,
-            name: team.name,
-            description: team.description,
-            status: team.status,
-            divisionId: team.divisionId,
-            captainUserId: team.captainUserId,
-            memberCount: team.memberCount,
-            maxMembers: team.maxMembers,
-            members: [...team.members],
-            submissions: submissionsByTeam.get(team.id) ?? [],
-        }));
+        const divisionNames = new Map(divisions.map((division) => [division.id, division.name]));
+        const resultsByTeam = new Map<string, JudgingResult>();
+        for (const result of results) {
+            if (result.teamId === null) {
+                continue;
+            }
+            const existing = resultsByTeam.get(result.teamId);
+            if (existing === undefined || isBetterResult(result, existing)) {
+                resultsByTeam.set(result.teamId, result);
+            }
+        }
+        return teams.map((team) => {
+            const latest = latestByTeam.get(team.id);
+            const result = resultsByTeam.get(team.id);
+            return {
+                id: team.id,
+                editionId: team.editionId,
+                name: team.name,
+                description: team.description,
+                status: team.status,
+                statusReason: team.statusReason,
+                divisionId: team.divisionId,
+                divisionName:
+                    team.divisionId === null ? null : (divisionNames.get(team.divisionId) ?? null),
+                captainUserId: team.captainUserId,
+                memberCount: team.memberCount,
+                maxMembers: team.maxMembers,
+                members: [...team.members],
+                submissions: submissionsByTeam.get(team.id) ?? [],
+                projectTitle: latest?.title ?? null,
+                submittedAt: latest?.submittedAt ?? null,
+                score: result?.displayScore ?? result?.averageScore ?? null,
+                rank: result?.rank ?? null,
+            };
+        });
     }
 
     async updateTeamStatus(
@@ -81,6 +111,7 @@ export class EditionAdministrationService {
         editionId: string,
         teamId: string,
         status: TeamStatus,
+        reason: string,
         ip: string | null,
     ): Promise<void> {
         await this.sources.teams.updateTeamStatus(
@@ -89,6 +120,7 @@ export class EditionAdministrationService {
             editionId,
             teamId,
             status,
+            reason,
         );
     }
 
@@ -153,4 +185,28 @@ export class EditionAdministrationService {
             throw new NotFoundError("The competition edition was not found.");
         }
     }
+}
+
+function isNewerSubmission(candidate: SubmissionSummary, current: SubmissionSummary): boolean {
+    if (candidate.submittedAt === null) {
+        return false;
+    }
+    if (current.submittedAt === null) {
+        return true;
+    }
+    if (candidate.submittedAt !== current.submittedAt) {
+        return candidate.submittedAt > current.submittedAt;
+    }
+    return candidate.currentVersion > current.currentVersion;
+}
+
+function isBetterResult(candidate: JudgingResult, current: JudgingResult): boolean {
+    const candidateRank = candidate.rank ?? Number.POSITIVE_INFINITY;
+    const currentRank = current.rank ?? Number.POSITIVE_INFINITY;
+    if (candidateRank !== currentRank) {
+        return candidateRank < currentRank;
+    }
+    const candidateScore = candidate.displayScore ?? candidate.averageScore ?? -1;
+    const currentScore = current.displayScore ?? current.averageScore ?? -1;
+    return candidateScore > currentScore;
 }

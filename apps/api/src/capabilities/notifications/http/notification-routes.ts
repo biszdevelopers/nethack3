@@ -5,6 +5,7 @@ import {
     listResponseSchema,
     notificationPreferencesSchema,
     notificationSchema,
+    notificationUnreadCountSchema,
     updateNotificationPreferencesRequestSchema,
 } from "@nethack/contracts";
 import type { CapabilityContext } from "../../../core/capability.js";
@@ -74,6 +75,15 @@ export async function registerNotificationRoutes(
         await service.markAllRead(auth.user.id);
         return reply.status(204).send();
     });
+
+    app.get(
+        "/api/v1/notifications/unread-count",
+        { schema: { response: { 200: notificationUnreadCountSchema } } },
+        async (request) => {
+            const auth = await guard.require(request);
+            return { count: await service.unreadCount(auth.user.id) };
+        },
+    );
 
     app.get(
         "/api/v1/notifications/preferences",

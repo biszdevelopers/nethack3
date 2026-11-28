@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import type { NotificationKind } from "@nethack/contracts";
 import type { DatabaseExecutor, DatabaseSession } from "../../../infrastructure/database/client.js";
 import {
@@ -77,6 +77,14 @@ export class NotificationRepository {
             .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)))
             .limit(1);
         return rows[0] ?? null;
+    }
+
+    async countUnreadForUser(db: DatabaseExecutor, userId: string): Promise<number> {
+        const rows = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(notifications)
+            .where(and(eq(notifications.userId, userId), isNull(notifications.readAt)));
+        return rows[0]?.count ?? 0;
     }
 
     async markRead(

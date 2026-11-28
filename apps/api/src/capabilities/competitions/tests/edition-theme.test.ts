@@ -18,6 +18,8 @@ const PUBLIC_COMPETITION = {
     description: "Edition used to verify public theme and visibility fields.",
     themeName: "Beneath the surface",
     themeDescription: "Build something hidden.",
+    contactEmail: null,
+    contactUrl: null,
     status: "published",
     organizationName: "Example Workspace",
     organizationSlug: "example-workspace",

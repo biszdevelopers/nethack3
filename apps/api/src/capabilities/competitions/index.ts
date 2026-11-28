@@ -70,6 +70,9 @@ export const competitionsCapability: CapabilityDefinition = {
             async listDivisions(organizationId, editionId) {
                 return service.divisions(organizationId, editionId);
             },
+            async listMilestones(organizationId, editionId) {
+                return service.milestones(organizationId, editionId);
+            },
             freezeForResults(session, organizationId, editionId) {
                 return service.freezeForResults(session, organizationId, editionId);
             },

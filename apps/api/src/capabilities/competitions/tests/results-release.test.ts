@@ -42,6 +42,8 @@ describe("public competition release contract", () => {
         description: "Public release contract fixture.",
         themeName: null,
         themeDescription: null,
+        contactEmail: null,
+        contactUrl: null,
         status: "judging",
         organizationName: "Example Workspace",
         organizationSlug: "example-workspace",

@@ -4,9 +4,11 @@ import {
     createTeamRequestSchema,
     inviteTeamMemberRequestSchema,
     listResponseSchema,
+    myTeamInvitationSchema,
     teamDetailSchema,
     teamInvitationAcceptanceSchema,
-    teamInvitationSchema,
+    teamInvitationCreatedSchema,
+    teamInvitationLinkSchema,
     teamSchema,
     transferTeamCaptainRequestSchema,
     updateTeamRequestSchema,
@@ -14,10 +16,12 @@ import {
     type CreateTeamRequest,
     type InviteTeamMemberRequest,
     type ListResponse,
+    type MyTeamInvitation,
     type Team,
     type TeamDetail,
-    type TeamInvitation,
     type TeamInvitationAcceptance,
+    type TeamInvitationCreated,
+    type TeamInvitationLink,
     type UpdateTeamRequest,
 } from "@nethack/contracts";
 import type { ApiClient } from "./client.js";
@@ -29,6 +33,7 @@ export interface TeamActivityQuery {
 
 const teamListSchema = listResponseSchema(teamSchema);
 const activityListSchema = listResponseSchema(auditLogSchema);
+const invitationListSchema = listResponseSchema(myTeamInvitationSchema);
 
 export class TeamsApi {
     private readonly client: ApiClient;
@@ -63,10 +68,16 @@ export class TeamsApi {
         });
     }
 
-    async invite(teamId: string, input: InviteTeamMemberRequest): Promise<TeamInvitation> {
+    async invite(teamId: string, input: InviteTeamMemberRequest): Promise<TeamInvitationCreated> {
         return this.client.request("POST", `/api/v1/teams/${teamId}/invitations`, {
             body: inviteTeamMemberRequestSchema.parse(input),
-            schema: teamInvitationSchema,
+            schema: teamInvitationCreatedSchema,
+        });
+    }
+
+    async mineInvitations(): Promise<ListResponse<MyTeamInvitation>> {
+        return this.client.request("GET", "/api/v1/me/team-invitations", {
+            schema: invitationListSchema,
         });
     }
 
@@ -75,6 +86,32 @@ export class TeamsApi {
             body: acceptTeamInvitationRequestSchema.parse({ token }),
             schema: teamInvitationAcceptanceSchema,
         });
+    }
+
+    async acceptInvitationById(invitationId: string): Promise<TeamInvitationAcceptance> {
+        return this.client.request("POST", `/api/v1/team-invitations/${invitationId}/accept`, {
+            schema: teamInvitationAcceptanceSchema,
+        });
+    }
+
+    async declineInvitation(invitationId: string): Promise<void> {
+        await this.client.request("POST", `/api/v1/team-invitations/${invitationId}/decline`);
+    }
+
+    async invitationLink(teamId: string, invitationId: string): Promise<TeamInvitationLink> {
+        return this.client.request(
+            "POST",
+            `/api/v1/teams/${teamId}/invitations/${invitationId}/link`,
+            { schema: teamInvitationLinkSchema },
+        );
+    }
+
+    async revokeInvitation(teamId: string, invitationId: string): Promise<void> {
+        await this.client.request("DELETE", `/api/v1/teams/${teamId}/invitations/${invitationId}`);
+    }
+
+    async disband(teamId: string): Promise<void> {
+        await this.client.request("DELETE", `/api/v1/teams/${teamId}`);
     }
 
     async removeMember(teamId: string, userId: string): Promise<void> {

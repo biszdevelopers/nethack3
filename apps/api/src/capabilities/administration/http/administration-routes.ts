@@ -25,6 +25,7 @@ import type { PreflightService } from "../application/preflight-service.js";
 import type { ReportService } from "../application/report-service.js";
 
 const administratorParams = z.object({ userId: z.uuid() });
+const userParams = z.object({ userId: z.uuid() });
 const organizationParams = z.object({ organizationId: z.uuid() });
 const organizationUserParams = z.object({ organizationId: z.uuid(), userId: z.uuid() });
 const editionParams = z.object({ editionId: z.uuid() });
@@ -83,6 +84,17 @@ export async function registerAdministrationRoutes(
             const auth = await guard.require(request);
             guard.requireGlobalAdministrator(auth);
             await service.revoke(auth, request.params.userId, request.body, request.ip);
+            return reply.status(204).send();
+        },
+    );
+
+    app.delete(
+        "/api/v1/admin/users/:userId",
+        { schema: { params: userParams } },
+        async (request, reply) => {
+            const auth = await guard.require(request);
+            guard.requireGlobalAdministrator(auth);
+            await service.deleteUserAccount(auth, request.params.userId, request.ip);
             return reply.status(204).send();
         },
     );
@@ -246,6 +258,7 @@ export async function registerAdministrationRoutes(
                 request.params.editionId,
                 request.params.teamId,
                 request.body.status,
+                request.body.reason ?? "",
                 request.ip,
             );
             return reply.status(204).send();

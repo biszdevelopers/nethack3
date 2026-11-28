@@ -2,6 +2,7 @@ import { Readable } from "node:stream";
 import { z } from "zod";
 import {
     createDebugAiSessionRequestSchema,
+    databaseExportQuerySchema,
     debugAiExchangeSchema,
     debugAiSessionDetailSchema,
     debugAiSessionListSchema,
@@ -31,16 +32,33 @@ export async function registerOperatorRoutes(
 ): Promise<void> {
     const guard = new AuthGuard(context.config, context.auth.sessions, context.auth.bearer);
 
-    app.get("/api/v1/admin/database/export", async (request, reply) => {
-        const auth = await guard.require(request);
-        guard.requireGlobalAdministrator(auth);
-        const date = context.clock.now().toISOString().slice(0, 10);
-        return reply
-            .type("application/json; charset=utf-8")
-            .header("content-disposition", `attachment; filename="nethack-export-${date}.json"`)
-            .header("cache-control", "private, no-store")
-            .send(Readable.from(databaseExport.stream(), { encoding: "utf8" }));
-    });
+    app.get(
+        "/api/v1/admin/database/export",
+        { schema: { querystring: databaseExportQuerySchema } },
+        async (request, reply) => {
+            const auth = await guard.require(request);
+            guard.requireGlobalAdministrator(auth);
+            const format = request.query.format;
+            const date = context.clock.now().toISOString().slice(0, 10);
+            return reply
+                .type(
+                    format === "csv"
+                        ? "text/csv; charset=utf-8"
+                        : "application/json; charset=utf-8",
+                )
+                .header(
+                    "content-disposition",
+                    `attachment; filename="nethack-export-${date}.${format}"`,
+                )
+                .header("cache-control", "private, no-store")
+                .send(
+                    Readable.from(
+                        format === "csv" ? databaseExport.streamCsv() : databaseExport.stream(),
+                        { encoding: "utf8" },
+                    ),
+                );
+        },
+    );
 
     app.get(
         "/api/v1/admin/debug/files",

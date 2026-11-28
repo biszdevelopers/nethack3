@@ -251,6 +251,8 @@ export class CompetitionService {
                         description: input.description,
                         themeName: input.themeName,
                         themeDescription: input.themeDescription,
+                        contactEmail: input.contactEmail,
+                        contactUrl: input.contactUrl,
                         showScores: input.showScores,
                         showRanking: input.showRanking,
                         timezone: input.timezone,
@@ -369,6 +371,12 @@ export class CompetitionService {
                 }
                 if (input.themeDescription !== undefined) {
                     values.themeDescription = input.themeDescription;
+                }
+                if (input.contactEmail !== undefined) {
+                    values.contactEmail = input.contactEmail;
+                }
+                if (input.contactUrl !== undefined) {
+                    values.contactUrl = input.contactUrl;
                 }
                 if (input.showScores !== undefined) {
                     values.showScores = input.showScores;
@@ -1086,6 +1094,8 @@ function toEdition(row: EditionRow): CompetitionEdition {
         description: row.description,
         themeName: row.themeName,
         themeDescription: row.themeDescription,
+        contactEmail: row.contactEmail,
+        contactUrl: row.contactUrl,
         showScores: row.showScores,
         showRanking: row.showRanking,
         status: row.status,
@@ -1157,6 +1167,8 @@ function toPublicCompetition(
         description: row.description,
         themeName: row.themeName,
         themeDescription: row.themeDescription,
+        contactEmail: row.contactEmail,
+        contactUrl: row.contactUrl,
         showScores: row.showScores,
         showRanking: row.showRanking,
         status: row.status,

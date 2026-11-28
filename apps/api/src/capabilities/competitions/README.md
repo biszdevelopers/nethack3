@@ -22,7 +22,7 @@ Owns competition series, competition editions, divisions, and the edition schedu
 
 Owned writes: `competition_series`, `competition_editions`, `divisions`, `milestones`.
 
-`competition_editions` stores the public theme (`theme_name`, `theme_description`, both nullable) and the results visibility switches (`show_scores`, `show_ranking`, both non-null, default `false`). Organizers set them on create and update; the public competition payload exposes all four.
+`competition_editions` stores the public theme (`theme_name`, `theme_description`, both nullable), the organizer contact channels (`contact_email`, `contact_url`, both nullable), and the results visibility switches (`show_scores`, `show_ranking`, both non-null, default `false`). Organizers set them on create and update; the public competition payload exposes all six. `contact_email` must be a valid address, `contact_url` must be `https`, and a blank value means not configured (`null`).
 
 Read-only counts used by the edition detail response: `registrations`, `teams`, `submissions`, always scoped by `organization_id` and `edition_id` inside an organization transaction. Public detail reads published `projects` and `teams` through the RLS public predicates; it does not bypass row-level security. The public organization route resolves the slug against `organizations` and then uses `organizations.v1` for the summary and showcase decision.
 
@@ -89,7 +89,7 @@ Published event: `competitions.edition.published` with `{ editionId, organizatio
 
 ## Tests
 
-`tests/competition-rules.test.ts` covers every allowed and forbidden status transition, publish eligibility, team-size bounds, date ordering, division bounds, and the series/division deletion guards. `tests/edition-theme.test.ts` covers the theme fields and results visibility flags in the create, update, and public contracts. The tests are pure and do not require a database.
+`tests/competition-rules.test.ts` covers every allowed and forbidden status transition, publish eligibility, team-size bounds, date ordering, division bounds, and the series/division deletion guards. `tests/edition-theme.test.ts` covers the theme fields and results visibility flags in the create, update, and public contracts. `tests/contact-channels.test.ts` covers organizer contact validation and the public contact payload. The tests are pure and do not require a database.
 
 ## Extraction
 

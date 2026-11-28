@@ -25,6 +25,11 @@ export const notificationSchema = z.object({
 });
 export type Notification = z.infer<typeof notificationSchema>;
 
+export const notificationUnreadCountSchema = z.object({
+    count: z.number().int().nonnegative(),
+});
+export type NotificationUnreadCount = z.infer<typeof notificationUnreadCountSchema>;
+
 export const notificationPreferencesSchema = z.object({
     emailEnabled: z.boolean(),
     inAppEnabled: z.boolean(),

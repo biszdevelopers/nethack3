@@ -10,6 +10,7 @@ import {
     unique,
     uuid,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { competitionEditions, divisions } from "./competitions.js";
 import { organizations } from "./organizations.js";
 import { users } from "./identity.js";
@@ -36,6 +37,7 @@ export const teams = pgTable(
         name: text("name").notNull(),
         description: text("description").notNull().default(""),
         status: teamStatusEnum("status").notNull().default("forming"),
+        statusReason: text("status_reason").notNull().default(""),
         captainUserId: uuid("captain_user_id")
             .notNull()
             .references(() => users.id, { onDelete: "restrict" }),
@@ -75,9 +77,12 @@ export const teamMembers = pgTable(
             .references(() => users.id, { onDelete: "cascade" }),
         role: teamMemberRoleEnum("role").notNull().default("member"),
         joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
+        leftAt: timestamp("left_at", { withTimezone: true }),
     },
     (table) => [
-        uniqueIndex("team_members_team_user_unique").on(table.teamId, table.userId),
+        uniqueIndex("team_members_team_user_unique")
+            .on(table.teamId, table.userId)
+            .where(sql`${table.leftAt} is null`),
         index("team_members_user_idx").on(table.userId),
         index("team_members_org_team_idx").on(table.organizationId, table.teamId),
         foreignKey({

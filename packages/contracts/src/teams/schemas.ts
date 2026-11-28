@@ -32,6 +32,34 @@ export const teamInvitationSchema = z.object({
 });
 export type TeamInvitation = z.infer<typeof teamInvitationSchema>;
 
+export const teamInvitationCreatedSchema = teamInvitationSchema.extend({
+    token: z.string().min(32).max(256),
+    inviteUrl: z.string().startsWith("/"),
+});
+export type TeamInvitationCreated = z.infer<typeof teamInvitationCreatedSchema>;
+
+export const teamInvitationLinkSchema = z.object({
+    invitationId: idSchema,
+    token: z.string().min(32).max(256),
+    inviteUrl: z.string().startsWith("/"),
+    expiresAt: isoDateTimeSchema,
+});
+export type TeamInvitationLink = z.infer<typeof teamInvitationLinkSchema>;
+
+export const myTeamInvitationSchema = z.object({
+    id: idSchema,
+    teamId: idSchema,
+    teamName: z.string(),
+    editionId: idSchema,
+    editionName: z.string(),
+    divisionName: z.string().nullable(),
+    inviterDisplayName: z.string(),
+    status: teamInvitationStatusSchema,
+    expiresAt: isoDateTimeSchema,
+    createdAt: isoDateTimeSchema,
+});
+export type MyTeamInvitation = z.infer<typeof myTeamInvitationSchema>;
+
 export const teamSchema = z.object({
     id: idSchema,
     organizationId: idSchema,
@@ -40,6 +68,7 @@ export const teamSchema = z.object({
     name: z.string(),
     description: z.string(),
     status: teamStatusSchema,
+    statusReason: z.string(),
     captainUserId: idSchema,
     memberCount: z.number().int().nonnegative(),
     maxMembers: z.number().int().min(1),
@@ -77,6 +106,7 @@ export const updateTeamRequestSchema = z
         name: z.string().trim().min(2).max(80).optional(),
         description: z.string().max(2000).optional(),
         status: teamStatusSchema.optional(),
+        reason: z.string().trim().max(500).optional(),
         divisionId: idSchema.nullable().optional(),
     })
     .strict();

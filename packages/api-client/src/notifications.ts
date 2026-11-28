@@ -2,6 +2,7 @@ import {
     listResponseSchema,
     notificationPreferencesSchema,
     notificationSchema,
+    notificationUnreadCountSchema,
     updateNotificationPreferencesRequestSchema,
     type ListResponse,
     type Notification,
@@ -40,6 +41,13 @@ export class NotificationsApi {
 
     async markAllRead(): Promise<void> {
         await this.client.request("POST", "/api/v1/notifications/read-all");
+    }
+
+    async unreadCount(): Promise<number> {
+        const result = await this.client.request("GET", "/api/v1/notifications/unread-count", {
+            schema: notificationUnreadCountSchema,
+        });
+        return result.count;
     }
 
     async preferences(): Promise<NotificationPreferences> {

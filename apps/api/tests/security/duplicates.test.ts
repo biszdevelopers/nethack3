@@ -155,6 +155,7 @@ describe("duplicate and racing operations", () => {
     });
 
     it("allows exactly one duplicate team invitation and one duplicate membership", async () => {
+        await queryAsOwner("update teams set max_members = 10 where id = $1", [fixture.teamId]);
         const email = emailOf(fixture.joinerA);
         const invites = await Promise.all([
             harness.authenticatedRequest(fixture.participant, {
@@ -253,6 +254,7 @@ describe("duplicate and racing operations", () => {
         });
         expectStatus(team, 201, "create capacity team");
         const teamId = (team.json() as IdBody).id;
+        await queryAsOwner("update teams set max_members = 3 where id = $1", [teamId]);
 
         for (const contender of [contenderA, contenderB]) {
             const invitation = await harness.authenticatedRequest(captain, {
@@ -268,6 +270,7 @@ describe("duplicate and racing operations", () => {
 
         const tokenA = await invitationToken(fixture.organizationId, emailOf(contenderA));
         const tokenB = await invitationToken(fixture.organizationId, emailOf(contenderB));
+        await queryAsOwner("update teams set max_members = 2 where id = $1", [teamId]);
         const accepts = await Promise.all([
             harness.authenticatedRequest(contenderA, {
                 method: "POST",

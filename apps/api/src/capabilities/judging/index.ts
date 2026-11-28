@@ -27,8 +27,10 @@ export const judgingCapability: CapabilityDefinition = {
             repository,
             contracts,
             context.events,
+            context.jobs,
             context.audit,
             context.clock,
+            context.config.origins.workspace,
         );
 
         const contract: JudgingContract = {

@@ -16,6 +16,7 @@ import { PreflightService } from "./application/preflight-service.js";
 import { ReportService } from "./application/report-service.js";
 import { registerAdministrationRoutes } from "./http/administration-routes.js";
 import { registerOperatorRoutes } from "./http/operator-routes.js";
+import { AccountDeletionRepository } from "./infrastructure/account-deletion-repository.js";
 import { AdministrationRepository } from "./infrastructure/administration-repository.js";
 import { PostgresDatabaseExportSource } from "./infrastructure/database-export-repository.js";
 import { DebugAiRepository } from "./infrastructure/debug-ai-repository.js";
@@ -52,6 +53,7 @@ export const administrationCapability: CapabilityDefinition = {
         const service = new AdministrationService(
             context.database,
             repository,
+            new AccountDeletionRepository(),
             context.audit,
             context.clock,
             organizationsContract,
@@ -76,14 +78,18 @@ export const administrationCapability: CapabilityDefinition = {
             submissions: submissionsContract,
             judging: judgingContract,
         });
-        const preflight = new PreflightService({
-            editions: editionsContract,
-            teams: teamsContract,
-            projects: context.contracts.get<ProjectsContract>(PROJECTS_CONTRACT),
-            submissions: submissionsContract,
-            judging: judgingContract,
-            voting: context.contracts.get<VotingContract>(VOTING_CONTRACT),
-        });
+        const preflight = new PreflightService(
+            {
+                editions: editionsContract,
+                teams: teamsContract,
+                projects: context.contracts.get<ProjectsContract>(PROJECTS_CONTRACT),
+                submissions: submissionsContract,
+                judging: judgingContract,
+                voting: context.contracts.get<VotingContract>(VOTING_CONTRACT),
+                participants: context.contracts.get<ParticipantsContract>(PARTICIPANTS_CONTRACT),
+            },
+            context.clock,
+        );
 
         return {
             registerRoutes: async (app) => {

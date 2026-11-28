@@ -1,10 +1,10 @@
-import type { TeamFeedbackEntry } from "@nethack/contracts";
+import { TEAM_FEEDBACK_MINIMUM_EVALUATIONS, type TeamFeedbackEntry } from "@nethack/contracts";
 
 /**
  * Written feedback is only released once at least three submitted evaluations
  * exist for a team, so no single judge can be identified from a one-person review.
  */
-export const TEAM_FEEDBACK_MIN_REVIEWERS = 3;
+export const TEAM_FEEDBACK_MIN_REVIEWERS = TEAM_FEEDBACK_MINIMUM_EVALUATIONS;
 
 export interface SubmittedTeamFeedbackRow {
     readonly comment: string;
