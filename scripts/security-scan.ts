@@ -13,6 +13,7 @@ const skippedDirectories = new Set([
     "playwright-report",
     "test-results",
     "artifacts",
+    "basishacks-r2",
 ]);
 const secretPatterns: readonly { readonly name: string; readonly pattern: RegExp }[] = [
     { name: "private key", pattern: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/u },

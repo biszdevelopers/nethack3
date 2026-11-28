@@ -77,7 +77,7 @@ All results below were executed on this host unless marked otherwise.
 | End-to-end | `bun run test:e2e` | 53 cases in 15 files, 1 desktop skip, 52 passed; accessibility/visual spec 22/22 |
 | Runtime matrix | `bun run verify:runtime` | 11/11 checks passed and exited 0: API health, site HTTP, migrations, and worker startup under Node 24 and Bun 1.3.14, plus package builds |
 | Dependency audit | `bun audit --audit-level=high` | Pass, no high-severity advisory reported |
-| Secret scan and SBOM | `bun run security:scan` | Pass; 70-component CycloneDX SBOM written and uploaded by CI, plus a daily scheduled audit workflow |
+| Secret scan and SBOM | `bun run security:scan` | Pass; 71-component CycloneDX SBOM written and uploaded by CI, plus a daily scheduled audit workflow |
 | Performance | `bun run test:performance` | Lighthouse 13.6.0: 100 performance, 100 accessibility, 100 best practices, 100 SEO on mobile and desktop |
 | Load | `bun run test:load` with k6 2.4.0 | 0% failed requests, public p95 96 ms, health p95 31 ms, 20 VUs |
 | Migration tool | `tests/migration/migrate-legacy.test.ts` | 22 tests passed |
