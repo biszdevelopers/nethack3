@@ -22,4 +22,8 @@ describe("JudgingRules.assertEditionWritable", () => {
     it.each(frozen)("rejects evaluation while the edition is %s", (status) => {
         expect(() => JudgingRules.assertEditionWritable(status)).toThrow(ConflictError);
     });
+
+    it.each(frozen)("rejects score curve edits while the edition is %s", (status) => {
+        expect(() => JudgingRules.assertEditionWritable(status)).toThrow(ConflictError);
+    });
 });

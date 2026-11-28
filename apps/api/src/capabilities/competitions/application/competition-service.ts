@@ -262,6 +262,7 @@ export class CompetitionService {
                         teamMaxSize: input.teamMaxSize,
                         maxParticipants: input.maxParticipants,
                         rulesMarkdown: input.rulesMarkdown,
+                        resultsOpenAt: parseNullable(input.resultsOpenAt),
                     });
                     await this.audit.record(session, {
                         organizationId,
@@ -389,6 +390,9 @@ export class CompetitionService {
                 }
                 if (input.rulesMarkdown !== undefined) {
                     values.rulesMarkdown = input.rulesMarkdown;
+                }
+                if (input.resultsOpenAt !== undefined) {
+                    values.resultsOpenAt = parseNullable(input.resultsOpenAt);
                 }
                 if (input.registrationOpensAt !== undefined) {
                     values.registrationOpensAt = parseNullable(input.registrationOpensAt);
@@ -1094,6 +1098,7 @@ function toEdition(row: EditionRow): CompetitionEdition {
         teamMaxSize: row.teamMaxSize,
         maxParticipants: row.maxParticipants,
         rulesMarkdown: row.rulesMarkdown,
+        resultsOpenAt: nullableIso(row.resultsOpenAt),
         publishedAt: nullableIso(row.publishedAt),
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
@@ -1161,6 +1166,7 @@ function toPublicCompetition(
         startsAt: nullableIso(row.startsAt),
         endsAt: nullableIso(row.endsAt),
         registrationClosesAt: nullableIso(row.registrationClosesAt),
+        resultsOpenAt: nullableIso(row.resultsOpenAt),
         teamMinSize: row.teamMinSize,
         teamMaxSize: row.teamMaxSize,
         publishedProjectCount,

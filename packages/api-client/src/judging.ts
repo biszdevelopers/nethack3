@@ -19,6 +19,7 @@ import {
     saveEvaluationRequestSchema,
     scoreCurveResponseSchema,
     scoreCurveSchema,
+    teamFeedbackResponseSchema,
     updateRubricRequestSchema,
     updateRubricTemplateRequestSchema,
     type ApplyRubricTemplateRequest,
@@ -42,6 +43,7 @@ import {
     type SaveEvaluationRequest,
     type ScoreCurve,
     type ScoreCurveResponse,
+    type TeamFeedbackResponse,
     type UpdateRubricRequest,
     type UpdateRubricTemplateRequest,
 } from "@nethack/contracts";
@@ -351,6 +353,21 @@ export class JudgingApi {
             schema: judgeFlagSchema,
             headers: organizationHeader(organizationId),
         });
+    }
+
+    async teamFeedback(
+        organizationId: string,
+        editionId: string,
+        teamId: string,
+    ): Promise<TeamFeedbackResponse> {
+        return this.client.request(
+            "GET",
+            `/api/v1/competitions/${editionId}/teams/${teamId}/judging-feedback`,
+            {
+                schema: teamFeedbackResponseSchema,
+                headers: organizationHeader(organizationId),
+            },
+        );
     }
 
     async coverage(organizationId: string, editionId: string): Promise<JudgingCoverage> {

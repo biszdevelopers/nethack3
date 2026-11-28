@@ -1,4 +1,16 @@
-import { and, desc, eq, exists, inArray, isNotNull, lt, or, sql, type SQL } from "drizzle-orm";
+import {
+    and,
+    desc,
+    eq,
+    exists,
+    inArray,
+    isNotNull,
+    isNull,
+    lt,
+    or,
+    sql,
+    type SQL,
+} from "drizzle-orm";
 import type { ProjectStatus, TeamStatus } from "@nethack/contracts";
 import type { DatabaseExecutor, DatabaseSession } from "../../../infrastructure/database/client.js";
 import {
@@ -255,6 +267,46 @@ export class ProjectRepository {
             throw new Error("The project could not be updated.");
         }
         return row;
+    }
+
+    async lock(
+        session: DatabaseSession,
+        organizationId: string,
+        projectId: string,
+        at: Date,
+    ): Promise<ProjectRow | null> {
+        const [row] = await session.db
+            .update(projects)
+            .set({ lockedAt: at, updatedAt: at })
+            .where(
+                and(
+                    eq(projects.organizationId, organizationId),
+                    eq(projects.id, projectId),
+                    isNull(projects.lockedAt),
+                ),
+            )
+            .returning();
+        return row ?? null;
+    }
+
+    async unlock(
+        session: DatabaseSession,
+        organizationId: string,
+        projectId: string,
+        at: Date,
+    ): Promise<ProjectRow | null> {
+        const [row] = await session.db
+            .update(projects)
+            .set({ lockedAt: null, updatedAt: at })
+            .where(
+                and(
+                    eq(projects.organizationId, organizationId),
+                    eq(projects.id, projectId),
+                    isNotNull(projects.lockedAt),
+                ),
+            )
+            .returning();
+        return row ?? null;
     }
 
     async listMembers(

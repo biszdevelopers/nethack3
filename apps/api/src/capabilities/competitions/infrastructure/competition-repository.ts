@@ -76,6 +76,7 @@ export interface NewEditionValues {
     readonly teamMaxSize: number;
     readonly maxParticipants: number | null;
     readonly rulesMarkdown: string;
+    readonly resultsOpenAt: Date | null;
 }
 
 export interface EditionUpdateValues {
@@ -96,6 +97,7 @@ export interface EditionUpdateValues {
     readonly teamMaxSize?: number;
     readonly maxParticipants?: number | null;
     readonly rulesMarkdown?: string;
+    readonly resultsOpenAt?: Date | null;
     readonly publishedAt?: Date | null;
 }
 

@@ -68,6 +68,14 @@ export interface EditionEvaluationRow {
     readonly submittedAt: string | null;
 }
 
+export interface SubmittedFeedbackRow {
+    readonly evaluationId: string;
+    readonly submissionId: string;
+    readonly overallComment: string;
+    readonly weightedScore: number | null;
+    readonly submittedAt: Date;
+}
+
 export interface JudgeFlagView {
     readonly flag: JudgeFlagRow;
     readonly reportedByDisplayName: string;
@@ -1158,6 +1166,57 @@ export class JudgingRepository {
                 overallComment: row.overallComment,
                 submittedAt: row.submittedAt,
                 scores: scoresByEvaluation.get(row.evaluationId) ?? [],
+            });
+        }
+        return results;
+    }
+
+    async listSubmittedFeedbackForSubmissions(
+        db: DatabaseExecutor,
+        organizationId: string,
+        editionId: string,
+        submissionIds: readonly string[],
+    ): Promise<readonly SubmittedFeedbackRow[]> {
+        if (submissionIds.length === 0) {
+            return [];
+        }
+        const rows = await db
+            .select({
+                evaluationId: evaluations.id,
+                submissionId: judgeAssignments.submissionId,
+                overallComment: evaluations.overallComment,
+                weightedScore: evaluations.weightedScore,
+                submittedAt: evaluations.submittedAt,
+            })
+            .from(evaluations)
+            .innerJoin(
+                judgeAssignments,
+                and(
+                    eq(judgeAssignments.id, evaluations.assignmentId),
+                    eq(judgeAssignments.organizationId, organizationId),
+                ),
+            )
+            .where(
+                and(
+                    eq(evaluations.organizationId, organizationId),
+                    eq(evaluations.status, "submitted"),
+                    eq(judgeAssignments.editionId, editionId),
+                    inArray(judgeAssignments.submissionId, [...submissionIds]),
+                    isNotNull(evaluations.submittedAt),
+                ),
+            )
+            .orderBy(asc(evaluations.submittedAt), asc(evaluations.id));
+        const results: SubmittedFeedbackRow[] = [];
+        for (const row of rows) {
+            if (row.submittedAt === null) {
+                continue;
+            }
+            results.push({
+                evaluationId: row.evaluationId,
+                submissionId: row.submissionId,
+                overallComment: row.overallComment,
+                weightedScore: row.weightedScore === null ? null : Number(row.weightedScore),
+                submittedAt: row.submittedAt,
             });
         }
         return results;

@@ -25,6 +25,7 @@ const PUBLIC_COMPETITION = {
     startsAt: null,
     endsAt: null,
     registrationClosesAt: null,
+    resultsOpenAt: null,
     teamMinSize: 1,
     teamMaxSize: 4,
     showScores: false,

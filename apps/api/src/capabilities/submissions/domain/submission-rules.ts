@@ -1,7 +1,10 @@
-import type {
-    CompetitionEditionStatus,
-    OrganizationRole,
-    SubmissionStatus,
+import {
+    missingProjectEvidence,
+    PROJECT_EVIDENCE_LABELS,
+    type CompetitionEditionStatus,
+    type OrganizationRole,
+    type ProjectEvidence,
+    type SubmissionStatus,
 } from "@nethack/contracts";
 import { ConflictError } from "../../../core/errors.js";
 
@@ -61,6 +64,21 @@ export class SubmissionRules {
             return projectTitle;
         }
         return "Untitled project";
+    }
+
+    /**
+     * Submission integrity: a project must carry the repository, demo, video,
+     * and AI-use evidence before any version exists or is marked ready.
+     */
+    static assertProjectEvidence(project: ProjectEvidence): void {
+        const missing = missingProjectEvidence(project);
+        if (missing.length > 0) {
+            throw new ConflictError(
+                `The project is missing required submission evidence: ${missing
+                    .map((field) => PROJECT_EVIDENCE_LABELS[field])
+                    .join(", ")}.`,
+            );
+        }
     }
 
     static assertSubmissionWindow(edition: EditionSubmissionWindow, now: Date): void {

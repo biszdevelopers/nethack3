@@ -1,3 +1,4 @@
+import { MINIMUM_PUBLIC_REVIEWS } from "@nethack/contracts";
 import type {
     JudgingResult,
     PublicAward,
@@ -63,8 +64,29 @@ export interface TeamResultView {
     readonly teamId: string;
     readonly teamName: string;
     readonly project: { readonly id: string; readonly title: string } | null;
+    readonly submissionId: string | null;
+    readonly submittedCount: number;
     readonly rank: number | null;
+    readonly averageScore: number | null;
+    readonly displayScore: number | null;
     readonly awards: readonly PublicTeamAward[];
+}
+
+/** Removes ranks and scores a submission has not earned enough reviews for. */
+export function applyReviewThreshold(results: PublicResults): PublicResults {
+    return {
+        ...results,
+        judgingEntries: results.judgingEntries.map((entry) =>
+            entry.submittedCount >= MINIMUM_PUBLIC_REVIEWS
+                ? entry
+                : {
+                      ...entry,
+                      rank: null,
+                      averageScore: null,
+                      displayScore: null,
+                  },
+        ),
+    };
 }
 
 export function assemblePublicResults(input: ResultAssemblyInput): PublicResults {
@@ -116,6 +138,7 @@ export function assemblePublicResults(input: ResultAssemblyInput): PublicResults
         .map((result) => {
             const team = result.teamId === null ? undefined : teamsById.get(result.teamId);
             const submission = submissionsById.get(result.submissionId);
+            const enoughReviews = result.submittedCount >= MINIMUM_PUBLIC_REVIEWS;
             return {
                 submissionId: result.submissionId,
                 projectId: result.projectId,
@@ -127,9 +150,9 @@ export function assemblePublicResults(input: ResultAssemblyInput): PublicResults
                     team === undefined || team.divisionId === null
                         ? null
                         : (divisionsById.get(team.divisionId) ?? null),
-                rank: result.rank,
-                averageScore: result.averageScore,
-                displayScore: result.displayScore ?? null,
+                rank: enoughReviews ? result.rank : null,
+                averageScore: enoughReviews ? result.averageScore : null,
+                displayScore: enoughReviews ? (result.displayScore ?? null) : null,
                 submittedCount: result.submittedCount,
                 assignmentCount: result.assignmentCount,
                 awards: result.teamId === null ? [] : (awardsByTeam.get(result.teamId) ?? []),
@@ -272,7 +295,11 @@ export function findTeamResult(results: PublicResults, teamId: string): TeamResu
         teamId,
         teamName,
         project,
+        submissionId: entry?.submissionId ?? null,
+        submittedCount: entry?.submittedCount ?? 0,
         rank: entry?.rank ?? null,
+        averageScore: entry?.averageScore ?? null,
+        displayScore: entry?.displayScore ?? null,
         awards,
     };
 }

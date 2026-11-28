@@ -23,6 +23,7 @@ export interface EditionSummary {
     readonly teamMaxSize: number;
     readonly maxParticipants: number | null;
     readonly rulesMarkdown: string;
+    readonly resultsOpenAt?: string | null;
     readonly publishedAt: string | null;
 }
 

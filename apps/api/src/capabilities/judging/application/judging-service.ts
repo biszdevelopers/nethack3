@@ -20,6 +20,9 @@ import type {
     SaveEvaluationRequest,
     ScoreCurve,
     ScoreCurveResponse,
+    SubmissionStatus,
+    TeamFeedbackEntry,
+    TeamFeedbackResponse,
     UpdateRubricRequest,
     UpdateRubricTemplateRequest,
 } from "@nethack/contracts";
@@ -50,12 +53,14 @@ import type { ProjectsContract } from "../../projects/contracts.js";
 import type { SubmissionSummary, SubmissionsContract } from "../../submissions/contracts.js";
 import type { TeamsContract } from "../../teams/contracts.js";
 import { nextEvaluationRevision, toEvaluationVersion } from "../domain/evaluation-history.js";
+import { assertJudgeCommentReady } from "../domain/judge-comments.js";
 import { JudgeFlagRules } from "../domain/judge-flags.js";
 import { summarizeJudgeCoverage } from "../domain/judging-coverage.js";
 import { aggregateJudgingResults } from "../domain/judging-results.js";
 import { JudgingRules, type ScorableCriterion } from "../domain/judging-rules.js";
 import {
     assertRubricCriteria,
+    assertRubricWeightTotal,
     assertTemplateTrack,
     buildRubricSnapshot,
     nextRubricVersion,
@@ -68,6 +73,11 @@ import {
     assertValidScoreCurve,
     DEFAULT_SCORE_CURVE_POINTS,
 } from "../domain/score-curve.js";
+import {
+    anonymousTeamFeedback,
+    TEAM_FEEDBACK_MIN_REVIEWERS,
+    type SubmittedTeamFeedbackRow,
+} from "../domain/team-feedback.js";
 import type { JudgingSummary } from "../contracts.js";
 import {
     EMPTY_PROJECT_DISCLOSURE,
@@ -247,6 +257,7 @@ export class JudgingService {
                               weight: Number(criterion.weight),
                           }))
                         : this.resolveCriteria(input.criteria);
+                assertRubricWeightTotal(criteria.map((criterion) => criterion.weight));
                 const latest = await this.repository.maxRubricVersion(
                     session.db,
                     organizationId,
@@ -325,6 +336,9 @@ export class JudgingService {
                         "The judging rubric was not found for this competition edition.",
                     );
                 }
+                assertRubricWeightTotal(
+                    existing.criteria.map((criterion) => Number(criterion.weight)),
+                );
                 const rubric = existing.rubric.active
                     ? existing.rubric
                     : await this.repository.setRubricActive(
@@ -637,7 +651,7 @@ export class JudgingService {
         ip: string | null,
     ): Promise<ScoreCurveResponse> {
         this.assertOrganizer(auth, organizationId);
-        await this.requireEdition(organizationId, editionId);
+        await this.requireWritableEdition(organizationId, editionId);
         assertValidScoreCurve(curve.points);
         const now = this.clock.now();
         const row = await this.database.transaction(
@@ -849,12 +863,23 @@ export class JudgingService {
                     return assignment;
                 },
             );
+            const [project, team] = await Promise.all([
+                this.contracts.projects.getProject(organizationId, submission.projectId),
+                submission.teamId === null
+                    ? Promise.resolve(null)
+                    : this.contracts.teams.getTeam(organizationId, submission.teamId),
+            ]);
+            const divisionName = await this.divisionNameFor(
+                organizationId,
+                team?.divisionId ?? null,
+            );
             return toAssignment(
                 { assignment: row, judgeDisplayName: judge.displayName },
                 submission.title,
-                toProjectDisclosure(
-                    await this.contracts.projects.getProject(organizationId, submission.projectId),
-                ),
+                team?.name ?? null,
+                divisionName,
+                submission.status,
+                toProjectDisclosure(project),
                 isEditionResultsFrozen(edition.status),
             );
         } catch (error) {
@@ -1097,21 +1122,43 @@ export class JudgingService {
             submissionRows.map((submission) => [submission.id, submission] as const),
         );
         const teamsById = new Map(teamRows.map((team) => [team.id, team] as const));
+        const submittedSubmissionIds = new Set(rows.map((row) => row.submissionId));
+        const [disclosures, divisionNames] = await Promise.all([
+            this.projectDisclosures(
+                organizationId,
+                submissionRows
+                    .filter((submission) => submittedSubmissionIds.has(submission.id))
+                    .map((submission) => submission.projectId),
+            ),
+            this.divisionNamesById(
+                organizationId,
+                teamRows.map((team) => team.divisionId),
+            ),
+        ]);
         return rows.map((row) => {
             const submission = submissionsById.get(row.submissionId);
             if (submission === undefined) {
                 throw new InternalError("A judging evaluation references a missing submission.");
             }
+            const team = submission.teamId === null ? undefined : teamsById.get(submission.teamId);
+            const disclosure = disclosures.get(submission.projectId) ?? EMPTY_PROJECT_DISCLOSURE;
             return {
                 assignmentId: row.assignmentId,
                 submissionId: row.submissionId,
                 projectId: submission.projectId,
                 projectTitle: submission.title,
                 teamId: submission.teamId,
-                teamName:
-                    submission.teamId === null
+                teamName: team?.name ?? null,
+                divisionName:
+                    team?.divisionId === null || team?.divisionId === undefined
                         ? null
-                        : (teamsById.get(submission.teamId)?.name ?? null),
+                        : (divisionNames.get(team.divisionId) ?? null),
+                descriptionMarkdown: disclosure.descriptionMarkdown,
+                repositoryUrl: disclosure.repositoryUrl,
+                demoUrl: disclosure.demoUrl,
+                videoUrl: disclosure.videoUrl,
+                aiDisclosure: disclosure.aiDisclosure,
+                submissionStatus: submission.status,
                 rubricName: row.rubricName,
                 rubricVersion: row.rubricVersion,
                 evaluationId: row.evaluationId,
@@ -1125,6 +1172,72 @@ export class JudgingService {
                 scores: row.scores.map((score) => ({ ...score })),
             };
         });
+    }
+
+    /**
+     * Anonymous written feedback for one team. Returns entries only after at
+     * least TEAM_FEEDBACK_MIN_REVIEWERS submitted evaluations exist; judge
+     * identity and individual score breakdowns are never part of the result.
+     */
+    async teamFeedbackForOrganization(
+        organizationId: string,
+        editionId: string,
+        teamId: string,
+    ): Promise<readonly TeamFeedbackEntry[]> {
+        const loaded = await this.loadTeamFeedback(organizationId, editionId, teamId);
+        return anonymousTeamFeedback(loaded.rows);
+    }
+
+    async teamFeedbackView(
+        auth: AuthContext,
+        organizationId: string,
+        editionId: string,
+        teamId: string,
+    ): Promise<TeamFeedbackResponse> {
+        this.assertOrganizer(auth, organizationId);
+        const loaded = await this.loadTeamFeedback(organizationId, editionId, teamId);
+        const feedback = anonymousTeamFeedback(loaded.rows);
+        return {
+            teamId,
+            threshold: TEAM_FEEDBACK_MIN_REVIEWERS,
+            submittedCount: loaded.rows.length,
+            withheld: feedback.length === 0,
+            feedback: [...feedback],
+        };
+    }
+
+    private async loadTeamFeedback(
+        organizationId: string,
+        editionId: string,
+        teamId: string,
+    ): Promise<{ readonly rows: readonly SubmittedTeamFeedbackRow[] }> {
+        await this.requireEdition(organizationId, editionId);
+        const team = await this.contracts.teams.getTeam(organizationId, teamId);
+        if (team === null || team.editionId !== editionId) {
+            throw new NotFoundError("The team was not found for this competition edition.");
+        }
+        const submissions = await this.contracts.submissions.listEditionSubmissions(
+            organizationId,
+            editionId,
+        );
+        const submissionIds = submissions
+            .filter((submission) => submission.teamId === teamId)
+            .map((submission) => submission.id);
+        const rows = await this.database.transaction({ organizationId }, async (session) =>
+            this.repository.listSubmittedFeedbackForSubmissions(
+                session.db,
+                organizationId,
+                editionId,
+                submissionIds,
+            ),
+        );
+        return {
+            rows: rows.map((row) => ({
+                comment: row.overallComment,
+                weightedScore: row.weightedScore,
+                submittedAt: row.submittedAt.toISOString(),
+            })),
+        };
     }
 
     async assignmentDetail(
@@ -1170,15 +1283,25 @@ export class JudgingService {
             view.assignment.editionId,
             view.assignment.submissionId,
         );
-        const disclosure = toProjectDisclosure(
-            await this.contracts.projects.getProject(organizationId, submission.projectId),
+        const project = await this.contracts.projects.getProject(
+            organizationId,
+            submission.projectId,
         );
+        const disclosure = toProjectDisclosure(project);
+        const team =
+            submission.teamId === null
+                ? null
+                : await this.contracts.teams.getTeam(organizationId, submission.teamId);
+        const divisionName = await this.divisionNameFor(organizationId, team?.divisionId ?? null);
         const evaluationView =
             evaluation === null ? null : toEvaluation(evaluation.evaluation, evaluation.scores);
         return {
             assignment: toAssignment(
                 view,
                 submission.title,
+                team?.name ?? null,
+                divisionName,
+                submission.status,
                 disclosure,
                 isEditionResultsFrozen(edition.status),
             ),
@@ -1189,8 +1312,14 @@ export class JudgingService {
                 projectId: submission.projectId,
                 projectTitle: submission.title,
                 teamId: submission.teamId,
+                teamName: team?.name ?? null,
+                divisionName,
+                submissionStatus: submission.status,
                 videoUrl: disclosure.videoUrl,
                 aiDisclosure: disclosure.aiDisclosure,
+                repositoryUrl: disclosure.repositoryUrl,
+                demoUrl: disclosure.demoUrl,
+                descriptionMarkdown: disclosure.descriptionMarkdown,
             },
             evaluation: evaluationView,
             scoreCurve: { points: [...curvePoints] },
@@ -1284,6 +1413,10 @@ export class JudgingService {
                 }
                 JudgingRules.assertCanEvaluate(assignment.status);
                 JudgingRules.assertBeforeDeadline(assignment.dueAt, now);
+                assertJudgeCommentReady(input.overallComment, {
+                    displayName: auth.user.displayName,
+                    email: auth.user.email,
+                });
                 const rubric = await this.repository.findRubric(
                     session.db,
                     organizationId,
@@ -1414,6 +1547,10 @@ export class JudgingService {
                 if (loaded.evaluation.status === "submitted") {
                     throw new ConflictError("This evaluation was already submitted.");
                 }
+                assertJudgeCommentReady(loaded.evaluation.overallComment, {
+                    displayName: auth.user.displayName,
+                    email: auth.user.email,
+                });
                 const rubric = await this.repository.findRubric(
                     session.db,
                     organizationId,
@@ -1710,24 +1847,77 @@ export class JudgingService {
             return [];
         }
         const summaries = await this.submissionSummaries(organizationId, views);
-        const disclosures = await this.projectDisclosures(
+        const editionIds = [...new Set(views.map((view) => view.assignment.editionId))];
+        const [teamLists, disclosures] = await Promise.all([
+            Promise.all(
+                editionIds.map((editionId) =>
+                    this.contracts.teams.listEditionTeams(organizationId, editionId),
+                ),
+            ),
+            this.projectDisclosures(
+                organizationId,
+                [...summaries.values()].map((summary) => summary.projectId),
+            ),
+        ]);
+        const teamsById = new Map(teamLists.flat().map((team) => [team.id, team] as const));
+        const divisionNames = await this.divisionNamesById(
             organizationId,
-            [...summaries.values()].map((summary) => summary.projectId),
+            [...teamsById.values()].map((team) => team.divisionId),
         );
         return views.map((view) => {
             const summary = summaries.get(view.assignment.submissionId);
             if (summary === undefined) {
                 throw new InternalError("A judging assignment references a missing submission.");
             }
+            const team = summary.teamId === null ? undefined : teamsById.get(summary.teamId);
             return toAssignment(
                 view,
                 summary.title,
+                team?.name ?? null,
+                team?.divisionId === null || team?.divisionId === undefined
+                    ? null
+                    : (divisionNames.get(team.divisionId) ?? null),
+                summary.status,
                 disclosures.get(summary.projectId) ?? EMPTY_PROJECT_DISCLOSURE,
                 typeof frozen === "boolean"
                     ? frozen
                     : (frozen.get(view.assignment.editionId) ?? false),
             );
         });
+    }
+
+    private async divisionNamesById(
+        organizationId: string,
+        divisionIds: readonly (string | null)[],
+    ): Promise<ReadonlyMap<string, string>> {
+        const uniqueIds = [
+            ...new Set(
+                divisionIds.filter((divisionId): divisionId is string => divisionId !== null),
+            ),
+        ];
+        const entries = await Promise.all(
+            uniqueIds.map(async (divisionId) => {
+                const division = await this.contracts.competitions.getDivision(
+                    organizationId,
+                    divisionId,
+                );
+                return division === null ? null : ([division.id, division.name] as const);
+            }),
+        );
+        return new Map(
+            entries.filter((entry): entry is readonly [string, string] => entry !== null),
+        );
+    }
+
+    private async divisionNameFor(
+        organizationId: string,
+        divisionId: string | null,
+    ): Promise<string | null> {
+        if (divisionId === null) {
+            return null;
+        }
+        const division = await this.contracts.competitions.getDivision(organizationId, divisionId);
+        return division?.name ?? null;
     }
 
     private async projectDisclosures(
@@ -1981,6 +2171,9 @@ function toCriterion(row: CriterionRow): Criterion {
 function toAssignment(
     view: AssignmentView,
     projectTitle: string,
+    teamName: string | null,
+    divisionName: string | null,
+    submissionStatus: SubmissionStatus,
     disclosure: ProjectDisclosure,
     frozen?: boolean,
 ): JudgeAssignment {
@@ -1993,8 +2186,14 @@ function toAssignment(
         judgeUserId: view.assignment.judgeUserId,
         judgeDisplayName: view.judgeDisplayName,
         projectTitle,
+        teamName,
+        divisionName,
+        descriptionMarkdown: disclosure.descriptionMarkdown,
+        submissionStatus,
         videoUrl: disclosure.videoUrl,
         aiDisclosure: disclosure.aiDisclosure,
+        repositoryUrl: disclosure.repositoryUrl,
+        demoUrl: disclosure.demoUrl,
         status: view.assignment.status,
         conflictNote: view.assignment.conflictNote,
         assignmentNote: view.assignment.assignmentNote,

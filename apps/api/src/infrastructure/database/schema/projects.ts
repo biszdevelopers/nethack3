@@ -40,6 +40,7 @@ export const projects = pgTable(
         tags: text("tags").array().notNull().default([]),
         status: projectStatusEnum("status").notNull().default("draft"),
         publishedAt: timestamp("published_at", { withTimezone: true }),
+        lockedAt: timestamp("locked_at", { withTimezone: true }),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     },

@@ -57,6 +57,13 @@
             "when": 1795840709873,
             "tag": "0007_foamy_morlocks",
             "breakpoints": true
+        },
+        {
+            "idx": 8,
+            "version": "7",
+            "when": 1795847179476,
+            "tag": "0008_last_micromacro",
+            "breakpoints": true
         }
     ]
 }

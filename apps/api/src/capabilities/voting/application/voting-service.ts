@@ -29,7 +29,14 @@ import type { ParticipantsContract } from "../../participants/contracts.js";
 import type { ProjectsContract } from "../../projects/contracts.js";
 import type { SubmissionsContract } from "../../submissions/contracts.js";
 import type { TeamsContract } from "../../teams/contracts.js";
-import { toVotableSubmissions } from "../domain/votable-submissions.js";
+import {
+    assertSelectionsEligible,
+    toBallotEligibility,
+    type BallotEligibility,
+    type SubmissionPlacement,
+    type TeamDivision,
+} from "../domain/ballot-eligibility.js";
+import { toVotableSubmissions, type VotableTeamInfo } from "../domain/votable-submissions.js";
 import { rankVoteTallies } from "../domain/voting-results.js";
 import { normalizeEligibleRoles, VotingRules } from "../domain/voting-rules.js";
 import type {
@@ -97,9 +104,15 @@ export class VotingService {
         organizationId: string,
         role: OrganizationRole,
         editionId: string,
+        userId: string,
     ): Promise<readonly VotableSubmission[]> {
         await this.requireEdition(organizationId, editionId);
         await this.assertCanDiscoverVotableSubmissions(organizationId, editionId, role);
+        // Organizers manage the edition and may review every votable submission.
+        // Every other member gets the ballot scope: same division, own team excluded.
+        const eligibility = VotingRules.isOrganizerRole(role)
+            ? null
+            : await this.resolveBallotEligibility(organizationId, editionId, userId);
         const submissions = await this.submissions.listEditionSubmissions(
             organizationId,
             editionId,
@@ -107,7 +120,7 @@ export class VotingService {
         const votable = submissions.filter((submission) =>
             VotingRules.isVotableSubmission(submission.status),
         );
-        const teamNames = await this.resolveTeamNames(
+        const teams = await this.resolveTeamInfo(
             organizationId,
             votable.flatMap((submission) =>
                 submission.teamId === null ? [] : [submission.teamId],
@@ -122,7 +135,8 @@ export class VotingService {
                 ...submission,
                 ...(disclosures.get(submission.projectId) ?? EMPTY_PROJECT_DISCLOSURE),
             })),
-            teamNames,
+            teams,
+            eligibility,
         );
     }
 
@@ -390,10 +404,16 @@ export class VotingService {
         VotingRules.assertBallotWindow(round, now);
         VotingRules.assertScores(input.scores, round.maxSelections, round.maxVotesPerUser);
         await this.assertVoterEligible(organizationId, round, auth.user.id, role);
+        const eligibility = await this.resolveBallotEligibility(
+            organizationId,
+            round.editionId,
+            auth.user.id,
+        );
         await this.assertSelectionsAreVotable(
             organizationId,
             round,
             input.scores.map((score) => score.submissionId),
+            eligibility,
         );
 
         try {
@@ -555,7 +575,7 @@ export class VotingService {
         );
         const titles = new Map<string, string>();
         const teamNamesBySubmission = new Map<string, string | null>();
-        const teamNames = await this.resolveTeamNames(
+        const teams = await this.resolveTeamInfo(
             organizationId,
             submissions.flatMap((submission) =>
                 submission.teamId === null ? [] : [submission.teamId],
@@ -565,7 +585,7 @@ export class VotingService {
             titles.set(submission.id, submission.title);
             teamNamesBySubmission.set(
                 submission.id,
-                submission.teamId === null ? null : (teamNames.get(submission.teamId) ?? null),
+                submission.teamId === null ? null : (teams.get(submission.teamId)?.name ?? null),
             );
         }
         const entries = rankVoteTallies(counts, titles, RESULT_LIMIT, teamNamesBySubmission);
@@ -683,20 +703,55 @@ export class VotingService {
         }
     }
 
-    private async resolveTeamNames(
+    private async resolveBallotEligibility(
+        organizationId: string,
+        editionId: string,
+        userId: string,
+    ): Promise<BallotEligibility> {
+        const team = await this.teams.getTeamForUser(organizationId, editionId, userId);
+        return toBallotEligibility(team);
+    }
+
+    private async resolveTeamInfo(
         organizationId: string,
         teamIds: readonly string[],
-    ): Promise<Map<string, string>> {
-        const names = new Map<string, string>();
-        await Promise.all(
-            [...new Set(teamIds)].map(async (teamId) => {
+    ): Promise<Map<string, VotableTeamInfo>> {
+        const uniqueTeamIds = [...new Set(teamIds)];
+        const teamRows = await Promise.all(
+            uniqueTeamIds.map(async (teamId) => {
                 const team = await this.teams.getTeam(organizationId, teamId);
-                if (team !== null) {
-                    names.set(teamId, team.name);
+                return [teamId, team] as const;
+            }),
+        );
+        const divisionIds = [
+            ...new Set(
+                teamRows.flatMap(([, team]) =>
+                    team === null || team.divisionId === null ? [] : [team.divisionId],
+                ),
+            ),
+        ];
+        const divisionNames = new Map<string, string>();
+        await Promise.all(
+            divisionIds.map(async (divisionId) => {
+                const division = await this.competitions.getDivision(organizationId, divisionId);
+                if (division !== null) {
+                    divisionNames.set(divisionId, division.name);
                 }
             }),
         );
-        return names;
+        const info = new Map<string, VotableTeamInfo>();
+        for (const [teamId, team] of teamRows) {
+            if (team === null) {
+                continue;
+            }
+            info.set(teamId, {
+                name: team.name,
+                divisionId: team.divisionId,
+                divisionName:
+                    team.divisionId === null ? null : (divisionNames.get(team.divisionId) ?? null),
+            });
+        }
+        return info;
     }
 
     private async projectDisclosures(
@@ -716,6 +771,7 @@ export class VotingService {
         organizationId: string,
         round: VotingRoundRow,
         submissionIds: readonly string[],
+        eligibility: BallotEligibility,
     ): Promise<void> {
         const submissions = await this.submissions.listEditionSubmissions(
             organizationId,
@@ -733,6 +789,26 @@ export class VotingService {
                 throw new ConflictError("A scored submission is not open for voting.");
             }
         }
+        // Re-apply the discovery scope on cast: the client is never trusted to
+        // submit an out-of-division or own-team submission.
+        const selected = submissionIds.flatMap((submissionId) => {
+            const submission = byId.get(submissionId);
+            return submission === undefined ? [] : [submission];
+        });
+        const teams = await this.resolveTeamInfo(
+            organizationId,
+            selected.flatMap((submission) =>
+                submission.teamId === null ? [] : [submission.teamId],
+            ),
+        );
+        const teamDivisions = new Map<string, TeamDivision>();
+        for (const [teamId, team] of teams) {
+            teamDivisions.set(teamId, { divisionId: team.divisionId });
+        }
+        const placements = new Map<string, SubmissionPlacement>(
+            selected.map((submission) => [submission.id, { teamId: submission.teamId }]),
+        );
+        assertSelectionsEligible(submissionIds, placements, teamDivisions, eligibility);
     }
 
     private async publishRoundEvent(

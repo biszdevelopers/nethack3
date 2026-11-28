@@ -11,7 +11,7 @@ import type {
 } from "../../../infrastructure/database/schema/judging.js";
 
 const MAX_CRITERIA = 20;
-const LEGACY_WEIGHT_TOTAL = 10;
+export const RUBRIC_WEIGHT_TOTAL_TOLERANCE = 0.01;
 
 export interface RubricCriterionInput {
     readonly name: string;
@@ -30,11 +30,11 @@ function round2(value: number): number {
 }
 
 /**
- * New rubrics use percentage weights that total 100. Rubrics authored before
- * percentage weights used a normalized 0-10 scale, so small totals are scaled
- * up instead of rejected.
+ * Every rubric track uses percentage weights that total 100 within 0.01.
+ * There is no implicit normalization: an authored total that is not 100 is
+ * rejected so each division's weighting is explicit.
  */
-export function resolveRubricWeights(weights: readonly number[]): readonly number[] {
+export function assertRubricWeightTotal(weights: readonly number[]): void {
     if (weights.length === 0) {
         throw new ValidationError("A rubric needs at least one criterion.");
     }
@@ -42,20 +42,15 @@ export function resolveRubricWeights(weights: readonly number[]): readonly numbe
         throw new ValidationError("Criterion weights must be positive numbers.");
     }
     const total = weights.reduce((sum, weight) => sum + weight, 0);
-    if (Math.abs(total - 100) < 0.005) {
-        return weights.map(round2);
-    }
-    if (total > LEGACY_WEIGHT_TOTAL) {
+    // Floating-point addition can land a hair outside an exact 0.01 boundary.
+    if (Math.abs(total - 100) > RUBRIC_WEIGHT_TOTAL_TOLERANCE + 1e-9) {
         throw new ValidationError("Criterion weights must total 100.");
     }
-    const scaled = weights.map((weight) => round2((weight / total) * 100));
-    const scaledTotal = scaled.reduce((sum, weight) => sum + weight, 0);
-    const last = scaled[scaled.length - 1];
-    if (last === undefined) {
-        throw new ValidationError("A rubric needs at least one criterion.");
-    }
-    scaled[scaled.length - 1] = round2(last + (100 - scaledTotal));
-    return scaled;
+}
+
+export function resolveRubricWeights(weights: readonly number[]): readonly number[] {
+    assertRubricWeightTotal(weights);
+    return weights.map(round2);
 }
 
 export function assertRubricCriteria(criteria: readonly RubricCriterionInput[]): void {
@@ -85,7 +80,7 @@ export function assertTemplateTrack(track: RubricTemplateTrack): void {
     }
     assertRubricCriteria(track.criteria);
     const total = track.criteria.reduce((sum, criterion) => sum + criterion.weight, 0);
-    if (Math.abs(total - 100) > 0.005) {
+    if (Math.abs(total - 100) > RUBRIC_WEIGHT_TOTAL_TOLERANCE + 1e-9) {
         throw new ValidationError(`Track “${track.name}” criterion weights must total 100.`);
     }
 }

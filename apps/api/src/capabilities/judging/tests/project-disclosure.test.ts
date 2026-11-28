@@ -3,7 +3,13 @@ import { toProjectDisclosure } from "../application/project-disclosure.js";
 
 describe("toProjectDisclosure", () => {
     it("returns an empty disclosure for a missing project", () => {
-        expect(toProjectDisclosure(null)).toEqual({ videoUrl: null, aiDisclosure: "" });
+        expect(toProjectDisclosure(null)).toEqual({
+            videoUrl: null,
+            aiDisclosure: "",
+            repositoryUrl: null,
+            demoUrl: null,
+            descriptionMarkdown: "",
+        });
     });
 
     it("reads the demonstration video and AI-use disclosure", () => {
@@ -15,6 +21,9 @@ describe("toProjectDisclosure", () => {
         ).toEqual({
             videoUrl: "https://videos.example.org/demo.mp4",
             aiDisclosure: "Generated placeholder art with an image model.",
+            repositoryUrl: null,
+            demoUrl: null,
+            descriptionMarkdown: "",
         });
     });
 
@@ -22,6 +31,9 @@ describe("toProjectDisclosure", () => {
         expect(toProjectDisclosure({ title: "Legacy project" })).toEqual({
             videoUrl: null,
             aiDisclosure: "",
+            repositoryUrl: null,
+            demoUrl: null,
+            descriptionMarkdown: "",
         });
     });
 });

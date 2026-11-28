@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { idSchema, isoDateTimeSchema } from "../common/schemas.js";
 
+/** Public rankings and scores appear only once this many evaluations are submitted. */
+export const MINIMUM_PUBLIC_REVIEWS = 3;
+
 export const awardNamespaceSchema = z
     .string()
     .trim()
@@ -217,13 +220,21 @@ export const publicCertificateSchema = z.object({
 });
 export type PublicCertificate = z.infer<typeof publicCertificateSchema>;
 
+export const myResultsFeedbackSchema = z.object({
+    comment: z.string(),
+    submittedAt: isoDateTimeSchema.nullable(),
+});
+export type MyResultsFeedback = z.infer<typeof myResultsFeedbackSchema>;
+
 export const myResultsPastEntrySchema = z.object({
     editionId: idSchema,
     editionName: z.string(),
     editionSlug: z.string(),
     teamId: idSchema,
     teamName: z.string(),
+    score: z.number().nullable(),
     rank: z.number().int().positive().nullable(),
+    feedback: z.array(myResultsFeedbackSchema),
     awards: z.array(publicTeamAwardSchema),
     publishedAt: isoDateTimeSchema,
 });
@@ -237,7 +248,9 @@ export const myResultsSchema = z.object({
         .object({
             teamId: idSchema,
             teamName: z.string(),
+            score: z.number().nullable(),
             rank: z.number().int().positive().nullable(),
+            feedback: z.array(myResultsFeedbackSchema),
             awards: z.array(publicTeamAwardSchema),
         })
         .nullable(),

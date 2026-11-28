@@ -54,6 +54,7 @@ export async function registerVotingRoutes(
                 access.organizationId,
                 access.role,
                 request.params.editionId,
+                auth.user.id,
             );
             return { items: [...items], nextCursor: null };
         },

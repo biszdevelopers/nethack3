@@ -170,6 +170,7 @@ export class SubmissionService {
             auth.user.id,
             input.projectId,
         );
+        SubmissionRules.assertProjectEvidence(project);
         await this.assertTeamAcceptsSubmission(organizationId, project.teamId);
         const now = this.clock.now();
         try {
@@ -266,6 +267,7 @@ export class SubmissionService {
                             "The submission edition no longer matches its project.",
                         );
                     }
+                    SubmissionRules.assertProjectEvidence(project);
                     const edition = await this.contracts.competitions.getEdition(
                         organizationId,
                         row.editionId,
@@ -295,6 +297,14 @@ export class SubmissionService {
                         ...(input.submit ? { submittedAt: now } : {}),
                         updatedAt: now,
                     });
+                    if (input.submit && project.lockedAt === null) {
+                        await this.contracts.projects.lockProject(
+                            organizationId,
+                            row.projectId,
+                            now,
+                            session,
+                        );
+                    }
                     await this.audit.record(session, {
                         organizationId,
                         actorUserId: auth.user.id,
@@ -511,6 +521,12 @@ export class SubmissionService {
                     submittedAt: status === "draft" ? null : row.submittedAt,
                     updatedAt: now,
                 });
+                await this.contracts.projects.unlockProject(
+                    organizationId,
+                    row.projectId,
+                    now,
+                    session,
+                );
                 await this.audit.record(session, {
                     organizationId,
                     actorUserId: actor.userId,

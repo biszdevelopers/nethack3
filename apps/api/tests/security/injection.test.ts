@@ -126,8 +126,8 @@ describe("input injection and URL scheme validation", () => {
             repository_url: string | null;
             demo_url: string | null;
         }>("select repository_url, demo_url from projects where id = $1", [fixture.projectId]);
-        expect(stored[0]?.repository_url).toBeNull();
-        expect(stored[0]?.demo_url).toBeNull();
+        expect(stored[0]?.repository_url).toBe("https://github.com/example/security-project");
+        expect(stored[0]?.demo_url).toBe("https://example.com/security-project");
     });
 
     it("keeps organization-scoped list filters from leaking other organizations", async () => {

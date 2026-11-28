@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { idSchema, isoDateTimeSchema } from "../common/schemas.js";
+import { submissionStatusSchema } from "../submissions/schemas.js";
 
 export const rubricCommentTemplateSchema = z
     .object({
@@ -215,8 +216,14 @@ export const judgeAssignmentSchema = z.object({
     judgeUserId: idSchema,
     judgeDisplayName: z.string(),
     projectTitle: z.string(),
+    teamName: z.string().nullable(),
+    divisionName: z.string().nullable(),
+    descriptionMarkdown: z.string(),
+    submissionStatus: submissionStatusSchema,
     videoUrl: z.string().nullable(),
     aiDisclosure: z.string(),
+    repositoryUrl: z.string().nullable(),
+    demoUrl: z.string().nullable(),
     status: judgeAssignmentStatusSchema,
     conflictNote: z.string().nullable(),
     assignmentNote: z.string(),
@@ -292,8 +299,14 @@ export const assignmentSubmissionSummarySchema = z.object({
     projectId: idSchema,
     projectTitle: z.string(),
     teamId: idSchema.nullable(),
+    teamName: z.string().nullable(),
+    divisionName: z.string().nullable(),
+    submissionStatus: submissionStatusSchema,
     videoUrl: z.string().nullable(),
     aiDisclosure: z.string(),
+    repositoryUrl: z.string().nullable(),
+    demoUrl: z.string().nullable(),
+    descriptionMarkdown: z.string(),
 });
 export type AssignmentSubmissionSummary = z.infer<typeof assignmentSubmissionSummarySchema>;
 
@@ -415,6 +428,13 @@ export const judgingHistoryItemSchema = z.object({
     projectTitle: z.string(),
     teamId: idSchema.nullable(),
     teamName: z.string().nullable(),
+    divisionName: z.string().nullable(),
+    descriptionMarkdown: z.string(),
+    repositoryUrl: z.string().nullable(),
+    demoUrl: z.string().nullable(),
+    videoUrl: z.string().nullable(),
+    aiDisclosure: z.string(),
+    submissionStatus: submissionStatusSchema,
     rubricName: z.string(),
     rubricVersion: z.number().int().positive().optional(),
     evaluationId: idSchema,
@@ -425,3 +445,86 @@ export const judgingHistoryItemSchema = z.object({
     scores: z.array(judgingHistoryCriterionScoreSchema),
 });
 export type JudgingHistoryItem = z.infer<typeof judgingHistoryItemSchema>;
+
+export const teamFeedbackEntrySchema = z.object({
+    comment: z.string(),
+    weightedScore: z.number().nullable(),
+    submittedAt: isoDateTimeSchema,
+});
+export type TeamFeedbackEntry = z.infer<typeof teamFeedbackEntrySchema>;
+
+export const teamFeedbackResponseSchema = z.object({
+    teamId: idSchema,
+    threshold: z.number().int().positive(),
+    submittedCount: z.number().int().nonnegative(),
+    withheld: z.boolean(),
+    feedback: z.array(teamFeedbackEntrySchema),
+});
+export type TeamFeedbackResponse = z.infer<typeof teamFeedbackResponseSchema>;
+
+export const MIN_JUDGE_COMMENT_LENGTH = 20;
+
+export const JUDGE_COMMENT_TOO_SHORT = `Write at least ${String(MIN_JUDGE_COMMENT_LENGTH)} characters of feedback after trimming.`;
+export const JUDGE_COMMENT_TEMPLATE_ERROR =
+    "Replace every double-braced template placeholder with your own observation.";
+export const JUDGE_COMMENT_IDENTITY_ERROR =
+    "Remove your email address or display name from the comment to keep it anonymous.";
+
+const UNFILLED_COMMENT_TEMPLATE = /\{\{[^{}]+\}\}/;
+
+export interface JudgeCommentIdentity {
+    readonly displayName: string;
+    readonly email: string | null;
+}
+
+export function hasUnfilledCommentTemplate(value: string): boolean {
+    return UNFILLED_COMMENT_TEMPLATE.test(value);
+}
+
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function commentContainsJudgeIdentity(
+    comment: string,
+    identity: JudgeCommentIdentity,
+): boolean {
+    const normalizedComment = comment.trim();
+    if (normalizedComment.length === 0) {
+        return false;
+    }
+
+    const email = identity.email?.trim() ?? "";
+    if (email.length > 0) {
+        const emailPattern = new RegExp(
+            `(?:^|[^\\p{L}\\p{N}._%+-])${escapeRegExp(email)}(?:$|[^\\p{L}\\p{N}._%+-])`,
+            "iu",
+        );
+        if (emailPattern.test(normalizedComment)) {
+            return true;
+        }
+    }
+
+    const name = identity.displayName.trim().replace(/\s+/g, " ");
+    if (name.length === 0) {
+        return false;
+    }
+    const namePattern = name.split(" ").map(escapeRegExp).join("\\s+");
+    return new RegExp(`(?:^|[^\\p{L}\\p{N}])${namePattern}(?:$|[^\\p{L}\\p{N}])`, "iu").test(
+        normalizedComment,
+    );
+}
+
+export function judgeCommentIssue(comment: string, identity: JudgeCommentIdentity): string | null {
+    const trimmed = comment.trim();
+    if (trimmed.length < MIN_JUDGE_COMMENT_LENGTH) {
+        return JUDGE_COMMENT_TOO_SHORT;
+    }
+    if (hasUnfilledCommentTemplate(trimmed)) {
+        return JUDGE_COMMENT_TEMPLATE_ERROR;
+    }
+    if (commentContainsJudgeIdentity(trimmed, identity)) {
+        return JUDGE_COMMENT_IDENTITY_ERROR;
+    }
+    return null;
+}

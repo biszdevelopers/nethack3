@@ -21,6 +21,7 @@ import {
     saveEvaluationRequestSchema,
     scoreCurveResponseSchema,
     scoreCurveSchema,
+    teamFeedbackResponseSchema,
     updateRubricRequestSchema,
     updateRubricTemplateRequestSchema,
 } from "@nethack/contracts";
@@ -39,6 +40,7 @@ const rubricParams = z.object({ editionId: z.uuid(), rubricId: z.uuid() });
 const rubricTemplateParams = z.object({ organizationId: z.uuid(), templateId: z.uuid() });
 const organizationParams = z.object({ organizationId: z.uuid() });
 const applyTemplateParams = z.object({ editionId: z.uuid(), templateId: z.uuid() });
+const teamFeedbackParams = z.object({ editionId: z.uuid(), teamId: z.uuid() });
 
 export async function registerJudgingRoutes(
     app: NethackServer,
@@ -383,6 +385,27 @@ export async function registerJudgingRoutes(
                 request.params.editionId,
             );
             return { items: [...items], nextCursor: null };
+        },
+    );
+
+    app.get(
+        "/api/v1/competitions/:editionId/teams/:teamId/judging-feedback",
+        {
+            schema: {
+                params: teamFeedbackParams,
+                response: { 200: teamFeedbackResponseSchema },
+            },
+        },
+        async (request) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            guard.requireOrganizer(access);
+            return service.teamFeedbackView(
+                auth,
+                access.organizationId,
+                request.params.editionId,
+                request.params.teamId,
+            );
         },
     );
 

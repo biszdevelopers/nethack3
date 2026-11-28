@@ -1,16 +1,22 @@
 export interface ProjectDisclosure {
     readonly videoUrl: string | null;
     readonly aiDisclosure: string;
+    readonly repositoryUrl: string | null;
+    readonly demoUrl: string | null;
 }
 
 export const EMPTY_PROJECT_DISCLOSURE: ProjectDisclosure = {
     videoUrl: null,
     aiDisclosure: "",
+    repositoryUrl: null,
+    demoUrl: null,
 };
 
 interface ProjectDisclosureFields {
     readonly videoUrl?: string | null;
     readonly aiDisclosure?: string;
+    readonly repositoryUrl?: string | null;
+    readonly demoUrl?: string | null;
 }
 
 // The projects contract exposes these fields alongside this integration, so read
@@ -23,5 +29,7 @@ export function toProjectDisclosure(project: object | null): ProjectDisclosure {
     return {
         videoUrl: fields.videoUrl ?? null,
         aiDisclosure: fields.aiDisclosure ?? "",
+        repositoryUrl: fields.repositoryUrl ?? null,
+        demoUrl: fields.demoUrl ?? null,
     };
 }

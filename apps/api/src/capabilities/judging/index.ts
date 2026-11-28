@@ -47,6 +47,9 @@ export const judgingCapability: CapabilityDefinition = {
             async getEvaluation(organizationId, assignmentId) {
                 return service.getEvaluation(organizationId, assignmentId);
             },
+            async listTeamFeedback(organizationId, editionId, teamId) {
+                return service.teamFeedbackForOrganization(organizationId, editionId, teamId);
+            },
         };
 
         return {

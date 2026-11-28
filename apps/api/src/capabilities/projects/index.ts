@@ -59,6 +59,24 @@ export const projectsCapability: CapabilityDefinition = {
                     repository.countByEdition(session.db, organizationId, editionId),
                 );
             },
+            async lockProject(organizationId, projectId, at, session) {
+                if (session !== undefined) {
+                    await service.lockProject(session, organizationId, projectId, at);
+                    return;
+                }
+                await context.database.transaction({ organizationId }, async (transaction) =>
+                    service.lockProject(transaction, organizationId, projectId, at),
+                );
+            },
+            async unlockProject(organizationId, projectId, at, session) {
+                if (session !== undefined) {
+                    await service.unlockProject(session, organizationId, projectId, at);
+                    return;
+                }
+                await context.database.transaction({ organizationId }, async (transaction) =>
+                    service.unlockProject(transaction, organizationId, projectId, at),
+                );
+            },
         };
 
         return {

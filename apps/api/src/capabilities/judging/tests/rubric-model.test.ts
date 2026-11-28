@@ -20,13 +20,16 @@ describe("rubric weights", () => {
         expect(resolveRubricWeights([30, 25, 20, 15, 10])).toEqual([30, 25, 20, 15, 10]);
     });
 
-    it("scales the legacy normalized scale to percentages", () => {
-        expect(resolveRubricWeights([1, 2])).toEqual([33.33, 66.67]);
-        expect(resolveRubricWeights([1])).toEqual([100]);
+    it("accepts totals within the 0.01 tolerance", () => {
+        expect(resolveRubricWeights([33.33, 33.33, 33.34])).toEqual([33.33, 33.33, 33.34]);
+        expect(resolveRubricWeights([50, 50.01])).toEqual([50, 50.01]);
+        expect(resolveRubricWeights([33.33, 33.33, 33.33])).toEqual([33.33, 33.33, 33.33]);
     });
 
-    it("rejects totals that are neither percentages nor legacy", () => {
+    it("rejects totals outside the tolerance instead of normalizing them", () => {
+        expect(() => resolveRubricWeights([1, 2])).toThrow(ValidationError);
         expect(() => resolveRubricWeights([20, 30])).toThrow(ValidationError);
+        expect(() => resolveRubricWeights([50, 49.98])).toThrow(ValidationError);
     });
 
     it("rejects non-positive weights", () => {

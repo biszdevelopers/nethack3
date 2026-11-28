@@ -102,6 +102,7 @@ function toEditionSummary(row: {
     teamMaxSize: number;
     maxParticipants: number | null;
     rulesMarkdown: string;
+    resultsOpenAt?: Date | null;
     publishedAt: Date | null;
 }): EditionSummary {
     return {
@@ -126,6 +127,7 @@ function toEditionSummary(row: {
         teamMaxSize: row.teamMaxSize,
         maxParticipants: row.maxParticipants,
         rulesMarkdown: row.rulesMarkdown,
+        resultsOpenAt: nullableIso(row.resultsOpenAt ?? null),
         publishedAt: nullableIso(row.publishedAt),
     };
 }

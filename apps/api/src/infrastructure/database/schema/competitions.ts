@@ -79,6 +79,7 @@ export const competitionEditions = pgTable(
         teamMaxSize: integer("team_max_size").notNull().default(4),
         maxParticipants: integer("max_participants"),
         rulesMarkdown: text("rules_markdown").notNull().default(""),
+        resultsOpenAt: timestamp("results_open_at", { withTimezone: true }),
         publishedAt: timestamp("published_at", { withTimezone: true }),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

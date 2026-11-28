@@ -52,6 +52,14 @@ export class ProjectRules {
         throw new ForbiddenError("Only the project owner or an organizer may edit this project.");
     }
 
+    static assertNotLocked(lockedAt: Date | null): void {
+        if (lockedAt !== null) {
+            throw new ConflictError(
+                "This project was locked when its first version was submitted and can no longer be edited.",
+            );
+        }
+    }
+
     static assertCanManageMembers(
         project: ProjectAccessShape,
         userId: string,

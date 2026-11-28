@@ -27,6 +27,7 @@ export const projectSchema = z.object({
     tags: z.array(z.string()),
     status: projectStatusSchema,
     publishedAt: isoDateTimeSchema.nullable(),
+    lockedAt: isoDateTimeSchema.nullable(),
     createdAt: isoDateTimeSchema,
     updatedAt: isoDateTimeSchema,
 });
@@ -98,6 +99,40 @@ export const updateProjectRequestSchema = z
     })
     .strict();
 export type UpdateProjectRequest = z.infer<typeof updateProjectRequestSchema>;
+
+export const PROJECT_EVIDENCE_LABELS = {
+    repositoryUrl: "repository URL",
+    demoUrl: "demo URL",
+    videoUrl: "demonstration video URL",
+    aiDisclosure: "AI-use disclosure",
+} as const;
+
+export type ProjectEvidenceField = keyof typeof PROJECT_EVIDENCE_LABELS;
+
+export interface ProjectEvidence {
+    readonly repositoryUrl: string | null;
+    readonly demoUrl: string | null;
+    readonly videoUrl: string | null;
+    readonly aiDisclosure: string;
+}
+
+/** Submission evidence the project must provide before any version exists. */
+export function missingProjectEvidence(project: ProjectEvidence): readonly ProjectEvidenceField[] {
+    const missing: ProjectEvidenceField[] = [];
+    if ((project.repositoryUrl ?? "").trim().length === 0) {
+        missing.push("repositoryUrl");
+    }
+    if ((project.demoUrl ?? "").trim().length === 0) {
+        missing.push("demoUrl");
+    }
+    if ((project.videoUrl ?? "").trim().length === 0) {
+        missing.push("videoUrl");
+    }
+    if (project.aiDisclosure.trim().length === 0) {
+        missing.push("aiDisclosure");
+    }
+    return missing;
+}
 
 export const projectLinkTargetSchema = z.object({
     kind: z.enum(["repository", "demo"]),

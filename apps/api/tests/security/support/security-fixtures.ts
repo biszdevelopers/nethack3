@@ -396,6 +396,10 @@ export async function buildSecurityFixture(harness: TestHarness): Promise<Securi
             editionId,
             title: "Security Project",
             summary: "A project used by the security test suite.",
+            repositoryUrl: "https://github.com/example/security-project",
+            demoUrl: "https://example.com/security-project",
+            videoUrl: "https://example.com/security-project-video",
+            aiDisclosure: "No AI tools or models were used in this project.",
         },
         headers: { "x-nethack-organization-id": organizationId },
     });
@@ -435,7 +439,7 @@ export async function buildSecurityFixture(harness: TestHarness): Promise<Securi
         payload: {
             name: "Security Rubric",
             description: "",
-            criteria: [{ name: "Quality", maxScore: 10, weight: 1 }],
+            criteria: [{ name: "Quality", maxScore: 10, weight: 100 }],
         },
         headers: { "x-nethack-organization-id": organizationId },
     });
@@ -465,7 +469,7 @@ export async function buildSecurityFixture(harness: TestHarness): Promise<Securi
         url: `/api/v1/assignments/${assignmentId}/evaluation`,
         payload: {
             scores: [{ criterionId, score: 8, comment: "Solid." }],
-            overallComment: "Good work.",
+            overallComment: "Good work overall, well built and clearly presented.",
         },
         headers: { "x-nethack-organization-id": organizationId },
     });
@@ -485,7 +489,7 @@ export async function buildSecurityFixture(harness: TestHarness): Promise<Securi
         url: `/api/v1/competitions/${editionId}/voting-rounds`,
         payload: {
             name: "Security Round",
-            eligibleRoles: ["participant"],
+            eligibleRoles: ["participant", "judge"],
             maxSelections: 2,
         },
         headers: { "x-nethack-organization-id": organizationId },
@@ -509,8 +513,10 @@ export async function buildSecurityFixture(harness: TestHarness): Promise<Securi
             title: `Security Second Project ${uniqueSlug("project")}`,
             summary: "A second eligible project for star voting.",
             descriptionMarkdown: "",
-            repositoryUrl: null,
-            demoUrl: null,
+            repositoryUrl: "https://github.com/example/security-second",
+            demoUrl: "https://example.com/security-second",
+            videoUrl: "https://example.com/security-second-video",
+            aiDisclosure: "No AI tools or models were used in this project.",
             tags: [],
         },
         headers: { "x-nethack-organization-id": organizationId },
@@ -537,7 +543,7 @@ export async function buildSecurityFixture(harness: TestHarness): Promise<Securi
     });
     expectStatus(secondVersion, 200, "submit second version");
 
-    const ballot = await harness.authenticatedRequest(participant, {
+    const ballot = await harness.authenticatedRequest(judge, {
         method: "POST",
         url: `/api/v1/voting-rounds/${roundId}/ballot`,
         payload: {
@@ -551,7 +557,7 @@ export async function buildSecurityFixture(harness: TestHarness): Promise<Securi
     expectStatus(ballot, 201, "cast ballot");
     const ballotRows = await queryAsOwner<{ id: string }>(
         "select id from ballots where organization_id = $1 and round_id = $2 and user_id = $3",
-        [organizationId, roundId, participant.userId],
+        [organizationId, roundId, judge.userId],
     );
     const ballotId = ballotRows[0]?.id;
     if (ballotId === undefined) {

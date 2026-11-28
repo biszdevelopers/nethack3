@@ -10,7 +10,10 @@ import type {
 } from "@nethack/contracts";
 import type { AuthContext } from "../../../authentication/types.js";
 import type { Clock } from "../../../core/clock.js";
-import type { DatabaseConnection } from "../../../infrastructure/database/client.js";
+import type {
+    DatabaseConnection,
+    DatabaseSession,
+} from "../../../infrastructure/database/client.js";
 import type { OutboxPublisher } from "../../../core/outbox.js";
 import {
     ConflictError,
@@ -243,6 +246,7 @@ export class ProjectService {
         }
         const loaded = await this.load(organizationId, projectId, auth.user.id);
         ProjectRules.assertCanEdit(loaded.project, auth.user.id, role, loaded.memberRole);
+        ProjectRules.assertNotLocked(loaded.project.lockedAt);
         if (input.teamId !== undefined && input.teamId !== null) {
             await this.assertTeamEligible(
                 organizationId,
@@ -270,6 +274,7 @@ export class ProjectService {
                     auth.user.id,
                 );
                 ProjectRules.assertCanEdit(current, auth.user.id, role, memberRole);
+                ProjectRules.assertNotLocked(current.lockedAt);
                 const row = await this.repository.update(session, organizationId, projectId, {
                     ...(input.title === undefined ? {} : { title: input.title }),
                     ...(input.summary === undefined ? {} : { summary: input.summary }),
@@ -374,6 +379,54 @@ export class ProjectService {
             },
         );
         return toProject(published);
+    }
+
+    async lockProject(
+        session: DatabaseSession,
+        organizationId: string,
+        projectId: string,
+        at: Date,
+    ): Promise<void> {
+        const locked = await this.repository.lock(session, organizationId, projectId, at);
+        if (locked === null) {
+            const existing = await this.repository.findById(session.db, organizationId, projectId);
+            if (existing === null) {
+                throw new NotFoundError("The project was not found.");
+            }
+            return;
+        }
+        await this.audit.record(session, {
+            organizationId,
+            actorUserId: session.userId,
+            action: "project.locked",
+            entityType: "project",
+            entityId: projectId,
+            metadata: { lockedAt: at.toISOString() },
+        });
+    }
+
+    async unlockProject(
+        session: DatabaseSession,
+        organizationId: string,
+        projectId: string,
+        at: Date,
+    ): Promise<void> {
+        const unlocked = await this.repository.unlock(session, organizationId, projectId, at);
+        if (unlocked === null) {
+            const existing = await this.repository.findById(session.db, organizationId, projectId);
+            if (existing === null) {
+                throw new NotFoundError("The project was not found.");
+            }
+            return;
+        }
+        await this.audit.record(session, {
+            organizationId,
+            actorUserId: session.userId,
+            action: "project.unlocked",
+            entityType: "project",
+            entityId: projectId,
+            metadata: { unlockedAt: at.toISOString() },
+        });
     }
 
     async members(
@@ -617,6 +670,7 @@ export function toProject(row: ProjectRow): Project {
         tags: [...row.tags],
         status: row.status,
         publishedAt: row.publishedAt === null ? null : row.publishedAt.toISOString(),
+        lockedAt: row.lockedAt === null ? null : row.lockedAt.toISOString(),
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
     };
@@ -635,9 +689,12 @@ export function toProjectSummary(row: ProjectRow): ProjectSummary {
         descriptionMarkdown: row.descriptionMarkdown,
         repositoryUrl: row.repositoryUrl,
         demoUrl: row.demoUrl,
+        videoUrl: row.videoUrl,
+        aiDisclosure: row.aiDisclosure,
         tags: [...row.tags],
         status: row.status,
         publishedAt: row.publishedAt === null ? null : row.publishedAt.toISOString(),
+        lockedAt: row.lockedAt === null ? null : row.lockedAt.toISOString(),
     };
 }
 

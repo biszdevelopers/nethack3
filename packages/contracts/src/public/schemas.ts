@@ -16,6 +16,7 @@ export const publicCompetitionSchema = z.object({
     startsAt: isoDateTimeSchema.nullable(),
     endsAt: isoDateTimeSchema.nullable(),
     registrationClosesAt: isoDateTimeSchema.nullable(),
+    resultsOpenAt: isoDateTimeSchema.nullable(),
     teamMinSize: z.number().int(),
     teamMaxSize: z.number().int(),
     showScores: z.boolean(),

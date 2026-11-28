@@ -87,6 +87,7 @@ export const competitionEditionSchema = z.object({
     teamMaxSize: z.number().int().min(1),
     maxParticipants: z.number().int().min(1).nullable(),
     rulesMarkdown: z.string(),
+    resultsOpenAt: isoDateTimeSchema.nullable(),
     publishedAt: isoDateTimeSchema.nullable(),
     createdAt: isoDateTimeSchema,
     updatedAt: isoDateTimeSchema,
@@ -150,6 +151,7 @@ export const createEditionRequestSchema = z
         teamMaxSize: z.number().int().min(1).max(50).default(4),
         maxParticipants: z.number().int().min(1).max(100000).nullable().default(null),
         rulesMarkdown: markdownSchema.default(""),
+        resultsOpenAt: isoDateTimeSchema.nullable().default(null),
     })
     .strict()
     .refine((value) => value.teamMinSize <= value.teamMaxSize, {
@@ -199,6 +201,7 @@ export const updateEditionRequestSchema = z
         teamMaxSize: z.number().int().min(1).max(50).optional(),
         maxParticipants: z.number().int().min(1).max(100000).nullable().optional(),
         rulesMarkdown: markdownSchema.optional(),
+        resultsOpenAt: isoDateTimeSchema.nullable().optional(),
     })
     .strict();
 export type UpdateEditionRequest = z.infer<typeof updateEditionRequestSchema>;

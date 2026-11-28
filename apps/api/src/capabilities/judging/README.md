@@ -20,6 +20,7 @@ Owns judging rubrics, criteria, judge assignments, evaluations, evaluation score
 | `countSubmittedEvaluations(organizationId, editionId)` | Count of submitted evaluations for an edition. Runs in an organization-scoped transaction. |
 | `countOpenFlags(organizationId, editionId)` | Count of `judge_flags` with status `open` for an edition. Runs in an organization-scoped transaction. |
 | `getEvaluation(organizationId, assignmentId)` | The evaluation with scores, or `null`. Runs in an organization-scoped transaction. |
+| `listTeamFeedback(organizationId, editionId, teamId)` | Anonymous `{ comment, weightedScore, submittedAt }` entries for a team's submitted evaluations. Judge identity is removed. Returns an empty list until at least three submitted evaluations exist. |
 
 ## Tables
 
@@ -27,7 +28,7 @@ Owned writes: `judging_rubrics`, `judging_criteria`, `judging_rubric_templates`,
 
 `judging_rubrics` stores immutable versions. `family_id` groups versions of the same rubric, `version` increments within the family, and `active` marks the version offered to new assignments. `division_id` scopes a rubric to one division; `null` is edition-wide. `comment_guidance` stores the introduction, guidelines, and comment templates shown to judges. Saving an edit inserts a new row and archives the prior version instead of mutating it.
 
-`judging_criteria` stores `min_score`, `max_score`, `weight`, and `position`. New rubrics use percentage weights that total 100 per rubric; the legacy 0–10 weight scale is scaled up on create.
+`judging_criteria` stores `min_score`, `max_score`, `weight`, and `position`. Criterion weights must total 100 per rubric track within a 0.01 tolerance. There is no implicit normalization; authored totals outside the tolerance are rejected on create, update, template application, and publish.
 
 `judging_rubric_templates` stores organization-wide `{ tracks, commentGuidance }` definitions. A template never changes a rubric version already used for judging.
 
@@ -40,7 +41,7 @@ Owned writes: `judging_rubrics`, `judging_criteria`, `judging_rubric_templates`,
 Read-only joins outside the capability:
 
 - `users` and `organization_memberships` resolve a judge by email and verify that the judge is an active owner, organizer, or judge in the organization. This is directory and membership data. Move it to an identity or organizations contract when one exposes those lookups.
-- Submissions, projects, and teams are never read directly. Submission data comes from `submissions.v1`; team names come from `teams.v1`. The assignment detail exposes `teamId`.
+- Submissions, projects, teams, and divisions are never read directly. Submission data comes from `submissions.v1`, team and division names come from `teams.v1`, project context comes from `projects.v1`, and division names are resolved through `competitions.v1`. Assignment and history DTOs expose submission state, team, division, description, repository, demo, video, and AI-use disclosure.
 
 ## Routes and permissions
 
@@ -63,6 +64,7 @@ All routes require authentication. Routes without an organization in the path us
 | DELETE | `/api/v1/organizations/:organizationId/rubric-templates/:templateId` | Owner or organizer |
 | GET | `/api/v1/competitions/:editionId/assignments` | Owner or organizer |
 | GET | `/api/v1/competitions/:editionId/judging-results` | Owner or organizer; ranked mean of submitted evaluations |
+| GET | `/api/v1/competitions/:editionId/teams/:teamId/judging-feedback` | Owner or organizer; anonymous written feedback, withheld below three submitted evaluations |
 | POST | `/api/v1/competitions/:editionId/assignments` | Owner or organizer |
 | GET | `/api/v1/judging/assignments?status=` | Active organization member; returns only the caller's assignments |
 | GET | `/api/v1/judging/history?editionId=` | Active organization member; returns only the caller's submitted evaluations |
@@ -82,7 +84,7 @@ The assignment is the scoring authority. An organizer who is not the assigned ju
 ## Rubric and assignment rules
 
 - Creating a rubric inserts the rubric and its criteria in one transaction. Criterion `position` is the array index. `divisionId` must belong to the edition; `null` creates an edition-wide rubric.
-- Criterion weights must total 100 per rubric. Payloads that use the legacy normalized 0–10 scale are scaled to percentages. Every criterion validates `0 <= minScore < maxScore <= 100`.
+- Criterion weights must total 100 per division or track within a 0.01 tolerance. Create, update, template application, and publish reject totals outside that tolerance instead of normalizing them. Every criterion validates `0 <= minScore < maxScore <= 100`.
 - Editing a rubric through `PATCH` inserts a new version in the same `family_id`, makes it active, and archives the previous versions. Existing assignments keep their pinned `rubricId`.
 - Publishing a version activates it and archives the other versions in its family. Archiving deactivates one version without deleting it or its criteria.
 - Applying a template creates a new rubric version in a new family from the selected track. The template's criteria weights must total 100.
@@ -96,15 +98,18 @@ The assignment is the scoring authority. An organizer who is not the assigned ju
 ## Evaluation rules
 
 - A save requires exactly one score for every rubric criterion and no others. Each score is an integer between the criterion `minScore` and `maxScore`.
+- The overall comment must contain at least 20 characters after trimming, must not contain an unfilled `{{...}}` template placeholder, and must not contain the judge's own display name or email address (case-insensitive). Draft saves and submissions enforce the same rules and return a field-scoped `validation_error` on `overallComment`.
 - Saving and submitting an evaluation are rejected with `409 conflict` when the edition is `completed` or `archived` (results published). Assignment, history, coverage, and result reads stay available and the assignment detail reports `frozen` so the workspace shows a read-only state.
+- Updating the score curve is rejected with `409 conflict` once results are published or the edition is frozen. Reading the curve remains available.
 - `normalized = (score - minScore) / (maxScore - minScore)`; `weightedScore = round2(sum(normalized * weight) / sum(weight) * 100)`. A criterion with no range contributes zero.
 - Saving upserts the single evaluation row (`unique(assignment_id)`), replaces all score rows (`unique(evaluation_id, criterion_id)`), and moves the assignment to `in_progress`.
 - Submitting requires a draft evaluation, a complete scorecard, and an open assignment. It sets the evaluation and assignment to `submitted`, records `submittedAt`, and publishes `judging.evaluation.submitted` with `{ assignmentId, submissionId, projectId, judgeUserId, organizationId, editionId, weightedScore }`.
 - Every successful draft save and submission inserts an `evaluation_versions` snapshot in the same transaction. The snapshot contains the full scorecard, status, overall comment, weighted score, the pinned rubric id and version, a rubric snapshot, and the submission timestamp. Revision `n` is built from the previous maximum revision plus one; existing snapshots are never mutated.
 - `GET /history` returns `{ evaluation, versions, scoreCurve, displayWeightedScore }`: the current single-row evaluation, up to 50 snapshots ordered newest revision first, and the curve-adjusted display score. The evaluation table remains the current state; `evaluation_versions` is the revision history.
 - `GET /judging-results` groups active assignments by submission, averages only submitted weighted scores, excludes drafts and revoked assignments, ranks ties equally, and places unscored submissions last with a null rank. Each row includes `averageScore` (raw, used for ranking) and `displayScore` (edition curve, presentation only).
-- `GET /judging/history` reads the caller's submitted evaluations from judging-owned tables and enriches them with submission metadata from `submissions.v1` and team names from `teams.v1`. Items include the pinned rubric version and the curve-adjusted display score. It does not require judging to be open.
-- `GET /assignments/:assignmentId` returns the pinned rubric (including comment guidance), the edition score curve, and `displayWeightedScore` alongside the raw evaluation score.
+- `GET /judging/history` reads the caller's submitted evaluations from judging-owned tables and enriches them with submission metadata from `submissions.v1`, team names from `teams.v1`, division names from `competitions.v1`, and project context from `projects.v1`. Items include team, division, description, repository, demo, video, AI-use disclosure, submission state, the pinned rubric version, and the curve-adjusted display score. It does not require judging to be open.
+- `GET /assignments/:assignmentId` returns the pinned rubric (including comment guidance), the edition score curve, and `displayWeightedScore` alongside the raw evaluation score. Assignment and submission summaries include team, division, description, repository, demo, video, AI-use disclosure, and submission state.
+- `GET /competitions/:editionId/teams/:teamId/judging-feedback` returns `{ teamId, threshold, submittedCount, withheld, feedback }`. `feedback` contains only `{ comment, weightedScore, submittedAt }`; judge identity is never returned. Below three submitted evaluations the endpoint returns `withheld: true` and an empty list, and `judging.v1.listTeamFeedback` returns an empty list.
 - `GET /judging-coverage` aggregates non-revoked assignments per judge: assignment count, submitted count, recusals, open flags, and the mean submitted weighted score. Calibration compares each judge's average with the edition average; a delta of at least 10 points is `above`, at most -10 is `below`, otherwise `in_line`. Judges without submitted scores are `insufficient_data`.
 - A flag requires the caller to be the assigned judge and an assignment that is `assigned`, `in_progress`, or `submitted`. Resolving an already-resolved flag returns the existing flag without a second audit record.
 
@@ -128,7 +133,7 @@ The assignment is the scoring authority. An organizer who is not the assigned ju
 
 ## Tests
 
-`tests/judging-rules.test.ts` covers scoring math, weight and maximum-score handling, rounding, missing/duplicate/extra criteria, score bounds, deadline checks, assignment state transitions, and judge eligibility. `tests/rubric-model.test.ts` covers weight normalization, min/max bounds, rubric version numbers, rubric snapshots, and the score curve (interpolation, monotonicity, bounds, and ranking independence). `tests/evaluation-history.test.ts` covers revision numbering and snapshot mapping. `tests/judging-results.test.ts` covers submitted-only averaging, draft exclusion, tie ranking, and unscored submissions. `tests/judging-coverage.test.ts` covers coverage counts, draft exclusion, revoked exclusion, calibration labels, and the threshold. `tests/judge-flags.test.ts` covers flag eligibility and resolution transitions. `tests/e2e/04-judge-workflow.spec.ts` verifies that an organizer sees the submitted score and rank in the edition results; `tests/e2e/12-judging-workflow.spec.ts` covers the judge queue, submission, history, flag, and organizer coverage; `tests/e2e/17-rubric-tracks.spec.ts` covers division-scoped rubrics, versions, templates, the score curve, and the judge's curve-adjusted view. The unit tests are pure and do not require a database.
+`tests/judging-rules.test.ts` covers scoring math, weight and maximum-score handling, rounding, missing/duplicate/extra criteria, score bounds, deadline checks, assignment state transitions, and judge eligibility. `tests/rubric-model.test.ts` covers weight totals and tolerance, min/max bounds, rubric version numbers, rubric snapshots, and the score curve (interpolation, monotonicity, bounds, and ranking independence). `tests/judge-comments.test.ts` covers the 20-character minimum, unfilled placeholders, judge identity detection, and field-scoped errors. `tests/team-feedback.test.ts` covers the three-reviewer threshold and identity removal. `tests/evaluation-history.test.ts` covers revision numbering and snapshot mapping. `tests/judging-results.test.ts` covers submitted-only averaging, draft exclusion, tie ranking, and unscored submissions. `tests/judging-coverage.test.ts` covers coverage counts, draft exclusion, revoked exclusion, calibration labels, and the threshold. `tests/judge-flags.test.ts` covers flag eligibility and resolution transitions. `tests/e2e/04-judge-workflow.spec.ts` verifies assignment context and the submitted score in the edition results; `tests/e2e/12-judging-workflow.spec.ts` covers the judge queue, submission, history context, flag, and organizer coverage; `tests/e2e/17-rubric-tracks.spec.ts` covers division-scoped rubrics, versions, templates, the score curve, comment validation, and the judge's curve-adjusted view; `tests/e2e/26-judge-feedback.spec.ts` covers anonymous organizer feedback above and below the three-reviewer threshold and judge history context. The unit tests are pure and do not require a database.
 
 ## Extraction
 

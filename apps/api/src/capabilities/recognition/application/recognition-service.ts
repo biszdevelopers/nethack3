@@ -3,13 +3,14 @@ import type {
     AwardCatalog,
     CreateAwardRequest,
     MyResults,
+    MyResultsFeedback,
     PublicCertificate,
     PublicResults,
     ResultsStatus,
     TeamAward,
     UpdateAwardRequest,
 } from "@nethack/contracts";
-import { publicResultsSchema } from "@nethack/contracts";
+import { MINIMUM_PUBLIC_REVIEWS, publicResultsSchema } from "@nethack/contracts";
 import type { AuthContext } from "../../../authentication/types.js";
 import type { Clock } from "../../../core/clock.js";
 import { domainEvents } from "../../../core/domain-event.js";
@@ -30,9 +31,11 @@ import type { SubmissionsContract } from "../../submissions/contracts.js";
 import type { TeamsContract } from "../../teams/contracts.js";
 import type { VotingContract } from "../../voting/contracts.js";
 import {
+    applyReviewThreshold,
     assemblePublicResults,
     findTeamResult,
     type AssemblyAward,
+    type TeamResultView,
 } from "../domain/results-assembly.js";
 import type {
     AwardRow,
@@ -528,7 +531,15 @@ export class RecognitionService {
                 : {
                       teamId: team.id,
                       teamName: team.name,
+                      score:
+                          results?.showScores === true && currentView !== null
+                              ? (currentView.displayScore ?? currentView.averageScore)
+                              : null,
                       rank: results?.showRanking === true ? (currentView?.rank ?? null) : null,
+                      feedback:
+                          results === null || currentView === null
+                              ? []
+                              : await this.teamFeedback(organizationId, editionId, currentView),
                       awards: [...(currentView?.awards ?? [])],
                   };
 
@@ -562,7 +573,11 @@ export class RecognitionService {
                         editionSlug: edition.slug,
                         teamId: pastTeam.id,
                         teamName: pastTeam.name,
+                        score: pastResults.showScores
+                            ? (view.displayScore ?? view.averageScore)
+                            : null,
                         rank: pastResults.showRanking ? view.rank : null,
+                        feedback: await this.teamFeedback(organizationId, edition.id, view),
                         awards: [...view.awards],
                         publishedAt: pastRow.publishedAt.toISOString(),
                     };
@@ -627,6 +642,25 @@ export class RecognitionService {
             awards: [...view.awards],
             publishedAt: results.publishedAt,
         };
+    }
+
+    private async teamFeedback(
+        organizationId: string,
+        editionId: string,
+        view: TeamResultView,
+    ): Promise<MyResultsFeedback[]> {
+        if (view.submittedCount < MINIMUM_PUBLIC_REVIEWS) {
+            return [];
+        }
+        const feedback = await this.judging.listTeamFeedback(
+            organizationId,
+            editionId,
+            view.teamId,
+        );
+        return feedback.flatMap((entry): MyResultsFeedback[] => {
+            const comment = entry.comment.trim();
+            return comment.length === 0 ? [] : [{ comment, submittedAt: entry.submittedAt }];
+        });
     }
 
     private async buildSnapshot(
@@ -717,7 +751,7 @@ function parseSnapshot(value: PublicResults): PublicResults {
     if (!parsed.success) {
         throw new InternalError("The published results snapshot is invalid.");
     }
-    return parsed.data;
+    return applyReviewThreshold(parsed.data);
 }
 
 function toAward(row: AwardRow): Award {

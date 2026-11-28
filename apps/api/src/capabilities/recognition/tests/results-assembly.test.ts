@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { publicResultsSchema, type JudgingResult, type VoteResult } from "@nethack/contracts";
 import {
+    applyReviewThreshold,
     assemblePublicResults,
     awardsForTeam,
     findTeamResult,
@@ -23,8 +24,8 @@ function judging(
 ): JudgingResult {
     return {
         teamName: null,
-        assignmentCount: 2,
-        submittedCount: 2,
+        assignmentCount: 3,
+        submittedCount: 3,
         averageScore: null,
         rank: null,
         evaluations: [],
@@ -259,6 +260,92 @@ describe("public results assembly", () => {
         expect(results.votingRounds[0]?.entries[0]?.teamName).toBe("Beta team");
         expect(results.peopleChoice?.projectTitle).toBe("Beta");
         expect(results.peopleChoice?.roundName).toBe("Community choice");
+    });
+
+    it("withholds rank and scores below three submitted evaluations", () => {
+        const results = assemblePublicResults(
+            input({
+                judging: [
+                    judging({
+                        submissionId: SUBMISSION_A,
+                        projectId: PROJECT_A,
+                        projectTitle: "Alpha",
+                        teamId: TEAM_A,
+                        teamName: "Alpha team",
+                        submittedCount: 2,
+                        averageScore: 91.5,
+                        displayScore: 88,
+                        rank: 1,
+                    }),
+                    judging({
+                        submissionId: SUBMISSION_B,
+                        projectId: PROJECT_B,
+                        projectTitle: "Beta",
+                        teamId: TEAM_B,
+                        teamName: "Beta team",
+                        submittedCount: 3,
+                        averageScore: 80,
+                        displayScore: 79,
+                        rank: 2,
+                    }),
+                ],
+            }),
+        );
+
+        expect(
+            results.judgingEntries.find((entry) => entry.projectTitle === "Alpha"),
+        ).toMatchObject({
+            rank: null,
+            averageScore: null,
+            displayScore: null,
+            submittedCount: 2,
+        });
+        expect(results.judgingEntries.find((entry) => entry.projectTitle === "Beta")).toMatchObject(
+            {
+                rank: 2,
+                averageScore: 80,
+                displayScore: 79,
+            },
+        );
+        expect(findTeamResult(results, TEAM_A)).toMatchObject({
+            rank: null,
+            submittedCount: 2,
+            averageScore: null,
+            displayScore: null,
+        });
+    });
+
+    it("sanitizes a previously published low-review snapshot", () => {
+        const results = assemblePublicResults(
+            input({
+                judging: [
+                    judging({
+                        submissionId: SUBMISSION_A,
+                        projectId: PROJECT_A,
+                        projectTitle: "Alpha",
+                        teamId: TEAM_A,
+                        teamName: "Alpha team",
+                        averageScore: 91.5,
+                        displayScore: 88,
+                        rank: 1,
+                    }),
+                ],
+            }),
+        );
+        const legacy = {
+            ...results,
+            judgingEntries: results.judgingEntries.map((entry) => ({
+                ...entry,
+                submittedCount: 1,
+            })),
+        };
+
+        const sanitized = applyReviewThreshold(legacy);
+        expect(sanitized.judgingEntries[0]).toMatchObject({
+            rank: null,
+            averageScore: null,
+            displayScore: null,
+        });
     });
 
     it("finds a team result by rank and by award only", () => {
