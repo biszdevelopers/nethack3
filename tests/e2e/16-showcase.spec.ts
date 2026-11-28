@@ -56,12 +56,27 @@ test.describe("showcase", () => {
         await expect(page.getByRole("heading", { name: "All projects", level: 2 })).toBeVisible();
         const marquee = page.getByRole("group", { name: "All projects", exact: true });
         await expect(marquee).toBeVisible();
-        const card = marquee.getByRole("button").first();
+        await expect(marquee.getByText(/AI use:/).first()).toBeVisible();
+        const card = marquee
+            .getByRole("button")
+            .filter({ has: page.getByText(FIXTURE.projectTitle, { exact: true }) })
+            .first();
         await expect(card).toBeVisible();
-        await card.click();
+        await card.focus();
+        await expect(card).toBeFocused();
+        await page.keyboard.press("Enter");
         const dialog = page.getByRole("dialog");
         await expect(dialog).toBeVisible();
+        await expect(dialog.getByRole("heading", { name: FIXTURE.projectTitle })).toBeVisible();
         await expect(dialog.getByRole("link", { name: /Open project page/i })).toBeVisible();
+        await expect(dialog.getByText("AI use disclosure")).toBeVisible();
+        await expect(
+            dialog.getByText("This team did not provide an AI-use disclosure."),
+        ).toBeVisible();
+        const videoLink = dialog.getByRole("link", { name: /Demonstration video/i });
+        if ((await videoLink.count()) > 0) {
+            await expect(videoLink.first()).toHaveAttribute("href", /^https?:\/\//);
+        }
         await page.keyboard.press("Escape");
         await expect(dialog).toBeHidden();
         await expect(card).toBeFocused();
@@ -125,6 +140,24 @@ test.describe("showcase", () => {
         await expect(
             page.getByRole("link", { name: new RegExp(FIXTURE.projectTitle) }).first(),
         ).toHaveAttribute("href", `/projects/${FIXTURE.projectSlug}`);
+
+        await expect(page.getByText("AI use disclosure").first()).toBeVisible();
+        const ranks = page.getByText(/^Rank #\d+$/);
+        if ((await ranks.count()) === 0) {
+            await expect(
+                page.getByText(
+                    /Results are not published for this edition yet|not to publish rankings|No ranks or awards were published/,
+                ),
+            ).toBeVisible();
+        }
+        const archiveVideo = page.getByRole("link", { name: /Demonstration video/i }).first();
+        if ((await archiveVideo.count()) > 0) {
+            await expect(archiveVideo).toHaveAttribute("href", /^https?:\/\//);
+        }
+        const certificate = page.getByRole("link", { name: "Certificate" }).first();
+        if ((await certificate.count()) > 0) {
+            await expect(certificate).toHaveAttribute("href", /^\/certificates\/[0-9a-f-]+$/);
+        }
     });
 
     test("unknown season archive shows not found", async ({ page }) => {
@@ -138,7 +171,12 @@ test.describe("showcase", () => {
         test.setTimeout(180_000);
         await page.setViewportSize({ width: 390, height: 844 });
 
-        for (const path of ["/showcase", "/showcase/signal", "/showcase/beneath-the-surface"]) {
+        for (const path of [
+            "/showcase",
+            "/showcase/signal",
+            "/showcase/beneath-the-surface",
+            `/showcase/seasons/${FIXTURE.editionSlug}`,
+        ]) {
             await page.goto(siteUrl(path));
             await expect(page.locator("h1").first()).toBeVisible({ timeout: 60_000 });
             await expectNoHorizontalOverflow(page);

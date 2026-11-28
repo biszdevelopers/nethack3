@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import type { PublicCompetition } from "@nethack/contracts";
 import { getAllProjects, getCompetitions } from "@/lib/public-api";
+import { getPublicResults } from "@/lib/recognition-api";
 import { SignalExperience } from "@/components/showcase/signal-experience";
-import { toShowcaseProject } from "@/components/showcase/showcase-server";
+import { toShowcaseProject, toShowcaseStandings } from "@/components/showcase/showcase-server";
 import type { ShowcaseProject } from "@/components/showcase/showcase-data";
 
 export const metadata: Metadata = {
@@ -35,7 +36,14 @@ export default async function SignalShowcasePage(): Promise<ReactNode> {
     try {
         const competitions = await getCompetitions();
         const edition = previousEdition(competitions.items);
-        projects = (await getAllProjects(edition?.slug)).map(toShowcaseProject);
+        const [projectList, results] = await Promise.all([
+            getAllProjects(edition?.slug),
+            edition === null
+                ? Promise.resolve(null)
+                : getPublicResults(edition.slug).catch(() => null),
+        ]);
+        const standings = results === null ? undefined : toShowcaseStandings(results);
+        projects = projectList.map((project) => toShowcaseProject(project, standings));
     } catch {
         unavailable = true;
     }

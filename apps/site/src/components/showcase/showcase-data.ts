@@ -4,6 +4,11 @@ export interface ShowcaseLink {
     readonly kind: "repository" | "demo" | "video";
 }
 
+export interface ShowcaseAward {
+    readonly id: string;
+    readonly name: string;
+}
+
 export interface ShowcaseProject {
     readonly id: string;
     readonly title: string;
@@ -12,10 +17,21 @@ export interface ShowcaseProject {
     readonly descriptionMarkdown: string;
     readonly repositoryUrl: string | null;
     readonly demoUrl: string | null;
+    readonly videoUrl: string | null;
+    readonly aiDisclosure: string;
     readonly tags: readonly string[];
+    readonly teamId: string | null;
     readonly teamName: string | null;
+    readonly teamStatus: string | null;
+    readonly divisionName: string | null;
     readonly competitionName: string;
+    readonly rank: number | null;
+    readonly awards: readonly ShowcaseAward[];
+    readonly certificateUrl: string | null;
+    readonly showRanking: boolean;
 }
+
+export const AI_DISCLOSURE_EMPTY = "This team did not provide an AI-use disclosure.";
 
 export interface SignalFeatured {
     readonly key: "syl" | "robotic-head" | "dysarthria";

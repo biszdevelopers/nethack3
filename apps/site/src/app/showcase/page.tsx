@@ -181,6 +181,12 @@ export default async function ShowcaseIndexPage(): Promise<ReactNode> {
                                         <h3 className="mt-3 break-words text-2xl font-semibold tracking-tight text-ink">
                                             {season.name}
                                         </h3>
+                                        {season.themeName === null ||
+                                        season.themeName.length === 0 ? null : (
+                                            <p className="mt-1 break-words text-sm font-medium text-primary">
+                                                {season.themeName}
+                                            </p>
+                                        )}
                                         <p className="mt-2 break-words text-sm text-ink-muted">
                                             {season.description}
                                         </p>

@@ -9,9 +9,11 @@ import {
     Award,
     CalendarDays,
     ExternalLink,
+    FileCheck,
     GitBranch,
+    Video,
 } from "lucide-react";
-import { slugSchema, type PublicResultEntry, type PublicTeamAward } from "@nethack/contracts";
+import { slugSchema } from "@nethack/contracts";
 import {
     Badge,
     Button,
@@ -25,14 +27,12 @@ import {
 import { Reveal, StaggerReveal } from "@nethack/ui/motion";
 import { PublicApiError, getAllProjects, getCompetition } from "@/lib/public-api";
 import { getPublicResults } from "@/lib/recognition-api";
-import { toShowcaseProject } from "@/components/showcase/showcase-server";
-import { safeExternalUrl, type ShowcaseProject } from "@/components/showcase/showcase-data";
-
-interface ArchivedEntry {
-    readonly project: ShowcaseProject;
-    readonly rank: number | null;
-    readonly awards: readonly PublicTeamAward[];
-}
+import { toShowcaseProject, toShowcaseStandings } from "@/components/showcase/showcase-server";
+import {
+    AI_DISCLOSURE_EMPTY,
+    safeExternalUrl,
+    type ShowcaseProject,
+} from "@/components/showcase/showcase-data";
 
 function formatDate(value: string | null): string {
     if (value === null) {
@@ -99,33 +99,42 @@ export default async function ShowcaseSeasonPage({
     ]);
 
     const projectsUnavailable = projectList === null;
-    let entries: ArchivedEntry[] =
+    const standings = results === null ? undefined : toShowcaseStandings(results);
+    const rankingsPublished = results !== null && (standings?.showRanking ?? false);
+    const projects: ShowcaseProject[] =
         projectList === null
             ? []
-            : projectList.map((project) => ({
-                  project: toShowcaseProject(project),
-                  rank: null,
-                  awards: [],
-              }));
+            : projectList
+                  .map((project) => toShowcaseProject(project, standings))
+                  .toSorted((left, right) => {
+                      if (rankingsPublished) {
+                          const rankDifference =
+                              (left.rank ?? Number.MAX_SAFE_INTEGER) -
+                              (right.rank ?? Number.MAX_SAFE_INTEGER);
+                          if (rankDifference !== 0) {
+                              return rankDifference;
+                          }
+                      }
+                      return left.title.localeCompare(right.title);
+                  });
 
-    const ranked = new Map<string, PublicResultEntry>(
-        results === null ? [] : results.judgingEntries.map((entry) => [entry.projectId, entry]),
-    );
+    const resultsNotice =
+        projects.length === 0
+            ? null
+            : results === null
+              ? "Results are not published for this edition yet. Project cards remain available; ranks, awards, and certificates appear after publication."
+              : projects.every((project) => project.rank === null && project.awards.length === 0)
+                ? "No ranks or awards were published for this edition."
+                : !rankingsPublished
+                  ? "The organizer has chosen not to publish rankings for this edition. Project cards remain available without ranks or a podium."
+                  : null;
 
-    entries = entries.map((entry) => {
-        const result = ranked.get(entry.project.id);
-        return {
-            ...entry,
-            rank: result?.rank ?? null,
-            awards: result?.awards ?? [],
-        };
-    });
-
-    entries.sort((left, right) => {
-        const rankDifference =
-            (left.rank ?? Number.MAX_SAFE_INTEGER) - (right.rank ?? Number.MAX_SAFE_INTEGER);
-        return rankDifference || left.project.title.localeCompare(right.project.title);
-    });
+    const themeName =
+        season.themeName === null || season.themeName.length === 0 ? null : season.themeName;
+    const themeDescription =
+        season.themeDescription === null || season.themeDescription.length === 0
+            ? null
+            : season.themeDescription;
 
     return (
         <div className="bg-app">
@@ -153,6 +162,18 @@ export default async function ShowcaseSeasonPage({
                         <h1 className="break-words text-balance text-4xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl">
                             {season.name}
                         </h1>
+                        {themeName === null && themeDescription === null ? null : (
+                            <div className="max-w-3xl border-l-2 border-primary pl-4">
+                                {themeName === null ? null : (
+                                    <p className="text-sm font-semibold text-ink">{themeName}</p>
+                                )}
+                                {themeDescription === null ? null : (
+                                    <p className="mt-1 text-sm leading-6 text-ink-muted">
+                                        {themeDescription}
+                                    </p>
+                                )}
+                            </div>
+                        )}
                         <p className="max-w-3xl text-base text-ink-muted">{season.description}</p>
                         <div className="flex flex-wrap items-center gap-4 text-xs text-ink-subtle">
                             <span className="inline-flex items-center gap-1.5">
@@ -209,110 +230,170 @@ export default async function ShowcaseSeasonPage({
                         title="Projects are unavailable"
                         description="The public API could not be reached. Try again shortly."
                     />
-                ) : entries.length === 0 ? (
+                ) : projects.length === 0 ? (
                     <EmptyState
                         title="No published projects"
                         description="Nothing from this edition has been approved for the public showcase."
                     />
                 ) : (
-                    <StaggerReveal className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                        {entries.map((entry) => {
-                            const repository = safeExternalUrl(entry.project.repositoryUrl);
-                            const demo = safeExternalUrl(entry.project.demoUrl);
-                            return (
-                                <Card key={entry.project.id} variant="outline">
-                                    <CardHeader className="flex-row flex-wrap items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <p className="break-words text-xs text-ink-subtle">
-                                                {entry.project.teamName ?? "Independent project"}
-                                            </p>
-                                            <CardTitle className="mt-2 break-words text-xl">
-                                                <Link
-                                                    href={`/projects/${entry.project.slug}`}
-                                                    className="transition-colors hover:text-primary"
-                                                >
-                                                    {entry.project.title}
-                                                </Link>
-                                            </CardTitle>
-                                        </div>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {entry.rank === null ? null : (
-                                                <Badge variant="soft" color="primary" size="sm">
-                                                    Rank #{entry.rank}
-                                                </Badge>
-                                            )}
-                                            {entry.awards.map((award) => (
-                                                <Badge key={award.id} variant="outline" size="sm">
-                                                    <Award className="size-3" aria-hidden="true" />
-                                                    {award.name}
-                                                </Badge>
-                                            ))}
-                                        </div>
-                                    </CardHeader>
-                                    <CardContent className="flex flex-col gap-4">
-                                        <p className="text-sm leading-6 text-ink-muted">
-                                            {entry.project.summary}
-                                        </p>
-                                        {entry.project.descriptionMarkdown.length === 0 ? null : (
-                                            <div className="border-t border-line pt-3 break-words">
-                                                <Markdown
-                                                    source={entry.project.descriptionMarkdown}
-                                                />
+                    <>
+                        {resultsNotice === null ? null : (
+                            <p className="mb-6 border border-line bg-panel px-4 py-3 text-sm leading-6 text-ink-muted">
+                                {resultsNotice}
+                            </p>
+                        )}
+                        <StaggerReveal className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                            {projects.map((project) => {
+                                const repository = safeExternalUrl(project.repositoryUrl);
+                                const demo = safeExternalUrl(project.demoUrl);
+                                const video = safeExternalUrl(project.videoUrl);
+                                const disclosure =
+                                    project.aiDisclosure.trim().length === 0
+                                        ? AI_DISCLOSURE_EMPTY
+                                        : project.aiDisclosure;
+                                return (
+                                    <Card key={project.id} variant="outline">
+                                        <CardHeader className="flex-row flex-wrap items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p className="break-words text-xs text-ink-subtle">
+                                                    {project.teamName ?? "Independent project"}
+                                                    {project.divisionName === null
+                                                        ? ""
+                                                        : ` · ${project.divisionName}`}
+                                                </p>
+                                                <CardTitle className="mt-2 break-words text-xl">
+                                                    <Link
+                                                        href={`/projects/${project.slug}`}
+                                                        className="transition-colors hover:text-primary"
+                                                    >
+                                                        {project.title}
+                                                    </Link>
+                                                </CardTitle>
                                             </div>
-                                        )}
-                                        <div className="flex flex-wrap items-center gap-3">
-                                            <Link
-                                                href={`/projects/${entry.project.slug}`}
-                                                className="inline-flex min-h-9 items-center gap-1.5 border border-primary/35 px-3 text-sm text-primary transition-colors hover:bg-primary/10"
-                                            >
-                                                Open project
-                                                <ArrowUpRight
-                                                    className="size-3.5"
-                                                    aria-hidden="true"
-                                                />
-                                            </Link>
-                                            {repository === null ? null : (
-                                                <a
-                                                    href={repository}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex min-h-9 items-center gap-1.5 border border-line-strong px-3 text-sm text-ink-muted transition-colors hover:bg-raised hover:text-ink"
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {project.showRanking && project.rank !== null ? (
+                                                    <Badge variant="soft" color="primary" size="sm">
+                                                        Rank #{project.rank}
+                                                    </Badge>
+                                                ) : null}
+                                                {project.awards.map((award) => (
+                                                    <Badge
+                                                        key={award.id}
+                                                        variant="outline"
+                                                        size="sm"
+                                                    >
+                                                        <Award
+                                                            className="size-3"
+                                                            aria-hidden="true"
+                                                        />
+                                                        {award.name}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent className="flex flex-col gap-4">
+                                            <p className="text-sm leading-6 text-ink-muted">
+                                                {project.summary}
+                                            </p>
+                                            <div className="border-t border-line pt-3">
+                                                <p className="text-xs text-ink-subtle">
+                                                    AI use disclosure
+                                                </p>
+                                                <p className="mt-1 text-sm leading-6 text-ink-muted">
+                                                    {disclosure}
+                                                </p>
+                                            </div>
+                                            {project.descriptionMarkdown.length === 0 ? null : (
+                                                <div className="border-t border-line pt-3 break-words">
+                                                    <Markdown
+                                                        source={project.descriptionMarkdown}
+                                                    />
+                                                </div>
+                                            )}
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                <Link
+                                                    href={`/projects/${project.slug}`}
+                                                    className="inline-flex min-h-9 items-center gap-1.5 border border-primary/35 px-3 text-sm text-primary transition-colors hover:bg-primary/10"
                                                 >
-                                                    <GitBranch
+                                                    Open project
+                                                    <ArrowUpRight
                                                         className="size-3.5"
                                                         aria-hidden="true"
                                                     />
-                                                    Repository
-                                                    <span className="sr-only">
-                                                        {" "}
-                                                        (opens in a new tab)
-                                                    </span>
-                                                </a>
-                                            )}
-                                            {demo === null ? null : (
-                                                <a
-                                                    href={demo}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex min-h-9 items-center gap-1.5 border border-line-strong px-3 text-sm text-ink-muted transition-colors hover:bg-raised hover:text-ink"
-                                                >
-                                                    <ExternalLink
-                                                        className="size-3.5"
-                                                        aria-hidden="true"
-                                                    />
-                                                    Live demo
-                                                    <span className="sr-only">
-                                                        {" "}
-                                                        (opens in a new tab)
-                                                    </span>
-                                                </a>
-                                            )}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            );
-                        })}
-                    </StaggerReveal>
+                                                </Link>
+                                                {repository === null ? null : (
+                                                    <a
+                                                        href={repository}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex min-h-9 items-center gap-1.5 border border-line-strong px-3 text-sm text-ink-muted transition-colors hover:bg-raised hover:text-ink"
+                                                    >
+                                                        <GitBranch
+                                                            className="size-3.5"
+                                                            aria-hidden="true"
+                                                        />
+                                                        Repository
+                                                        <span className="sr-only">
+                                                            {" "}
+                                                            (opens in a new tab)
+                                                        </span>
+                                                    </a>
+                                                )}
+                                                {demo === null ? null : (
+                                                    <a
+                                                        href={demo}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex min-h-9 items-center gap-1.5 border border-line-strong px-3 text-sm text-ink-muted transition-colors hover:bg-raised hover:text-ink"
+                                                    >
+                                                        <ExternalLink
+                                                            className="size-3.5"
+                                                            aria-hidden="true"
+                                                        />
+                                                        Live demo
+                                                        <span className="sr-only">
+                                                            {" "}
+                                                            (opens in a new tab)
+                                                        </span>
+                                                    </a>
+                                                )}
+                                                {video === null ? null : (
+                                                    <a
+                                                        href={video}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex min-h-9 items-center gap-1.5 border border-line-strong px-3 text-sm text-ink-muted transition-colors hover:bg-raised hover:text-ink"
+                                                    >
+                                                        <Video
+                                                            className="size-3.5"
+                                                            aria-hidden="true"
+                                                        />
+                                                        Demonstration video
+                                                        <span className="sr-only">
+                                                            {" "}
+                                                            (opens in a new tab)
+                                                        </span>
+                                                    </a>
+                                                )}
+                                                {project.certificateUrl === null ? null : (
+                                                    <Link
+                                                        href={project.certificateUrl}
+                                                        className="inline-flex min-h-9 items-center gap-1.5 border border-line-strong px-3 text-sm text-ink-muted transition-colors hover:bg-raised hover:text-ink"
+                                                    >
+                                                        <FileCheck
+                                                            className="size-3.5"
+                                                            aria-hidden="true"
+                                                        />
+                                                        Certificate
+                                                    </Link>
+                                                )}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
+                        </StaggerReveal>
+                    </>
                 )}
             </section>
         </div>
