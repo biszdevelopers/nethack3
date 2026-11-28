@@ -12,6 +12,7 @@ import {
 } from "@nethack/ui/static";
 import { Reveal, StaggerReveal, Tilt } from "@nethack/ui/motion";
 import { getCompetitions, getProjects } from "../../lib/public-api";
+import { safeExternalUrl } from "./project-links";
 
 export const metadata = {
     title: "Showcase",
@@ -98,47 +99,74 @@ export default async function ProjectsPage({
                 />
             ) : (
                 <StaggerReveal className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {projects.items.map((project) => (
-                        <Tilt key={project.id}>
-                            <Card hoverable className="h-full bg-panel/80">
-                                <CardHeader>
-                                    <div className="flex items-center gap-2 text-xs text-ink-subtle">
-                                        <FolderGit2
-                                            className="size-3.5 text-primary"
-                                            aria-hidden="true"
-                                        />
-                                        <span className="truncate">{project.competitionName}</span>
-                                    </div>
-                                    <CardTitle className="text-lg">{project.title}</CardTitle>
-                                </CardHeader>
-                                <CardContent className="flex flex-col gap-3">
-                                    <p className="line-clamp-3 text-sm text-ink-muted">
-                                        {project.summary}
-                                    </p>
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {project.tags.slice(0, 4).map((tag) => (
-                                            <Badge key={tag} variant="outline" size="sm">
-                                                {tag}
-                                            </Badge>
-                                        ))}
-                                    </div>
-                                    <div className="flex items-center justify-between gap-2 pt-1">
-                                        <span className="inline-flex items-center gap-1 text-xs text-ink-subtle">
-                                            <GitBranch className="size-3" aria-hidden="true" />
-                                            {project.teamName ?? "Independent project"}
-                                        </span>
-                                        <Link
-                                            href={`/projects/${project.slug}`}
-                                            className="inline-flex items-center gap-1 text-sm text-primary transition-colors hover:text-primary-hover"
-                                        >
-                                            Open
-                                            <ArrowRight className="size-3.5" aria-hidden="true" />
-                                        </Link>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </Tilt>
-                    ))}
+                    {projects.items.map((project) => {
+                        const videoUrl = safeExternalUrl(project.videoUrl);
+                        return (
+                            <Tilt key={project.id}>
+                                <Card hoverable className="h-full bg-panel/80">
+                                    <CardHeader>
+                                        <div className="flex items-center gap-2 text-xs text-ink-subtle">
+                                            <FolderGit2
+                                                className="size-3.5 text-primary"
+                                                aria-hidden="true"
+                                            />
+                                            <span className="truncate">
+                                                {project.competitionName}
+                                            </span>
+                                        </div>
+                                        <CardTitle className="text-lg">{project.title}</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="flex flex-col gap-3">
+                                        <p className="line-clamp-3 text-sm text-ink-muted">
+                                            {project.summary}
+                                        </p>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            {project.tags.slice(0, 4).map((tag) => (
+                                                <Badge key={tag} variant="outline" size="sm">
+                                                    {tag}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                        {project.aiDisclosure.trim().length === 0 ? null : (
+                                            <p className="line-clamp-2 text-xs text-ink-subtle">
+                                                <span className="text-ink-muted">AI use:</span>{" "}
+                                                {project.aiDisclosure}
+                                            </p>
+                                        )}
+                                        <div className="flex items-center justify-between gap-2 pt-1">
+                                            <span className="inline-flex items-center gap-1 text-xs text-ink-subtle">
+                                                <GitBranch className="size-3" aria-hidden="true" />
+                                                {project.teamName ?? "Independent project"}
+                                            </span>
+                                            <span className="inline-flex items-center gap-3">
+                                                {videoUrl === null ? null : (
+                                                    <a
+                                                        href={videoUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        aria-label={`Demonstration video for ${project.title}`}
+                                                        className="inline-flex items-center gap-1 text-sm text-primary transition-colors hover:text-primary-hover"
+                                                    >
+                                                        Video
+                                                    </a>
+                                                )}
+                                                <Link
+                                                    href={`/projects/${project.slug}`}
+                                                    className="inline-flex items-center gap-1 text-sm text-primary transition-colors hover:text-primary-hover"
+                                                >
+                                                    Open
+                                                    <ArrowRight
+                                                        className="size-3.5"
+                                                        aria-hidden="true"
+                                                    />
+                                                </Link>
+                                            </span>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </Tilt>
+                        );
+                    })}
                 </StaggerReveal>
             )}
         </div>

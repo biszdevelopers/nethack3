@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { emailSchema, idSchema, isoDateTimeSchema } from "../common/schemas.js";
+import { emailSchema, httpUrlSchema, idSchema, isoDateTimeSchema } from "../common/schemas.js";
 
 export const teamStatusSchema = z.enum([
     "forming",
@@ -53,6 +53,7 @@ export const teamDetailSchema = teamSchema.extend({
         z.object({
             userId: idSchema,
             displayName: z.string(),
+            avatarUrl: httpUrlSchema.nullable(),
             role: teamRoleSchema,
             joinedAt: isoDateTimeSchema,
         }),

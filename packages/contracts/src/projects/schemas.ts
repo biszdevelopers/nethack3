@@ -22,6 +22,8 @@ export const projectSchema = z.object({
     descriptionMarkdown: z.string(),
     repositoryUrl: httpUrlSchema.nullable(),
     demoUrl: httpUrlSchema.nullable(),
+    videoUrl: httpUrlSchema.nullable(),
+    aiDisclosure: z.string().max(2000),
     tags: z.array(z.string()),
     status: projectStatusSchema,
     publishedAt: isoDateTimeSchema.nullable(),
@@ -33,6 +35,7 @@ export type Project = z.infer<typeof projectSchema>;
 export const projectMemberSchema = z.object({
     userId: idSchema,
     displayName: z.string(),
+    avatarUrl: httpUrlSchema.nullable(),
     role: z.enum(["owner", "member"]),
 });
 export type ProjectMember = z.infer<typeof projectMemberSchema>;
@@ -50,6 +53,7 @@ export const projectDetailSchema = projectSchema.extend({
         z.object({
             userId: idSchema,
             displayName: z.string(),
+            avatarUrl: httpUrlSchema.nullable(),
             role: z.enum(["owner", "member"]),
         }),
     ),
@@ -73,6 +77,8 @@ export const createProjectRequestSchema = z
         descriptionMarkdown: markdownSchema.default(""),
         repositoryUrl: httpUrlSchema.nullable().default(null),
         demoUrl: httpUrlSchema.nullable().default(null),
+        videoUrl: httpUrlSchema.nullable().default(null),
+        aiDisclosure: z.string().trim().max(2000).default(""),
         tags: z.array(z.string().trim().min(1).max(32)).max(10).default([]),
     })
     .strict();
@@ -85,6 +91,8 @@ export const updateProjectRequestSchema = z
         descriptionMarkdown: markdownSchema.optional(),
         repositoryUrl: httpUrlSchema.nullable().optional(),
         demoUrl: httpUrlSchema.nullable().optional(),
+        videoUrl: httpUrlSchema.nullable().optional(),
+        aiDisclosure: z.string().trim().max(2000).optional(),
         tags: z.array(z.string().trim().min(1).max(32)).max(10).optional(),
         teamId: idSchema.nullable().optional(),
     })

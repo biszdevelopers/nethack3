@@ -159,6 +159,8 @@ export class ProjectService {
                             descriptionMarkdown: input.descriptionMarkdown,
                             repositoryUrl: input.repositoryUrl,
                             demoUrl: input.demoUrl,
+                            videoUrl: input.videoUrl,
+                            aiDisclosure: input.aiDisclosure,
                             tags: input.tags,
                         });
                         await this.repository.addMember(session, {
@@ -278,6 +280,10 @@ export class ProjectService {
                         ? {}
                         : { repositoryUrl: input.repositoryUrl }),
                     ...(input.demoUrl === undefined ? {} : { demoUrl: input.demoUrl }),
+                    ...(input.videoUrl === undefined ? {} : { videoUrl: input.videoUrl }),
+                    ...(input.aiDisclosure === undefined
+                        ? {}
+                        : { aiDisclosure: input.aiDisclosure }),
                     ...(input.tags === undefined ? {} : { tags: input.tags }),
                     ...(input.teamId === undefined ? {} : { teamId: input.teamId }),
                     updatedAt: this.clock.now(),
@@ -466,7 +472,12 @@ export class ProjectService {
             }
             throw error;
         }
-        return { userId: user.id, displayName: user.displayName, role: "member" };
+        return {
+            userId: user.id,
+            displayName: user.displayName,
+            avatarUrl: user.avatarUrl,
+            role: "member",
+        };
     }
 
     async listPublic(
@@ -601,6 +612,8 @@ export function toProject(row: ProjectRow): Project {
         descriptionMarkdown: row.descriptionMarkdown,
         repositoryUrl: row.repositoryUrl,
         demoUrl: row.demoUrl,
+        videoUrl: row.videoUrl,
+        aiDisclosure: row.aiDisclosure,
         tags: [...row.tags],
         status: row.status,
         publishedAt: row.publishedAt === null ? null : row.publishedAt.toISOString(),
@@ -629,7 +642,12 @@ export function toProjectSummary(row: ProjectRow): ProjectSummary {
 }
 
 function toMember(row: ProjectMemberView): ProjectMember {
-    return { userId: row.userId, displayName: row.displayName, role: row.role };
+    return {
+        userId: row.userId,
+        displayName: row.displayName,
+        avatarUrl: row.avatarUrl,
+        role: row.role,
+    };
 }
 
 function toPublicProject(row: PublicProjectRow, members: readonly string[]): PublicProject {
@@ -641,9 +659,14 @@ function toPublicProject(row: PublicProjectRow, members: readonly string[]): Pub
         descriptionMarkdown: row.descriptionMarkdown,
         repositoryUrl: row.repositoryUrl,
         demoUrl: row.demoUrl,
+        videoUrl: row.videoUrl,
+        aiDisclosure: row.aiDisclosure,
         tags: [...row.tags],
         publishedAt: row.publishedAt === null ? null : row.publishedAt.toISOString(),
+        teamId: row.teamId,
         teamName: row.teamName,
+        teamStatus: row.teamStatus,
+        divisionName: row.divisionName,
         organizationName: row.organizationName,
         competitionName: row.competitionName,
         competitionSlug: row.competitionSlug,

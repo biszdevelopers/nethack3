@@ -1,6 +1,14 @@
 import type { ReactNode } from "react";
 import { Link, useParams } from "react-router";
-import { Badge, Card, CardContent, CardHeader, CardTitle, Markdown } from "@nethack/ui";
+import {
+    Badge,
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+    Markdown,
+    UserDisplay,
+} from "@nethack/ui";
 import { useActiveMembership, useSession } from "../../../application/session.js";
 import { OrganizationRequired } from "../../../components/organization-required.js";
 import { QueryErrorState, QueryLoading } from "../../../components/query-state.js";
@@ -103,6 +111,23 @@ export function ProjectDetailPage(): ReactNode {
 
                     <Card>
                         <CardHeader>
+                            <CardTitle>AI-use disclosure</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {detail.aiDisclosure.trim().length === 0 ? (
+                                <p className="text-sm text-ink-muted">
+                                    No AI-use disclosure was recorded.
+                                </p>
+                            ) : (
+                                <p className="whitespace-pre-line break-words text-sm text-ink-muted">
+                                    {detail.aiDisclosure}
+                                </p>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
                             <CardTitle>Project files</CardTitle>
                         </CardHeader>
                         <CardContent>
@@ -194,6 +219,23 @@ export function ProjectDetailPage(): ReactNode {
                                     </dd>
                                 </div>
                                 <div className="flex flex-col gap-0.5">
+                                    <dt className="text-xs text-ink-subtle">Demonstration video</dt>
+                                    <dd className="break-all text-ink">
+                                        {detail.videoUrl === null ? (
+                                            "Not provided"
+                                        ) : (
+                                            <a
+                                                href={detail.videoUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-primary underline-offset-4 hover:underline"
+                                            >
+                                                {detail.videoUrl}
+                                            </a>
+                                        )}
+                                    </dd>
+                                </div>
+                                <div className="flex flex-col gap-0.5">
                                     <dt className="text-xs text-ink-subtle">Created</dt>
                                     <dd className="text-ink">{formatDateTime(detail.createdAt)}</dd>
                                 </div>
@@ -216,9 +258,13 @@ export function ProjectDetailPage(): ReactNode {
                                         key={member.userId}
                                         className="flex items-center justify-between gap-2 py-2 first:pt-0 last:pb-0"
                                     >
-                                        <span className="truncate text-sm text-ink">
-                                            {member.displayName}
-                                        </span>
+                                        <div className="min-w-0">
+                                            <UserDisplay
+                                                name={member.displayName}
+                                                imageUrl={member.avatarUrl}
+                                                size="sm"
+                                            />
+                                        </div>
                                         <Badge
                                             tone={member.role === "owner" ? "primary" : "neutral"}
                                             size="sm"

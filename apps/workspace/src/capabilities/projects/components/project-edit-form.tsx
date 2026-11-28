@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import type { ReactNode } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -7,6 +7,7 @@ import type { ProjectDetail } from "@nethack/contracts";
 import { Alert, Button, Form, FormField, Input, TagInput, Textarea } from "@nethack/ui";
 import { errorMessage } from "../../../lib/errors.js";
 import { useUpdateProject } from "../hooks/use-projects.js";
+import { AiDisclosureField, AI_DISCLOSURE_MAX_LENGTH } from "./ai-disclosure-field.js";
 
 const optionalUrl = z
     .string()
@@ -22,6 +23,8 @@ const editProjectSchema = z.object({
     descriptionMarkdown: z.string().max(100_000),
     repositoryUrl: optionalUrl,
     demoUrl: optionalUrl,
+    videoUrl: optionalUrl,
+    aiDisclosure: z.string().trim().max(AI_DISCLOSURE_MAX_LENGTH, "Use at most 2,000 characters."),
     tags: z.array(z.string().trim().min(1).max(32)).max(10, "Use at most 10 tags."),
 });
 
@@ -34,6 +37,8 @@ function toValues(project: ProjectDetail): EditProjectValues {
         descriptionMarkdown: project.descriptionMarkdown,
         repositoryUrl: project.repositoryUrl ?? "",
         demoUrl: project.demoUrl ?? "",
+        videoUrl: project.videoUrl ?? "",
+        aiDisclosure: project.aiDisclosure,
         tags: project.tags,
     };
 }
@@ -44,6 +49,7 @@ export function ProjectEditForm({ project }: { readonly project: ProjectDetail }
         resolver: zodResolver(editProjectSchema),
         defaultValues: toValues(project),
     });
+    const aiDisclosure = useWatch({ control: form.control, name: "aiDisclosure" }) ?? "";
 
     useEffect(() => {
         form.reset(toValues(project));
@@ -57,6 +63,8 @@ export function ProjectEditForm({ project }: { readonly project: ProjectDetail }
                 descriptionMarkdown: values.descriptionMarkdown,
                 repositoryUrl: values.repositoryUrl.length === 0 ? null : values.repositoryUrl,
                 demoUrl: values.demoUrl.length === 0 ? null : values.demoUrl,
+                videoUrl: values.videoUrl.length === 0 ? null : values.videoUrl,
+                aiDisclosure: values.aiDisclosure,
                 tags: values.tags,
             });
         } catch {
@@ -88,6 +96,23 @@ export function ProjectEditForm({ project }: { readonly project: ProjectDetail }
                     {(field) => <Input {...field} inputMode="url" />}
                 </FormField>
             </div>
+            <FormField
+                name="videoUrl"
+                label="Demonstration video URL"
+                description="Link a public recording that shows the project working."
+                optionalLabel="optional"
+            >
+                {(field) => <Input {...field} inputMode="url" placeholder="https://youtu.be/…" />}
+            </FormField>
+            <AiDisclosureField
+                value={aiDisclosure}
+                onChange={(value) => {
+                    form.setValue("aiDisclosure", value, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                    });
+                }}
+            />
             <Controller
                 control={form.control}
                 name="tags"

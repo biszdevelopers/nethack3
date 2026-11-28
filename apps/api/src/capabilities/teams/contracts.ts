@@ -16,6 +16,7 @@ export interface TeamSummary {
 export interface TeamMemberSummary {
     readonly userId: string;
     readonly displayName: string;
+    readonly avatarUrl: string | null;
     readonly role: TeamRole;
     readonly joinedAt: string;
 }

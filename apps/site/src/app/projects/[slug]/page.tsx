@@ -6,6 +6,7 @@ import { ArrowUpRight, CalendarDays, Users } from "lucide-react";
 import { Badge, Card, CardContent, CardHeader, CardTitle, Markdown } from "@nethack/ui/static";
 import { Reveal } from "@nethack/ui/motion";
 import { PublicApiError, getProject } from "../../../lib/public-api";
+import { safeExternalUrl } from "../project-links";
 
 export async function generateMetadata({
     params,
@@ -46,11 +47,10 @@ export default async function ProjectDetailPage({
     }
 
     const links = [
-        project.repositoryUrl === null
-            ? null
-            : { label: "Repository", href: project.repositoryUrl },
-        project.demoUrl === null ? null : { label: "Live demo", href: project.demoUrl },
-    ].filter((entry): entry is { label: string; href: string } => entry !== null);
+        { label: "Repository", href: safeExternalUrl(project.repositoryUrl) },
+        { label: "Live demo", href: safeExternalUrl(project.demoUrl) },
+        { label: "Demonstration video", href: safeExternalUrl(project.videoUrl) },
+    ].filter((entry): entry is { label: string; href: string } => entry.href !== null);
 
     return (
         <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-10 px-4 py-10 sm:px-6 md:py-14 lg:px-8">
@@ -100,12 +100,27 @@ export default async function ProjectDetailPage({
             </Reveal>
 
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-                <Reveal className="flex flex-col gap-4" y={20}>
-                    <h2 className="text-2xl font-bold tracking-tight">About the project</h2>
-                    <div className="prose-nethack">
-                        <Markdown source={project.descriptionMarkdown} />
-                    </div>
-                </Reveal>
+                <div className="flex flex-col gap-8">
+                    <Reveal className="flex flex-col gap-4" y={20}>
+                        <h2 className="text-2xl font-bold tracking-tight">About the project</h2>
+                        <div className="prose-nethack">
+                            <Markdown source={project.descriptionMarkdown} />
+                        </div>
+                    </Reveal>
+
+                    <Reveal className="flex flex-col gap-3" y={20}>
+                        <h2 className="text-2xl font-bold tracking-tight">AI-use disclosure</h2>
+                        {project.aiDisclosure.trim().length === 0 ? (
+                            <p className="text-sm text-ink-muted">
+                                This team did not provide an AI-use disclosure.
+                            </p>
+                        ) : (
+                            <p className="whitespace-pre-line break-words text-sm text-ink-muted">
+                                {project.aiDisclosure}
+                            </p>
+                        )}
+                    </Reveal>
+                </div>
 
                 <div className="flex flex-col gap-4">
                     <Reveal>

@@ -112,6 +112,7 @@ export class TeamService {
                 list.push({
                     userId: member.userId,
                     displayName: member.displayName,
+                    avatarUrl: member.avatarUrl,
                     role: member.role,
                     joinedAt: member.joinedAt.toISOString(),
                 });
@@ -971,6 +972,7 @@ function toDetail(
         members: members.map((member) => ({
             userId: member.userId,
             displayName: member.displayName,
+            avatarUrl: member.avatarUrl,
             role: member.role,
             joinedAt: member.joinedAt.toISOString(),
         })),

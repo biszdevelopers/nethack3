@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import type { TeamDetail } from "@nethack/contracts";
-import { Alert, AlertDialog, Badge, Button, Separator } from "@nethack/ui";
+import { Alert, AlertDialog, Badge, Button, Separator, UserDisplay } from "@nethack/ui";
 import { errorMessage } from "../../../lib/errors.js";
 import { formatDateTime } from "../../../lib/format.js";
 import { humanizeStatus, statusBadgeTone } from "../../../lib/status.js";
@@ -137,7 +137,11 @@ export function TeamMembers({
                         className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
                     >
                         <div className="flex min-w-0 flex-col gap-0.5">
-                            <span className="truncate text-sm text-ink">{member.displayName}</span>
+                            <UserDisplay
+                                name={member.displayName}
+                                imageUrl={member.avatarUrl}
+                                size="sm"
+                            />
                             <span className="text-xs text-ink-subtle">
                                 Joined {formatDateTime(member.joinedAt)}
                             </span>

@@ -1,8 +1,9 @@
 import { and, desc, eq, exists, inArray, isNotNull, lt, or, sql, type SQL } from "drizzle-orm";
-import type { ProjectStatus } from "@nethack/contracts";
+import type { ProjectStatus, TeamStatus } from "@nethack/contracts";
 import type { DatabaseExecutor, DatabaseSession } from "../../../infrastructure/database/client.js";
 import {
     competitionEditions,
+    divisions,
     organizations,
     projectMembers,
     projects,
@@ -27,6 +28,7 @@ export type ProjectRow = typeof projects.$inferSelect;
 export interface ProjectMemberView {
     readonly userId: string;
     readonly displayName: string;
+    readonly avatarUrl: string | null;
     readonly role: "owner" | "member";
 }
 
@@ -39,9 +41,14 @@ export interface PublicProjectRow {
     readonly descriptionMarkdown: string;
     readonly repositoryUrl: string | null;
     readonly demoUrl: string | null;
+    readonly videoUrl: string | null;
+    readonly aiDisclosure: string;
     readonly tags: readonly string[];
     readonly publishedAt: Date | null;
+    readonly teamId: string | null;
     readonly teamName: string | null;
+    readonly teamStatus: TeamStatus | null;
+    readonly divisionName: string | null;
     readonly organizationName: string;
     readonly competitionName: string;
     readonly competitionSlug: string;
@@ -68,6 +75,8 @@ export class ProjectRepository {
             descriptionMarkdown: string;
             repositoryUrl: string | null;
             demoUrl: string | null;
+            videoUrl: string | null;
+            aiDisclosure: string;
             tags: readonly string[];
         },
     ): Promise<ProjectRow> {
@@ -227,6 +236,8 @@ export class ProjectRepository {
             descriptionMarkdown?: string;
             repositoryUrl?: string | null;
             demoUrl?: string | null;
+            videoUrl?: string | null;
+            aiDisclosure?: string;
             tags?: readonly string[];
             teamId?: string | null;
             status?: ProjectStatus;
@@ -255,6 +266,7 @@ export class ProjectRepository {
             .select({
                 userId: projectMembers.userId,
                 displayName: users.displayName,
+                avatarUrl: users.avatarUrl,
                 role: projectMembers.role,
             })
             .from(projectMembers)
@@ -271,9 +283,9 @@ export class ProjectRepository {
     async findUserByEmail(
         db: DatabaseExecutor,
         email: string,
-    ): Promise<{ id: string; displayName: string } | null> {
+    ): Promise<{ id: string; displayName: string; avatarUrl: string | null } | null> {
         const rows = await db
-            .select({ id: users.id, displayName: users.displayName })
+            .select({ id: users.id, displayName: users.displayName, avatarUrl: users.avatarUrl })
             .from(users)
             .where(sql`lower(${users.email}) = ${email.toLowerCase()}`)
             .limit(1);
@@ -343,9 +355,14 @@ export class ProjectRepository {
                 descriptionMarkdown: projects.descriptionMarkdown,
                 repositoryUrl: projects.repositoryUrl,
                 demoUrl: projects.demoUrl,
+                videoUrl: projects.videoUrl,
+                aiDisclosure: projects.aiDisclosure,
                 tags: projects.tags,
                 publishedAt: projects.publishedAt,
+                teamId: teams.id,
                 teamName: teams.name,
+                teamStatus: teams.status,
+                divisionName: divisions.name,
                 organizationName: organizations.name,
                 competitionName: competitionEditions.name,
                 competitionSlug: competitionEditions.slug,
@@ -365,6 +382,13 @@ export class ProjectRepository {
                 and(
                     eq(teams.id, projects.teamId),
                     eq(teams.organizationId, projects.organizationId),
+                ),
+            )
+            .leftJoin(
+                divisions,
+                and(
+                    eq(divisions.id, teams.divisionId),
+                    eq(divisions.organizationId, teams.organizationId),
                 ),
             )
             .where(and(...conditions))
@@ -383,9 +407,14 @@ export class ProjectRepository {
                 descriptionMarkdown: projects.descriptionMarkdown,
                 repositoryUrl: projects.repositoryUrl,
                 demoUrl: projects.demoUrl,
+                videoUrl: projects.videoUrl,
+                aiDisclosure: projects.aiDisclosure,
                 tags: projects.tags,
                 publishedAt: projects.publishedAt,
+                teamId: teams.id,
                 teamName: teams.name,
+                teamStatus: teams.status,
+                divisionName: divisions.name,
                 organizationName: organizations.name,
                 competitionName: competitionEditions.name,
                 competitionSlug: competitionEditions.slug,
@@ -405,6 +434,13 @@ export class ProjectRepository {
                 and(
                     eq(teams.id, projects.teamId),
                     eq(teams.organizationId, projects.organizationId),
+                ),
+            )
+            .leftJoin(
+                divisions,
+                and(
+                    eq(divisions.id, teams.divisionId),
+                    eq(divisions.organizationId, teams.organizationId),
                 ),
             )
             .where(

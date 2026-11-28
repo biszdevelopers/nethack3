@@ -1,11 +1,14 @@
 import { z } from "zod";
 import { idSchema, isoDateTimeSchema } from "../common/schemas.js";
+import { teamStatusSchema } from "../teams/schemas.js";
 
 export const publicCompetitionSchema = z.object({
     editionId: idSchema,
     name: z.string(),
     slug: z.string(),
     description: z.string(),
+    themeName: z.string().nullable(),
+    themeDescription: z.string().nullable(),
     status: z.string(),
     organizationName: z.string(),
     organizationSlug: z.string(),
@@ -15,6 +18,8 @@ export const publicCompetitionSchema = z.object({
     registrationClosesAt: isoDateTimeSchema.nullable(),
     teamMinSize: z.number().int(),
     teamMaxSize: z.number().int(),
+    showScores: z.boolean(),
+    showRanking: z.boolean(),
     publishedProjectCount: z.number().int().nonnegative(),
 });
 export type PublicCompetition = z.infer<typeof publicCompetitionSchema>;
@@ -59,9 +64,14 @@ export const publicProjectSchema = z.object({
     descriptionMarkdown: z.string(),
     repositoryUrl: z.string().nullable(),
     demoUrl: z.string().nullable(),
+    videoUrl: z.string().nullable(),
+    aiDisclosure: z.string(),
     tags: z.array(z.string()),
     publishedAt: isoDateTimeSchema.nullable(),
+    teamId: idSchema.nullable(),
     teamName: z.string().nullable(),
+    teamStatus: teamStatusSchema.nullable(),
+    divisionName: z.string().nullable(),
     organizationName: z.string(),
     competitionName: z.string(),
     competitionSlug: z.string(),

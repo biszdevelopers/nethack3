@@ -35,6 +35,8 @@ export const projects = pgTable(
         descriptionMarkdown: text("description_markdown").notNull().default(""),
         repositoryUrl: text("repository_url"),
         demoUrl: text("demo_url"),
+        videoUrl: text("video_url"),
+        aiDisclosure: text("ai_disclosure").notNull().default(""),
         tags: text("tags").array().notNull().default([]),
         status: projectStatusEnum("status").notNull().default("draft"),
         publishedAt: timestamp("published_at", { withTimezone: true }),

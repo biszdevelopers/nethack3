@@ -21,6 +21,7 @@ import {
 import { FormSelect } from "../../../components/form-select.js";
 import { errorMessage } from "../../../lib/errors.js";
 import { useCreateProject } from "../hooks/use-projects.js";
+import { AiDisclosureField, AI_DISCLOSURE_MAX_LENGTH } from "./ai-disclosure-field.js";
 
 const optionalUrl = z
     .string()
@@ -38,6 +39,8 @@ const projectSchema = z.object({
     descriptionMarkdown: z.string().max(100_000),
     repositoryUrl: optionalUrl,
     demoUrl: optionalUrl,
+    videoUrl: optionalUrl,
+    aiDisclosure: z.string().trim().max(AI_DISCLOSURE_MAX_LENGTH, "Use at most 2,000 characters."),
     tags: z.array(z.string().trim().min(1).max(32)).max(10, "Use at most 10 tags."),
 });
 
@@ -69,10 +72,13 @@ export function CreateProjectDialog({
             descriptionMarkdown: "",
             repositoryUrl: "",
             demoUrl: "",
+            videoUrl: "",
+            aiDisclosure: "",
             tags: [],
         },
     });
     const editionId = useWatch({ control: form.control, name: "editionId" }) ?? "";
+    const aiDisclosure = useWatch({ control: form.control, name: "aiDisclosure" }) ?? "";
     const availableTeams = teams.filter((team) => team.editionId === editionId);
     const createProject = useCreateProject();
 
@@ -88,6 +94,8 @@ export function CreateProjectDialog({
             descriptionMarkdown: "",
             repositoryUrl: "",
             demoUrl: "",
+            videoUrl: "",
+            aiDisclosure: "",
             tags: [],
         });
     }, [open, defaultEditionId, form]);
@@ -114,6 +122,8 @@ export function CreateProjectDialog({
                 descriptionMarkdown: values.descriptionMarkdown,
                 repositoryUrl: values.repositoryUrl.length === 0 ? null : values.repositoryUrl,
                 demoUrl: values.demoUrl.length === 0 ? null : values.demoUrl,
+                videoUrl: values.videoUrl.length === 0 ? null : values.videoUrl,
+                aiDisclosure: values.aiDisclosure,
                 tags: values.tags,
             });
             close(false);
@@ -191,6 +201,29 @@ export function CreateProjectDialog({
                                 {(field) => <Input {...field} inputMode="url" />}
                             </FormField>
                         </div>
+                        <FormField
+                            name="videoUrl"
+                            label="Demonstration video URL"
+                            description="Link a public recording that shows the project working."
+                            optionalLabel="optional"
+                        >
+                            {(field) => (
+                                <Input
+                                    {...field}
+                                    inputMode="url"
+                                    placeholder="https://youtu.be/…"
+                                />
+                            )}
+                        </FormField>
+                        <AiDisclosureField
+                            value={aiDisclosure}
+                            onChange={(value) => {
+                                form.setValue("aiDisclosure", value, {
+                                    shouldDirty: true,
+                                    shouldValidate: true,
+                                });
+                            }}
+                        />
                         <Controller
                             control={form.control}
                             name="tags"

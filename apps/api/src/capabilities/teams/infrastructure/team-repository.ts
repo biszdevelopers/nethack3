@@ -31,6 +31,7 @@ export interface TeamWithMemberCount extends TeamRow {
 export interface TeamMemberRow {
     readonly userId: string;
     readonly displayName: string;
+    readonly avatarUrl: string | null;
     readonly role: TeamRole;
     readonly joinedAt: Date;
 }
@@ -204,6 +205,7 @@ export class TeamRepository {
             .select({
                 userId: teamMembers.userId,
                 displayName: users.displayName,
+                avatarUrl: users.avatarUrl,
                 role: teamMembers.role,
                 joinedAt: teamMembers.joinedAt,
             })
@@ -226,6 +228,7 @@ export class TeamRepository {
                 teamId: teamMembers.teamId,
                 userId: teamMembers.userId,
                 displayName: users.displayName,
+                avatarUrl: users.avatarUrl,
                 role: teamMembers.role,
                 joinedAt: teamMembers.joinedAt,
             })
@@ -254,6 +257,7 @@ export class TeamRepository {
             .select({
                 userId: teamMembers.userId,
                 displayName: users.displayName,
+                avatarUrl: users.avatarUrl,
                 role: teamMembers.role,
                 joinedAt: teamMembers.joinedAt,
             })
