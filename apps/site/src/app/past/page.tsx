@@ -65,6 +65,12 @@ export default async function PastCompetitionsPage(): Promise<ReactNode> {
                                 <p className="line-clamp-2 text-sm text-ink-muted">
                                     {competition.description}
                                 </p>
+                                {competition.themeName === null ? null : (
+                                    <p className="text-sm text-ink">
+                                        <span className="text-ink-subtle">Theme · </span>
+                                        {competition.themeName}
+                                    </p>
+                                )}
                                 <div className="flex gap-4 text-sm">
                                     <Link
                                         href={`/competitions/${competition.slug}`}

@@ -73,6 +73,10 @@ export const competitionEditionSchema = z.object({
     name: z.string(),
     slug: z.string(),
     description: z.string(),
+    themeName: z.string().nullable(),
+    themeDescription: z.string().nullable(),
+    showScores: z.boolean(),
+    showRanking: z.boolean(),
     status: competitionEditionStatusSchema,
     timezone: z.string(),
     registrationOpensAt: isoDateTimeSchema.nullable(),
@@ -122,6 +126,21 @@ export const createEditionRequestSchema = z
         name: z.string().trim().min(2).max(160),
         slug: slugSchema,
         description: z.string().max(5000).default(""),
+        themeName: z
+            .string()
+            .trim()
+            .max(160)
+            .nullable()
+            .default(null)
+            .transform((value) => (value === "" ? null : value)),
+        themeDescription: z
+            .string()
+            .max(2000)
+            .nullable()
+            .default(null)
+            .transform((value) => (value === "" ? null : value)),
+        showScores: z.boolean().default(false),
+        showRanking: z.boolean().default(false),
         timezone: timeZoneSchema,
         registrationOpensAt: isoDateTimeSchema.nullable().default(null),
         registrationClosesAt: isoDateTimeSchema.nullable().default(null),
@@ -155,6 +174,21 @@ export const updateEditionRequestSchema = z
     .object({
         name: z.string().trim().min(2).max(160).optional(),
         description: z.string().max(5000).optional(),
+        themeName: z
+            .string()
+            .trim()
+            .max(160)
+            .nullable()
+            .optional()
+            .transform((value) => (value === "" ? null : value)),
+        themeDescription: z
+            .string()
+            .max(2000)
+            .nullable()
+            .optional()
+            .transform((value) => (value === "" ? null : value)),
+        showScores: z.boolean().optional(),
+        showRanking: z.boolean().optional(),
         status: competitionEditionStatusSchema.optional(),
         timezone: timeZoneSchema.optional(),
         registrationOpensAt: isoDateTimeSchema.nullable().optional(),

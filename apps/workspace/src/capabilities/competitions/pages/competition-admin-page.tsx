@@ -36,6 +36,7 @@ import {
     useToast,
 } from "@nethack/ui";
 import { useActiveMembership } from "../../../application/session.js";
+import { FormSwitch } from "../../../components/form-switch.js";
 import { EditionSelect } from "../../shared/edition-select.js";
 import {
     formatDate,
@@ -132,6 +133,10 @@ function toEditionForm(edition: CompetitionEditionDetail): EditionForm {
         name: edition.name,
         slug: edition.slug,
         description: edition.description,
+        themeName: edition.themeName ?? "",
+        themeDescription: edition.themeDescription ?? "",
+        showScores: edition.showScores,
+        showRanking: edition.showRanking,
         timezone: edition.timezone,
         status: edition.status,
         registrationOpensAt: isoToLocalInput(edition.registrationOpensAt),
@@ -185,6 +190,10 @@ export function CompetitionAdminPage(): ReactNode {
             name: "",
             slug: "",
             description: "",
+            themeName: "",
+            themeDescription: "",
+            showScores: false,
+            showRanking: false,
             timezone: timezoneDefault(),
             status: "draft",
             registrationOpensAt: "",
@@ -203,6 +212,10 @@ export function CompetitionAdminPage(): ReactNode {
             name: "",
             slug: "",
             description: "",
+            themeName: "",
+            themeDescription: "",
+            showScores: false,
+            showRanking: false,
             timezone: timezoneDefault(),
             status: "draft",
             registrationOpensAt: "",
@@ -317,6 +330,11 @@ export function CompetitionAdminPage(): ReactNode {
                     name: values.name.trim(),
                     slug: values.slug,
                     description: values.description,
+                    themeName: values.themeName.length === 0 ? null : values.themeName,
+                    themeDescription:
+                        values.themeDescription.length === 0 ? null : values.themeDescription,
+                    showScores: values.showScores,
+                    showRanking: values.showRanking,
                     timezone: values.timezone,
                     registrationOpensAt: localInputToIso(values.registrationOpensAt),
                     registrationClosesAt: localInputToIso(values.registrationClosesAt),
@@ -333,6 +351,10 @@ export function CompetitionAdminPage(): ReactNode {
                 name: "",
                 slug: "",
                 description: "",
+                themeName: "",
+                themeDescription: "",
+                showScores: false,
+                showRanking: false,
                 timezone: timezoneDefault(),
                 status: "draft",
                 registrationOpensAt: "",
@@ -431,6 +453,11 @@ export function CompetitionAdminPage(): ReactNode {
                 body: {
                     name: values.name.trim(),
                     description: values.description,
+                    themeName: values.themeName.length === 0 ? null : values.themeName,
+                    themeDescription:
+                        values.themeDescription.length === 0 ? null : values.themeDescription,
+                    showScores: values.showScores,
+                    showRanking: values.showRanking,
                     timezone: values.timezone,
                     ...(editionData !== null && values.status !== editionData.status
                         ? { status: values.status }
@@ -630,6 +657,44 @@ export function CompetitionAdminPage(): ReactNode {
                                     >
                                         {(field) => <Textarea {...field} value={field.value} />}
                                     </FormField>
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <FormField
+                                            name="themeName"
+                                            label="Theme name"
+                                            optionalLabel="optional"
+                                            description="Public label. Leave empty until the theme is revealed."
+                                        >
+                                            {(field) => (
+                                                <Input
+                                                    {...field}
+                                                    value={field.value}
+                                                    placeholder="Beneath the surface"
+                                                />
+                                            )}
+                                        </FormField>
+                                        <FormField
+                                            name="themeDescription"
+                                            label="Theme description"
+                                            optionalLabel="optional"
+                                            description="Short public description of the theme."
+                                        >
+                                            {(field) => (
+                                                <Textarea {...field} value={field.value} rows={2} />
+                                            )}
+                                        </FormField>
+                                    </div>
+                                    <div className="flex flex-col gap-3">
+                                        <FormSwitch<EditionForm>
+                                            name="showScores"
+                                            label="Show scores publicly"
+                                            description="Publish judge scores on the public results page."
+                                        />
+                                        <FormSwitch<EditionForm>
+                                            name="showRanking"
+                                            label="Show rankings publicly"
+                                            description="Publish rank order on the public results page."
+                                        />
+                                    </div>
                                     <FormField name="timezone" label="Time zone" required>
                                         {(field) => <Input {...field} value={field.value} />}
                                     </FormField>
@@ -874,6 +939,38 @@ export function CompetitionAdminPage(): ReactNode {
                                     >
                                         {(field) => <Textarea {...field} value={field.value} />}
                                     </FormField>
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <FormField
+                                            name="themeName"
+                                            label="Theme name"
+                                            optionalLabel="optional"
+                                            description="Public label. Leave empty until the theme is revealed."
+                                        >
+                                            {(field) => <Input {...field} value={field.value} />}
+                                        </FormField>
+                                        <FormField
+                                            name="themeDescription"
+                                            label="Theme description"
+                                            optionalLabel="optional"
+                                            description="Short public description of the theme."
+                                        >
+                                            {(field) => (
+                                                <Textarea {...field} value={field.value} rows={2} />
+                                            )}
+                                        </FormField>
+                                    </div>
+                                    <div className="flex flex-col gap-3">
+                                        <FormSwitch<EditionForm>
+                                            name="showScores"
+                                            label="Show scores publicly"
+                                            description="Publish judge scores on the public results page."
+                                        />
+                                        <FormSwitch<EditionForm>
+                                            name="showRanking"
+                                            label="Show rankings publicly"
+                                            description="Publish rank order on the public results page."
+                                        />
+                                    </div>
                                     <div className="grid gap-4 sm:grid-cols-2">
                                         <FormField
                                             name="registrationOpensAt"

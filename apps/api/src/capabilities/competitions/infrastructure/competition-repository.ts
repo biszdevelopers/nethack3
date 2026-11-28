@@ -63,6 +63,10 @@ export interface NewEditionValues {
     readonly name: string;
     readonly slug: string;
     readonly description: string;
+    readonly themeName: string | null;
+    readonly themeDescription: string | null;
+    readonly showScores: boolean;
+    readonly showRanking: boolean;
     readonly timezone: string;
     readonly registrationOpensAt: Date | null;
     readonly registrationClosesAt: Date | null;
@@ -78,6 +82,10 @@ export interface EditionUpdateValues {
     readonly updatedAt: Date;
     readonly name?: string;
     readonly description?: string;
+    readonly themeName?: string | null;
+    readonly themeDescription?: string | null;
+    readonly showScores?: boolean;
+    readonly showRanking?: boolean;
     readonly status?: CompetitionEditionStatus;
     readonly timezone?: string;
     readonly registrationOpensAt?: Date | null;

@@ -88,6 +88,10 @@ function toEditionSummary(row: {
     name: string;
     slug: string;
     description: string;
+    themeName: string | null;
+    themeDescription: string | null;
+    showScores: boolean;
+    showRanking: boolean;
     status: EditionSummary["status"];
     timezone: string;
     registrationOpensAt: Date | null;
@@ -108,6 +112,10 @@ function toEditionSummary(row: {
         name: row.name,
         slug: row.slug,
         description: row.description,
+        themeName: row.themeName,
+        themeDescription: row.themeDescription,
+        showScores: row.showScores,
+        showRanking: row.showRanking,
         status: row.status,
         timezone: row.timezone,
         registrationOpensAt: nullableIso(row.registrationOpensAt),

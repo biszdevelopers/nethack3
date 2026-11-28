@@ -249,6 +249,10 @@ export class CompetitionService {
                         name: input.name,
                         slug: input.slug,
                         description: input.description,
+                        themeName: input.themeName,
+                        themeDescription: input.themeDescription,
+                        showScores: input.showScores,
+                        showRanking: input.showRanking,
                         timezone: input.timezone,
                         registrationOpensAt: schedule.registrationOpensAt,
                         registrationClosesAt: schedule.registrationClosesAt,
@@ -358,6 +362,18 @@ export class CompetitionService {
                 }
                 if (input.description !== undefined) {
                     values.description = input.description;
+                }
+                if (input.themeName !== undefined) {
+                    values.themeName = input.themeName;
+                }
+                if (input.themeDescription !== undefined) {
+                    values.themeDescription = input.themeDescription;
+                }
+                if (input.showScores !== undefined) {
+                    values.showScores = input.showScores;
+                }
+                if (input.showRanking !== undefined) {
+                    values.showRanking = input.showRanking;
                 }
                 if (input.timezone !== undefined) {
                     values.timezone = input.timezone;
@@ -1064,6 +1080,10 @@ function toEdition(row: EditionRow): CompetitionEdition {
         name: row.name,
         slug: row.slug,
         description: row.description,
+        themeName: row.themeName,
+        themeDescription: row.themeDescription,
+        showScores: row.showScores,
+        showRanking: row.showRanking,
         status: row.status,
         timezone: row.timezone,
         registrationOpensAt: nullableIso(row.registrationOpensAt),
@@ -1130,6 +1150,10 @@ function toPublicCompetition(
         name: row.name,
         slug: row.slug,
         description: row.description,
+        themeName: row.themeName,
+        themeDescription: row.themeDescription,
+        showScores: row.showScores,
+        showRanking: row.showRanking,
         status: row.status,
         organizationName: organization.name,
         organizationSlug: organization.slug,

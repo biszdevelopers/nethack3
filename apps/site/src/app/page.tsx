@@ -134,6 +134,9 @@ export default async function HomePage(): Promise<ReactNode> {
     }
 
     const openCompetition = currentEvent(competitions.items);
+    const themeCompetition =
+        competitions.items.find((competition) => competition.themeName !== null) ??
+        competitions.items[0];
     let nextMilestone: { title: string; occursAt: string } | null = null;
     if (openCompetition !== undefined) {
         try {
@@ -328,6 +331,51 @@ export default async function HomePage(): Promise<ReactNode> {
                             </Tilt>
                         ))}
                     </StaggerReveal>
+                )}
+            </section>
+
+            <section className="flex flex-col gap-5" aria-labelledby="theme-heading">
+                <Reveal className="flex flex-col gap-1">
+                    <h2
+                        id="theme-heading"
+                        className="text-2xl font-bold tracking-tight sm:text-3xl"
+                    >
+                        Theme
+                    </h2>
+                    <p className="text-sm text-ink-muted">
+                        The challenge participants build against.
+                    </p>
+                </Reveal>
+                {themeCompetition === undefined || themeCompetition.themeName === null ? (
+                    <EmptyState
+                        title="The theme will be revealed"
+                        description="The organizer has not published a theme yet."
+                    />
+                ) : (
+                    <Reveal delay={0.05}>
+                        <Card className="bg-panel/80">
+                            <CardContent className="flex flex-col gap-2 pt-5">
+                                <span className="text-xs text-ink-subtle">
+                                    {themeCompetition.name}
+                                </span>
+                                <p className="text-2xl font-bold tracking-tight text-primary">
+                                    {themeCompetition.themeName}
+                                </p>
+                                {themeCompetition.themeDescription === null ? null : (
+                                    <p className="max-w-3xl whitespace-pre-wrap text-sm text-ink-muted">
+                                        {themeCompetition.themeDescription}
+                                    </p>
+                                )}
+                                <Link
+                                    href={`/competitions/${themeCompetition.slug}`}
+                                    className="inline-flex w-fit items-center gap-1 text-sm text-primary transition-colors hover:text-primary-hover"
+                                >
+                                    View competition
+                                    <ArrowRight className="size-3.5" aria-hidden="true" />
+                                </Link>
+                            </CardContent>
+                        </Card>
+                    </Reveal>
                 )}
             </section>
 

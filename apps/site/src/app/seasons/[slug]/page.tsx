@@ -105,6 +105,12 @@ export default async function SeasonArchivePage({
                     {season.name}
                 </h1>
                 <p className="max-w-3xl text-base text-ink-muted">{season.description}</p>
+                {season.themeName === null ? null : (
+                    <p className="text-sm text-ink">
+                        <span className="text-ink-subtle">Theme · </span>
+                        <span className="font-medium">{season.themeName}</span>
+                    </p>
+                )}
                 <div className="flex flex-wrap gap-2">
                     <Button asChild>
                         <Link href={`/competitions/${season.slug}`}>

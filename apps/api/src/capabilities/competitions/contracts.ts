@@ -9,6 +9,10 @@ export interface EditionSummary {
     readonly name: string;
     readonly slug: string;
     readonly description: string;
+    readonly themeName: string | null;
+    readonly themeDescription: string | null;
+    readonly showScores: boolean;
+    readonly showRanking: boolean;
     readonly status: CompetitionEditionStatus;
     readonly timezone: string;
     readonly registrationOpensAt: string | null;

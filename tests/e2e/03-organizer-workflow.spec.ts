@@ -44,7 +44,7 @@ test.describe("organizer workflow", () => {
             await form.getByLabel("Edition name").fill(editionName);
             await form.getByLabel("Slug").fill("e2e-organizer-edition");
             await form
-                .getByLabel("Description")
+                .getByLabel(/^Description/)
                 .fill("Edition created by the E2E organizer journey.");
             await form.getByLabel("Registration opens").fill(localDateTime(-1));
             await form.getByLabel("Registration closes").fill(localDateTime(10));

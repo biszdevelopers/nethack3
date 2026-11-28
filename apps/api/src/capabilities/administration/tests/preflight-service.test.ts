@@ -27,6 +27,10 @@ function edition(): EditionSummary {
         maxParticipants: null,
         rulesMarkdown: "",
         publishedAt: null,
+        themeName: null,
+        themeDescription: null,
+        showScores: false,
+        showRanking: false,
     };
 }
 

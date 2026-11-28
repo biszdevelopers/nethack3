@@ -1,4 +1,5 @@
 import {
+    boolean,
     index,
     integer,
     pgEnum,
@@ -64,6 +65,10 @@ export const competitionEditions = pgTable(
         name: text("name").notNull(),
         slug: text("slug").notNull(),
         description: text("description").notNull().default(""),
+        themeName: text("theme_name"),
+        themeDescription: text("theme_description"),
+        showScores: boolean("show_scores").notNull().default(false),
+        showRanking: boolean("show_ranking").notNull().default(false),
         status: editionStatusEnum("status").notNull().default("draft"),
         timezone: text("timezone").notNull().default("UTC"),
         registrationOpensAt: timestamp("registration_opens_at", { withTimezone: true }),

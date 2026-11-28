@@ -60,6 +60,10 @@ function edition(): EditionSummary {
         maxParticipants: null,
         rulesMarkdown: "",
         publishedAt: null,
+        themeName: null,
+        themeDescription: null,
+        showScores: false,
+        showRanking: false,
     };
 }
 
@@ -79,6 +83,7 @@ function team(): TeamWithMembers {
             {
                 userId,
                 displayName: "Fixture Organizer",
+                avatarUrl: null,
                 role: "captain",
                 joinedAt: "2026-01-01T00:00:00.000Z",
             },
@@ -92,6 +97,7 @@ function submission(status: SubmissionStatus): SubmissionSummary {
         organizationId,
         editionId,
         projectId: "77777777-7777-4777-8777-777777777777",
+        projectSlug: "fixture-project",
         teamId,
         status,
         currentVersion: 1,

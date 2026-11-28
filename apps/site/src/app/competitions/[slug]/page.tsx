@@ -107,6 +107,23 @@ export default async function CompetitionDetailPage({
                 </div>
             </Reveal>
 
+            {competition.themeName === null ? null : (
+                <Reveal
+                    delay={0.05}
+                    className="flex flex-col gap-2 rounded-lg border border-primary/25 bg-primary/[0.06] p-5"
+                >
+                    <span className="text-xs text-ink-subtle">Theme</span>
+                    <p className="text-xl font-bold tracking-tight text-primary">
+                        {competition.themeName}
+                    </p>
+                    {competition.themeDescription === null ? null : (
+                        <p className="max-w-3xl whitespace-pre-wrap text-sm text-ink-muted">
+                            {competition.themeDescription}
+                        </p>
+                    )}
+                </Reveal>
+            )}
+
             <StaggerReveal className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <Card variant="soft">
                     <CardContent className="flex flex-col gap-1 pt-5">

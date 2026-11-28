@@ -25,6 +25,10 @@ function edition(index: number, startsAt: string | null): EditionSummary {
         maxParticipants: null,
         rulesMarkdown: "",
         publishedAt: null,
+        themeName: null,
+        themeDescription: null,
+        showScores: false,
+        showRanking: false,
     };
 }
 
