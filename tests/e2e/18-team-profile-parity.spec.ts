@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { API_ORIGIN, FIXTURE, SITE_ORIGIN, USERS } from "../support/e2e/config.js";
 import { chooseOption, expectToast, signIn, signOutThroughMenu } from "../support/e2e/app.js";
+import { ownerTenantQuery } from "../support/e2e/db.js";
 
 const THEME_PNG = Buffer.from(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgwJ/lK3y9QAAAABJRU5ErkJggg==",
@@ -24,6 +25,14 @@ async function fetchPublicProfile(): Promise<PublicProfilePayload> {
 }
 
 test.describe("team status and profile theme parity", () => {
+    test.afterAll(async () => {
+        await ownerTenantQuery(
+            FIXTURE.organizationId,
+            "update teams set status = 'ready' where id = $1",
+            [FIXTURE.teamId],
+        );
+    });
+
     test("admin terminal status shows the participant a badge and blocked submissions", async ({
         page,
     }) => {
