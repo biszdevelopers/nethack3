@@ -17,6 +17,7 @@ import {
     judgingResultSchema,
     judgingRubricSchema,
     listResponseSchema,
+    publicRubricSchema,
     rubricTemplateSchema,
     saveEvaluationRequestSchema,
     scoreCurveResponseSchema,
@@ -48,6 +49,17 @@ export async function registerJudgingRoutes(
     service: JudgingService,
 ): Promise<void> {
     const guard = new AuthGuard(context.config, context.auth.sessions, context.auth.bearer);
+
+    app.get(
+        "/api/v1/public/editions/:editionId/rubric",
+        {
+            schema: {
+                params: editionParams,
+                response: { 200: z.array(publicRubricSchema) },
+            },
+        },
+        async (request) => service.listPublicRubrics(request.params.editionId),
+    );
 
     app.get(
         "/api/v1/competitions/:editionId/rubrics",

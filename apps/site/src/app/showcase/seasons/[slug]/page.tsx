@@ -92,6 +92,9 @@ export default async function ShowcaseSeasonPage({
         }
         throw error;
     }
+    if (season.status !== "completed" && season.status !== "archived") {
+        notFound();
+    }
 
     const [projectList, results] = await Promise.all([
         getAllProjects(season.slug).catch(() => null),

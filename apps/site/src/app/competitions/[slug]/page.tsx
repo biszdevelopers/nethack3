@@ -14,7 +14,7 @@ import {
     Markdown,
 } from "@nethack/ui/static";
 import { Reveal, StaggerReveal, Tilt } from "@nethack/ui/motion";
-import { PublicApiError, getCompetition } from "../../../lib/public-api";
+import { PublicApiError, getCompetition, getCompetitionRubric } from "../../../lib/public-api";
 
 function formatDate(value: string | null): string {
     if (value === null) {
@@ -65,6 +65,7 @@ export default async function CompetitionDetailPage({
     }
 
     const workspaceOrigin = process.env.WORKSPACE_ORIGIN ?? "http://localhost:5173";
+    const rubrics = await getCompetitionRubric(competition.editionId).catch(() => []);
 
     return (
         <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-12 px-4 py-10 sm:px-6 md:py-14 lg:px-8">
@@ -98,6 +99,9 @@ export default async function CompetitionDetailPage({
                     <Button asChild variant="outline" color="neutral">
                         <Link href={`/competitions/${competition.slug}/schedule`}>Schedule</Link>
                     </Button>
+                    <Button asChild variant="outline" color="neutral">
+                        <a href="/calendar.ics">Add to calendar</a>
+                    </Button>
                     <Button asChild variant="subtle" color="neutral">
                         <Link href={`/projects?competition=${competition.slug}`}>
                             View projects
@@ -121,6 +125,51 @@ export default async function CompetitionDetailPage({
                             {competition.themeDescription}
                         </p>
                     )}
+                </Reveal>
+            )}
+
+            {rubrics.length === 0 ? null : (
+                <Reveal delay={0.05} className="flex flex-col gap-4">
+                    <h2 className="text-2xl font-bold tracking-tight">Judging rubric</h2>
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                        {rubrics.map((rubric) => (
+                            <Card key={`${rubric.id}-${String(rubric.version)}`}>
+                                <CardHeader>
+                                    <CardTitle className="text-base">
+                                        {rubric.divisionName ?? "Overall"} · {rubric.name}
+                                    </CardTitle>
+                                    {rubric.description.length === 0 ? null : (
+                                        <p className="text-sm text-ink-muted">
+                                            {rubric.description}
+                                        </p>
+                                    )}
+                                </CardHeader>
+                                <CardContent className="flex flex-col gap-2">
+                                    {rubric.criteria.map((criterion) => (
+                                        <div
+                                            key={criterion.name}
+                                            className="flex flex-col gap-0.5 border-t border-line pt-2 first:border-t-0 first:pt-0"
+                                        >
+                                            <div className="flex flex-wrap items-baseline justify-between gap-2">
+                                                <span className="text-sm font-medium text-ink">
+                                                    {criterion.name}
+                                                </span>
+                                                <span className="text-xs tabular-nums text-ink-subtle">
+                                                    {criterion.weight}% · max{" "}
+                                                    {String(criterion.maxScore)}
+                                                </span>
+                                            </div>
+                                            {criterion.description.length === 0 ? null : (
+                                                <p className="text-sm text-ink-muted">
+                                                    {criterion.description}
+                                                </p>
+                                            )}
+                                        </div>
+                                    ))}
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
                 </Reveal>
             )}
 

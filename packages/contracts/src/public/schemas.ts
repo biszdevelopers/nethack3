@@ -2,6 +2,24 @@ import { z } from "zod";
 import { idSchema, isoDateTimeSchema } from "../common/schemas.js";
 import { teamStatusSchema } from "../teams/schemas.js";
 
+export const publicRubricCriterionSchema = z.object({
+    name: z.string(),
+    description: z.string(),
+    maxScore: z.number(),
+    weight: z.number(),
+});
+
+export const publicRubricSchema = z.object({
+    id: idSchema,
+    name: z.string(),
+    description: z.string(),
+    version: z.number().int().positive(),
+    divisionId: idSchema.nullable(),
+    divisionName: z.string().nullable(),
+    criteria: z.array(publicRubricCriterionSchema),
+});
+export type PublicRubric = z.infer<typeof publicRubricSchema>;
+
 export const publicCompetitionSchema = z.object({
     editionId: idSchema,
     name: z.string(),

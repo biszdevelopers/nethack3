@@ -15,6 +15,7 @@ import type {
     JudgingResult,
     JudgingRubric,
     OrganizationRole,
+    PublicRubric,
     RubricTemplate,
     RubricTemplateDefinition,
     SaveEvaluationRequest,
@@ -141,6 +142,40 @@ export class JudgingService {
             this.repository.listRubrics(session.db, organizationId, editionId, includeInactive),
         );
         return rows.map(toRubric);
+    }
+
+    async listPublicRubrics(editionId: string): Promise<PublicRubric[]> {
+        const edition = await this.contracts.competitions.getPublicEdition(editionId);
+        if (edition === null) {
+            throw new NotFoundError("The competition edition was not found.");
+        }
+        const [rows, divisions] = await Promise.all([
+            this.database.transaction({ organizationId: edition.organizationId }, async (session) =>
+                this.repository.listRubrics(session.db, edition.organizationId, editionId, false),
+            ),
+            this.contracts.competitions.listDivisions(edition.organizationId, editionId),
+        ]);
+        const divisionNames = new Map(divisions.map((division) => [division.id, division.name]));
+        return rows.map((row) => {
+            const rubric = toRubric(row);
+            return {
+                id: rubric.id,
+                name: rubric.name,
+                description: rubric.description,
+                version: rubric.version,
+                divisionId: rubric.divisionId,
+                divisionName:
+                    rubric.divisionId === null
+                        ? null
+                        : (divisionNames.get(rubric.divisionId) ?? null),
+                criteria: rubric.criteria.map((criterion) => ({
+                    name: criterion.name,
+                    description: criterion.description,
+                    maxScore: criterion.maxScore,
+                    weight: criterion.weight,
+                })),
+            };
+        });
     }
 
     async getRubric(

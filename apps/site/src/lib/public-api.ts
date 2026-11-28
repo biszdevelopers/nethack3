@@ -4,12 +4,14 @@ import {
     publicCompetitionDetailSchema,
     publicCompetitionSchema,
     publicProjectSchema,
+    publicRubricSchema,
     publicUserProfileSchema,
     type ListResponse,
     type PublicAnnouncement,
     type PublicCompetition,
     type PublicCompetitionDetail,
     type PublicProject,
+    type PublicRubric,
     type PublicUserProfile,
 } from "@nethack/contracts";
 import type { z } from "zod";
@@ -57,6 +59,7 @@ const competitionListSchema = listResponseSchema(publicCompetitionSchema);
 const competitionDetailSchema = publicCompetitionDetailSchema;
 const projectListSchema = listResponseSchema(publicProjectSchema);
 const announcementListSchema = listResponseSchema(publicAnnouncementSchema);
+const rubricListSchema = publicRubricSchema.array();
 
 export async function getCompetitions(): Promise<ListResponse<PublicCompetition>> {
     return publicRequest("/api/v1/public/competitions", competitionListSchema);
@@ -66,6 +69,13 @@ export async function getCompetition(slug: string): Promise<PublicCompetitionDet
     return publicRequest(
         `/api/v1/public/competitions/${encodeURIComponent(slug)}`,
         competitionDetailSchema,
+    );
+}
+
+export async function getCompetitionRubric(editionId: string): Promise<readonly PublicRubric[]> {
+    return publicRequest(
+        `/api/v1/public/editions/${encodeURIComponent(editionId)}/rubric`,
+        rubricListSchema,
     );
 }
 

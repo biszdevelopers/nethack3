@@ -42,9 +42,7 @@ export default async function ShowcaseIndexPage(): Promise<ReactNode> {
     const archivedSeasons = competitions.items
         .filter(
             (competition) =>
-                competition.publishedProjectCount > 0 ||
-                competition.status === "completed" ||
-                competition.status === "archived",
+                competition.status === "completed" || competition.status === "archived",
         )
         .sort((left, right) => {
             const leftDate = left.endsAt ?? left.startsAt ?? "";

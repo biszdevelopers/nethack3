@@ -38,6 +38,11 @@ test.describe("public site", () => {
             page.getByRole("heading", { name: FIXTURE.editionName, level: 1 }),
         ).toBeVisible({ timeout: 60_000 });
         await expect(page.getByText(FIXTURE.projectTitle).first()).toBeVisible();
+        await expect(page.getByRole("heading", { name: "Judging rubric", level: 2 })).toBeVisible();
+        await expect(page.getByText(/E2E Organizer Rubric/).first()).toBeVisible();
+        const calendar = await page.request.get(siteUrl("/calendar.ics"));
+        expect(calendar.status()).toBe(200);
+        expect(await calendar.text()).toContain("BEGIN:VCALENDAR");
 
         await page.goto(siteUrl(`/projects/${FIXTURE.projectSlug}`));
         await expect(

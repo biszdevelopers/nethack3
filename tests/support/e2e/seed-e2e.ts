@@ -4,6 +4,8 @@ import { ownerQuery, ownerTenantBatch } from "./db.js";
 const ORG = FIXTURE.organizationId;
 const OPEN_EDITION = FIXTURE.openEditionId;
 const OPEN_DIVISION = FIXTURE.openDivisionId;
+const ARCHIVE_EDITION = FIXTURE.archiveEditionId;
+const ARCHIVE_PROJECT_ID = "f2000000-0000-4000-8000-000000000080";
 const OTHER_ORG = FIXTURE.otherOrganizationId;
 
 const AUTHOR_ID = "f2000000-0000-4000-8000-000000000041";
@@ -119,6 +121,36 @@ async function seedOpenEdition(): Promise<void> {
                    (organization_id, edition_id, user_id, division_id, status)
                    values ($1, $2, $3, $4, 'pending')`,
             values: [ORG, OPEN_EDITION, FIXTURE.applicantId, OPEN_DIVISION],
+        },
+        {
+            text: `insert into competition_editions
+                   (id, organization_id, series_id, name, slug, description, status, timezone,
+                    registration_opens_at, registration_closes_at, starts_at, ends_at,
+                    team_min_size, team_max_size, published_at)
+                   values ($1, $2, $3, $4, $5, 'A completed season used by the archive tests.',
+                           'completed', 'UTC', now() - interval '90 days',
+                           now() - interval '80 days', now() - interval '75 days',
+                           now() - interval '70 days', 1, 4, now() - interval '90 days')`,
+            values: [
+                ARCHIVE_EDITION,
+                ORG,
+                FIXTURE.seriesId,
+                FIXTURE.archiveEditionName,
+                FIXTURE.archiveEditionSlug,
+            ],
+        },
+        {
+            text: `insert into projects
+                   (id, organization_id, edition_id, owner_user_id, title, slug, summary,
+                    description_markdown, repository_url, demo_url, video_url, ai_disclosure,
+                    tags, status, published_at)
+                   values ($1, $2, $3, $4, 'Archived Showcase Project',
+                           'archived-showcase-project', 'A project from a completed season.',
+                           'Archive fixture.', 'https://example.com/archive-repo',
+                           'https://example.com/archive-demo', 'https://example.com/archive-video',
+                           'No AI tools were used in this archived project.',
+                           array['archive'], 'published', now() - interval '70 days')`,
+            values: [ARCHIVE_PROJECT_ID, ORG, ARCHIVE_EDITION, AUTHOR_ID],
         },
     ]);
 }

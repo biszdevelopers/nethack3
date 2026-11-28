@@ -63,6 +63,13 @@ export const competitionsCapability: CapabilityDefinition = {
                 const row = await repository.findVisibleEditionById(context.database.db, editionId);
                 return row !== null;
             },
+            async getPublicEdition(editionId) {
+                const row = await repository.findVisibleEditionById(context.database.db, editionId);
+                return row === null ? null : { id: row.id, organizationId: row.organizationId };
+            },
+            async listDivisions(organizationId, editionId) {
+                return service.divisions(organizationId, editionId);
+            },
             freezeForResults(session, organizationId, editionId) {
                 return service.freezeForResults(session, organizationId, editionId);
             },

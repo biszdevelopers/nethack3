@@ -18,7 +18,7 @@ const PUBLIC_PAGES = [
     "/showcase",
     "/showcase/signal",
     "/showcase/beneath-the-surface",
-    `/showcase/seasons/${FIXTURE.editionSlug}`,
+    `/showcase/seasons/${FIXTURE.archiveEditionSlug}`,
 ] as const;
 
 function siteUrl(path: string): string {
@@ -169,13 +169,13 @@ test.describe("accessibility and visual layout", () => {
         });
     });
 
-    test("empty archive state matches the visual baseline", async ({ page }) => {
+    test("completed archive state matches the visual baseline", async ({ page }) => {
         test.setTimeout(180_000);
         await page.goto(siteUrl("/past"));
-        await expect(page.getByRole("heading", { name: "No completed competitions" })).toBeVisible({
-            timeout: 60_000,
-        });
-        await expect(page).toHaveScreenshot("public-past-empty.png", {
+        await expect(
+            page.getByRole("heading", { name: "Fixture Archive Season", level: 3 }),
+        ).toBeVisible({ timeout: 60_000 });
+        await expect(page).toHaveScreenshot("public-past.png", {
             animations: "disabled",
             caret: "hide",
             maxDiffPixelRatio: 0.03,

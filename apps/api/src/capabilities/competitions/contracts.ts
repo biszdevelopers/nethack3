@@ -38,10 +38,17 @@ export interface DivisionSummary {
     readonly maxTeamSize: number | null;
 }
 
+export interface PublicEditionRef {
+    readonly id: string;
+    readonly organizationId: string;
+}
+
 export interface CompetitionsContract {
     getEdition(organizationId: string, editionId: string): Promise<EditionSummary | null>;
+    getPublicEdition(editionId: string): Promise<PublicEditionRef | null>;
     getDivision(organizationId: string, divisionId: string): Promise<DivisionSummary | null>;
     listEditions(organizationId: string): Promise<readonly EditionSummary[]>;
+    listDivisions(organizationId: string, editionId: string): Promise<readonly DivisionSummary[]>;
     isPublicEdition(editionId: string): Promise<boolean>;
     /**
      * Results publication freeze. Moves the edition to `completed` inside the
