@@ -37,16 +37,18 @@ export interface NewVoteValues {
     readonly ballotId: string;
     readonly userId: string;
     readonly submissionId: string;
+    readonly stars: number;
 }
 
 export interface BallotWithVotes {
     readonly ballot: BallotRow;
-    readonly submissionIds: readonly string[];
+    readonly scores: readonly { readonly submissionId: string; readonly stars: number }[];
 }
 
-export interface VoteCountRow {
+export interface VoteTallyRow {
     readonly submissionId: string;
     readonly votes: number;
+    readonly totalStars: number;
 }
 
 export class VotingRepository {
@@ -188,11 +190,11 @@ export class VotingRepository {
             return null;
         }
         const rows = await db
-            .select({ submissionId: votes.submissionId })
+            .select({ submissionId: votes.submissionId, stars: votes.stars })
             .from(votes)
             .where(and(eq(votes.organizationId, organizationId), eq(votes.ballotId, ballot.id)))
             .orderBy(asc(votes.createdAt), asc(votes.id));
-        return { ballot, submissionIds: rows.map((row) => row.submissionId) };
+        return { ballot, scores: rows };
     }
 
     async insertBallot(session: DatabaseSession, values: NewBallotValues): Promise<BallotRow> {
@@ -207,15 +209,40 @@ export class VotingRepository {
         await session.db.insert(votes).values([...values]);
     }
 
+    async deleteVotes(
+        session: DatabaseSession,
+        organizationId: string,
+        ballotId: string,
+    ): Promise<void> {
+        await session.db
+            .delete(votes)
+            .where(and(eq(votes.organizationId, organizationId), eq(votes.ballotId, ballotId)));
+    }
+
+    async touchBallot(
+        session: DatabaseSession,
+        organizationId: string,
+        ballotId: string,
+        submittedAt: Date,
+    ): Promise<BallotRow | null> {
+        const rows = await session.db
+            .update(ballots)
+            .set({ submittedAt })
+            .where(and(eq(ballots.organizationId, organizationId), eq(ballots.id, ballotId)))
+            .returning();
+        return rows[0] ?? null;
+    }
+
     async aggregateVotes(
         db: DatabaseExecutor,
         organizationId: string,
         roundId: string,
-    ): Promise<readonly VoteCountRow[]> {
+    ): Promise<readonly VoteTallyRow[]> {
         return db
             .select({
                 submissionId: votes.submissionId,
                 votes: sql<number>`count(*)::int`,
+                totalStars: sql<number>`coalesce(sum(${votes.stars}), 0)::int`,
             })
             .from(votes)
             .where(and(eq(votes.organizationId, organizationId), eq(votes.roundId, roundId)))

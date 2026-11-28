@@ -1,4 +1,6 @@
+import { sql } from "drizzle-orm";
 import {
+    check,
     foreignKey,
     index,
     integer,
@@ -34,7 +36,7 @@ export const votingRounds = pgTable(
         description: text("description").notNull().default(""),
         status: votingRoundStatusEnum("status").notNull().default("draft"),
         eligibleRoles: text("eligible_roles").array().notNull().default(["participant"]),
-        maxSelections: integer("max_selections").notNull().default(1),
+        maxSelections: integer("max_selections").notNull().default(10),
         opensAt: timestamp("opens_at", { withTimezone: true }),
         closesAt: timestamp("closes_at", { withTimezone: true }),
         publishedAt: timestamp("published_at", { withTimezone: true }),
@@ -92,9 +94,11 @@ export const votes = pgTable(
             .notNull()
             .references(() => users.id, { onDelete: "cascade" }),
         submissionId: uuid("submission_id").notNull(),
+        stars: integer("stars").notNull().default(1),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     },
     (table) => [
+        check("votes_stars_range_check", sql`${table.stars} between 1 and 5`),
         uniqueIndex("votes_round_user_submission_unique").on(
             table.roundId,
             table.userId,

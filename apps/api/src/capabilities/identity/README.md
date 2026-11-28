@@ -5,6 +5,7 @@ HTTP boundary for the signed-in account and the Basis Auth login/logout flow.
 ## Ownership
 
 - Public login start, callback, logout, session, CSRF token, and profile routes under `/api/v1/auth`.
+- Anonymous public profile read at `/api/v1/public/users/:userId`, limited to id, display name, avatar URL, and creation time.
 - Request schemas for login and callback parameters in `domain/identity-schemas.ts`.
 - Route-level rate limits for login, callback, logout, and profile mutations.
 
@@ -15,6 +16,7 @@ None. Identity is the HTTP adapter over the core authentication services in `app
 ## Permissions
 
 - Login and callback are public.
+- The public profile read is anonymous, cached for 60 seconds, and returns 404 for an unknown user id.
 - Session, CSRF, profile, and logout routes require a valid session cookie or bearer token.
 - Mutating routes require the CSRF header and an allowed Origin when cookie-authenticated.
 

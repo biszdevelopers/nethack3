@@ -101,4 +101,11 @@ export class SubmissionRules {
             throw new ConflictError(`A ${status} submission cannot be withdrawn.`);
         }
     }
+
+    /** Administrative reopen returns a submitted submission to an editable state. */
+    static assertReopenable(status: SubmissionStatus): void {
+        if (status !== "submitted") {
+            throw new ConflictError("Only a submitted submission can be reopened.");
+        }
+    }
 }

@@ -15,6 +15,7 @@ export interface JudgingContract {
         editionId: string,
     ): Promise<readonly JudgingResult[]>;
     countSubmittedEvaluations(organizationId: string, editionId: string): Promise<number>;
+    countOpenFlags(organizationId: string, editionId: string): Promise<number>;
     getEvaluation(organizationId: string, assignmentId: string): Promise<Evaluation | null>;
 }
 

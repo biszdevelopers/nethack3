@@ -1,7 +1,10 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
+import { z } from "zod";
 import {
     csrfTokenSchema,
+    idSchema,
     logoutResponseSchema,
+    publicUserProfileSchema,
     sessionSchema,
     updateProfileRequestSchema,
     userSchema,
@@ -9,12 +12,15 @@ import {
     type User,
 } from "@nethack/contracts";
 import type { CapabilityContext } from "../../../core/capability.js";
-import { AuthenticationError, ValidationError } from "../../../core/errors.js";
+import { AuthenticationError, NotFoundError, ValidationError } from "../../../core/errors.js";
 import { AuthGuard } from "../../../http/guards.js";
+import { setPublicCache } from "../../../http/pagination.js";
 import type { NethackServer } from "../../../http/types.js";
 import type { AuthContext, UserRow } from "../../../authentication/types.js";
 import { normalizeReturnTo } from "../../../authentication/login-service.js";
 import { callbackQuerySchema, loginQuerySchema } from "../domain/identity-schemas.js";
+
+const publicUserParams = z.object({ userId: idSchema });
 
 export async function registerIdentityRoutes(
     app: NethackServer,
@@ -141,6 +147,29 @@ export async function registerIdentityRoutes(
                 ...(request.body.locale === undefined ? {} : { locale: request.body.locale }),
             });
             return toUserDto(updated);
+        },
+    );
+
+    app.get(
+        "/api/v1/public/users/:userId",
+        {
+            schema: {
+                params: publicUserParams,
+                response: { 200: publicUserProfileSchema },
+            },
+        },
+        async (request, reply) => {
+            const user = await context.auth.users.getById(request.params.userId);
+            if (user === null) {
+                throw new NotFoundError("The requested user was not found.");
+            }
+            setPublicCache(reply);
+            return {
+                id: user.id,
+                displayName: user.displayName,
+                avatarUrl: user.avatarUrl,
+                createdAt: user.createdAt.toISOString(),
+            };
         },
     );
 }

@@ -33,7 +33,7 @@ export interface SubmissionWithVersionRow {
 export interface SubmissionUpdateValues {
     readonly status?: SubmissionStatus;
     readonly currentVersion?: number;
-    readonly submittedAt?: Date;
+    readonly submittedAt?: Date | null;
     readonly reviewNote?: string;
     readonly reviewNoteUpdatedAt?: Date;
     readonly updatedAt: Date;
@@ -199,6 +199,25 @@ export class SubmissionRepository {
                 and(
                     eq(submissions.organizationId, organizationId),
                     eq(submissions.editionId, editionId),
+                ),
+            );
+        return rows[0]?.count ?? 0;
+    }
+
+    async countTeamSubmissions(
+        db: DatabaseExecutor,
+        organizationId: string,
+        editionId: string,
+        teamId: string,
+    ): Promise<number> {
+        const rows = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(submissions)
+            .where(
+                and(
+                    eq(submissions.organizationId, organizationId),
+                    eq(submissions.editionId, editionId),
+                    eq(submissions.teamId, teamId),
                 ),
             );
         return rows[0]?.count ?? 0;

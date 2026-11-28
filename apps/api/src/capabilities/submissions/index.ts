@@ -124,6 +124,12 @@ export const submissionsCapability: CapabilityDefinition = {
                     repository.countByEdition(session.db, organizationId, editionId),
                 );
             },
+            async countTeamSubmissions(organizationId, editionId, teamId) {
+                return service.countTeamSubmissions(organizationId, editionId, teamId);
+            },
+            async reopenSubmission(actor, organizationId, submissionId, status) {
+                await service.reopenSubmission(actor, organizationId, submissionId, status);
+            },
         };
 
         return {

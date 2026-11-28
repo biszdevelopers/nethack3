@@ -48,6 +48,13 @@ export const teamsCapability: CapabilityDefinition = {
                     return rows.map((row) => toSummary(toTeam(row, row.memberCount)));
                 });
             },
+            async listEditionTeamsWithMembers(organizationId, editionId) {
+                const teams = await service.listEditionTeamsWithMembers(organizationId, editionId);
+                return teams.map((team) => ({
+                    ...toSummary(team),
+                    members: team.members,
+                }));
+            },
             async isTeamMember(organizationId, teamId, userId) {
                 return context.database.transaction({ organizationId }, async (session) => {
                     const member = await repository.findMember(session.db, teamId, userId);
@@ -74,6 +81,12 @@ export const teamsCapability: CapabilityDefinition = {
                     repository.countByEdition(session.db, organizationId, editionId),
                 );
             },
+            async updateTeamStatus(actor, organizationId, editionId, teamId, status) {
+                await service.updateTeamStatus(actor, organizationId, editionId, teamId, status);
+            },
+            async deleteTeam(actor, organizationId, editionId, teamId) {
+                await service.deleteTeam(actor, organizationId, editionId, teamId);
+            },
         };
 
         return {
@@ -85,7 +98,7 @@ export const teamsCapability: CapabilityDefinition = {
     },
 };
 
-function toSummary(team: ReturnType<typeof toTeam>): TeamSummary {
+function toSummary(team: TeamSummary): TeamSummary {
     return {
         id: team.id,
         organizationId: team.organizationId,

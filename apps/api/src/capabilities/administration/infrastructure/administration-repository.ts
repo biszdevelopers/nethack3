@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, sql } from "drizzle-orm";
+import { and, desc, eq, lt, sql, type SQL } from "drizzle-orm";
 import type { DatabaseExecutor, DatabaseSession } from "../../../infrastructure/database/client.js";
 import {
     auditLogs,
@@ -24,6 +24,15 @@ export interface AuditRow {
     readonly entityId: string | null;
     readonly metadata: Record<string, unknown>;
     readonly createdAt: Date;
+}
+
+export interface GlobalAuditOptions {
+    readonly organizationId: string | null;
+    readonly limit: number;
+    readonly before: Date | null;
+    readonly action: string | null;
+    readonly entityType: string | null;
+    readonly actorUserId: string | null;
 }
 
 const administratorColumns = {
@@ -136,6 +145,45 @@ export class AdministrationRepository {
             .from(auditLogs)
             .leftJoin(users, eq(users.id, auditLogs.actorUserId))
             .where(and(...conditions))
+            .orderBy(desc(auditLogs.createdAt))
+            .limit(options.limit);
+    }
+
+    async globalAuditPage(
+        db: DatabaseExecutor,
+        options: GlobalAuditOptions,
+    ): Promise<readonly AuditRow[]> {
+        const conditions: SQL[] = [];
+        if (options.organizationId !== null) {
+            conditions.push(eq(auditLogs.organizationId, options.organizationId));
+        }
+        if (options.before !== null) {
+            conditions.push(lt(auditLogs.createdAt, options.before));
+        }
+        if (options.action !== null) {
+            conditions.push(eq(auditLogs.action, options.action));
+        }
+        if (options.entityType !== null) {
+            conditions.push(eq(auditLogs.entityType, options.entityType));
+        }
+        if (options.actorUserId !== null) {
+            conditions.push(eq(auditLogs.actorUserId, options.actorUserId));
+        }
+        return db
+            .select({
+                id: auditLogs.id,
+                organizationId: auditLogs.organizationId,
+                actorUserId: auditLogs.actorUserId,
+                actorDisplayName: users.displayName,
+                action: auditLogs.action,
+                entityType: auditLogs.entityType,
+                entityId: auditLogs.entityId,
+                metadata: auditLogs.metadata,
+                createdAt: auditLogs.createdAt,
+            })
+            .from(auditLogs)
+            .leftJoin(users, eq(users.id, auditLogs.actorUserId))
+            .where(conditions.length === 0 ? undefined : and(...conditions))
             .orderBy(desc(auditLogs.createdAt))
             .limit(options.limit);
     }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { sessionSchema } from "../common/schemas.js";
+import { httpUrlSchema, idSchema, isoDateTimeSchema, sessionSchema } from "../common/schemas.js";
 
 export const loginRedirectSchema = z.object({
     returnTo: z.string().max(2048).optional(),
@@ -38,5 +38,13 @@ export const csrfTokenSchema = z.object({
     csrfToken: z.string(),
 });
 export type CsrfToken = z.infer<typeof csrfTokenSchema>;
+
+export const publicUserProfileSchema = z.object({
+    id: idSchema,
+    displayName: z.string(),
+    avatarUrl: httpUrlSchema.nullable(),
+    createdAt: isoDateTimeSchema,
+});
+export type PublicUserProfile = z.infer<typeof publicUserProfileSchema>;
 
 export { sessionSchema };

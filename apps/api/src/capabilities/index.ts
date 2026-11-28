@@ -11,6 +11,7 @@ import { votingCapability } from "./voting/index.js";
 import { announcementsCapability } from "./announcements/index.js";
 import { notificationsCapability } from "./notifications/index.js";
 import { administrationCapability } from "./administration/index.js";
+import { recognitionCapability } from "./recognition/index.js";
 import type { CapabilityDefinition } from "../core/capability.js";
 
 export const capabilities = [
@@ -27,4 +28,5 @@ export const capabilities = [
     announcementsCapability,
     notificationsCapability,
     administrationCapability,
+    recognitionCapability,
 ] satisfies readonly CapabilityDefinition[];

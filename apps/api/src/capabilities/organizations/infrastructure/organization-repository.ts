@@ -157,6 +157,59 @@ export class OrganizationRepository {
             .orderBy(organizationMemberships.createdAt);
     }
 
+    async memberWithUser(
+        db: DatabaseExecutor,
+        organizationId: string,
+        userId: string,
+    ): Promise<{
+        organizationId: string;
+        userId: string;
+        role: OrganizationRole;
+        status: "active" | "suspended";
+        displayName: string;
+        email: string | null;
+        createdAt: Date;
+    } | null> {
+        const rows = await db
+            .select({
+                organizationId: organizationMemberships.organizationId,
+                userId: organizationMemberships.userId,
+                role: organizationMemberships.role,
+                status: organizationMemberships.status,
+                displayName: users.displayName,
+                email: users.email,
+                createdAt: organizationMemberships.createdAt,
+            })
+            .from(organizationMemberships)
+            .innerJoin(users, eq(users.id, organizationMemberships.userId))
+            .where(
+                and(
+                    eq(organizationMemberships.organizationId, organizationId),
+                    eq(organizationMemberships.userId, userId),
+                ),
+            )
+            .limit(1);
+        return rows[0] ?? null;
+    }
+
+    /** Locks every membership row before an owner count or role change. */
+    async lockMemberships(
+        session: DatabaseSession,
+        organizationId: string,
+    ): Promise<
+        readonly { userId: string; role: OrganizationRole; status: "active" | "suspended" }[]
+    > {
+        return session.db
+            .select({
+                userId: organizationMemberships.userId,
+                role: organizationMemberships.role,
+                status: organizationMemberships.status,
+            })
+            .from(organizationMemberships)
+            .where(eq(organizationMemberships.organizationId, organizationId))
+            .for("update");
+    }
+
     async addMembership(
         session: DatabaseSession,
         values: { organizationId: string; userId: string; role: OrganizationRole },

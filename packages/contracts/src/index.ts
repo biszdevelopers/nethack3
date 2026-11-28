@@ -8,6 +8,7 @@ export * from "./projects/index.js";
 export * from "./submissions/index.js";
 export * from "./judging/index.js";
 export * from "./voting/index.js";
+export * from "./recognition/index.js";
 export * from "./announcements/index.js";
 export * from "./notifications/index.js";
 export * from "./files/index.js";

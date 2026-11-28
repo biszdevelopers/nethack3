@@ -20,7 +20,7 @@ import type { FilesContract } from "../../files/contracts.js";
 import type { OrganizationsContract } from "../../organizations/contracts.js";
 import type { ProjectSummary, ProjectsContract } from "../../projects/contracts.js";
 import type { TeamSummary, TeamsContract } from "../../teams/contracts.js";
-import type { SubmissionSummary } from "../contracts.js";
+import type { SubmissionSummary, SubmissionReopenStatus } from "../contracts.js";
 import { SubmissionRules } from "../domain/submission-rules.js";
 import type {
     SubmissionFileRow,
@@ -471,6 +471,53 @@ export class SubmissionService {
             updated.submission,
             updated.project,
             new DisplayResolver(this.contracts),
+        );
+    }
+
+    async countTeamSubmissions(
+        organizationId: string,
+        editionId: string,
+        teamId: string,
+    ): Promise<number> {
+        return this.database.transaction({ organizationId }, async (session) =>
+            this.repository.countTeamSubmissions(session.db, organizationId, editionId, teamId),
+        );
+    }
+
+    async reopenSubmission(
+        actor: { readonly userId: string; readonly ip: string | null },
+        organizationId: string,
+        submissionId: string,
+        status: SubmissionReopenStatus,
+    ): Promise<void> {
+        const now = this.clock.now();
+        await this.database.transaction(
+            { organizationId, userId: actor.userId },
+            async (session) => {
+                const row = await this.repository.findByIdForUpdate(
+                    session,
+                    organizationId,
+                    submissionId,
+                );
+                if (row === null) {
+                    throw new NotFoundError("The submission was not found.");
+                }
+                SubmissionRules.assertReopenable(row.status);
+                await this.repository.update(session, organizationId, submissionId, {
+                    status,
+                    submittedAt: status === "draft" ? null : row.submittedAt,
+                    updatedAt: now,
+                });
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: actor.userId,
+                    action: "submission.reopened",
+                    entityType: "submission",
+                    entityId: submissionId,
+                    metadata: { from: row.status, status, editionId: row.editionId },
+                    ip: actor.ip,
+                });
+            },
         );
     }
 

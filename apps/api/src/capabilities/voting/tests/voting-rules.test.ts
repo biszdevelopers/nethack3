@@ -141,26 +141,89 @@ describe("VotingRules.assertBallotWindow", () => {
     });
 });
 
-describe("VotingRules.assertSelections", () => {
+describe("VotingRules.assertScores", () => {
     const one = "3d0f2d0e-1111-4111-8111-111111111111";
     const two = "3d0f2d0e-2222-4222-8222-222222222222";
     const three = "3d0f2d0e-3333-4333-8333-333333333333";
 
-    it("accepts a unique selection within the limit", () => {
-        expect(() => VotingRules.assertSelections([one], 1)).not.toThrow();
-        expect(() => VotingRules.assertSelections([one, two, three], 3)).not.toThrow();
+    it("accepts scores that total exactly ten within the limits", () => {
+        expect(() =>
+            VotingRules.assertScores(
+                [
+                    { submissionId: one, stars: 5 },
+                    { submissionId: two, stars: 5 },
+                ],
+                2,
+            ),
+        ).not.toThrow();
+        expect(() =>
+            VotingRules.assertScores(
+                [
+                    { submissionId: one, stars: 4 },
+                    { submissionId: two, stars: 3 },
+                    { submissionId: three, stars: 3 },
+                ],
+                3,
+            ),
+        ).not.toThrow();
     });
 
-    it("rejects an empty selection", () => {
-        expect(() => VotingRules.assertSelections([], 1)).toThrow(ValidationError);
+    it("rejects an empty ballot", () => {
+        expect(() => VotingRules.assertScores([], 2)).toThrow(ValidationError);
     });
 
     it("rejects duplicate submissions", () => {
-        expect(() => VotingRules.assertSelections([one, one], 2)).toThrow(ValidationError);
+        expect(() =>
+            VotingRules.assertScores(
+                [
+                    { submissionId: one, stars: 5 },
+                    { submissionId: one, stars: 5 },
+                ],
+                2,
+            ),
+        ).toThrow(ValidationError);
     });
 
-    it("rejects more selections than the round allows", () => {
-        expect(() => VotingRules.assertSelections([one, two], 1)).toThrow(ValidationError);
+    it("rejects more scored submissions than the round allows", () => {
+        expect(() =>
+            VotingRules.assertScores(
+                [
+                    { submissionId: one, stars: 5 },
+                    { submissionId: two, stars: 5 },
+                ],
+                1,
+            ),
+        ).toThrow(ValidationError);
+    });
+
+    it("rejects zero, over five, and non-integer stars", () => {
+        for (const stars of [0, 6, 2.5]) {
+            expect(() => VotingRules.assertScores([{ submissionId: one, stars }], 2)).toThrow(
+                ValidationError,
+            );
+        }
+    });
+
+    it("rejects under- and over-allocation", () => {
+        expect(() =>
+            VotingRules.assertScores(
+                [
+                    { submissionId: one, stars: 4 },
+                    { submissionId: two, stars: 5 },
+                ],
+                2,
+            ),
+        ).toThrow(ValidationError);
+        expect(() =>
+            VotingRules.assertScores(
+                [
+                    { submissionId: one, stars: 5 },
+                    { submissionId: two, stars: 5 },
+                    { submissionId: three, stars: 1 },
+                ],
+                3,
+            ),
+        ).toThrow(ValidationError);
     });
 });
 

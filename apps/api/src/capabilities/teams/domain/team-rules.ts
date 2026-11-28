@@ -91,6 +91,12 @@ export class TeamRules {
         }
     }
 
+    static assertCanDelete(memberCount: number): void {
+        if (memberCount > 0) {
+            throw new ConflictError("Only a team without members can be deleted.");
+        }
+    }
+
     static assertCaptainOnly(teamCaptainUserId: string, actorUserId: string): void {
         if (teamCaptainUserId !== actorUserId) {
             throw new ForbiddenError("Only the team captain may perform this action.");

@@ -1,0 +1,262 @@
+import { describe, expect, it, vi } from "vitest";
+import type { JudgingResult, SubmissionStatus } from "@nethack/contracts";
+import type { AuthContext } from "../../../authentication/types.js";
+import type { EditionSummary } from "../../competitions/contracts.js";
+import type { SubmissionSummary } from "../../submissions/contracts.js";
+import type { TeamWithMembers } from "../../teams/contracts.js";
+import { ConflictError } from "../../../core/errors.js";
+import {
+    EditionAdministrationService,
+    type EditionAdministrationSources,
+} from "../application/edition-administration-service.js";
+
+const organizationId = "11111111-1111-4111-8111-111111111111";
+const editionId = "22222222-2222-4222-8222-222222222222";
+const teamId = "33333333-3333-4333-8333-333333333333";
+const submissionId = "44444444-4444-4444-8444-444444444444";
+const userId = "55555555-5555-4555-8555-555555555555";
+
+function auth(): AuthContext {
+    return {
+        method: "session",
+        sessionId: null,
+        sessionTokenHash: null,
+        csrfToken: null,
+        csrfHash: null,
+        user: {
+            id: userId,
+            displayName: "Organizer",
+            email: "organizer@example.test",
+            avatarUrl: null,
+            locale: "en",
+            status: "active",
+            createdAt: new Date("2026-01-01T00:00:00.000Z"),
+            updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+        },
+        memberships: [],
+        globalAdministrator: false,
+        permissions: [],
+        expiresAt: new Date("2026-02-01T00:00:00.000Z"),
+    };
+}
+
+function edition(): EditionSummary {
+    return {
+        id: editionId,
+        organizationId,
+        seriesId: "66666666-6666-4666-8666-666666666666",
+        seriesName: "Series",
+        name: "Edition",
+        slug: "edition",
+        description: "",
+        status: "judging",
+        timezone: "UTC",
+        registrationOpensAt: null,
+        registrationClosesAt: null,
+        startsAt: null,
+        endsAt: null,
+        teamMinSize: 1,
+        teamMaxSize: 4,
+        maxParticipants: null,
+        rulesMarkdown: "",
+        publishedAt: null,
+    };
+}
+
+function team(): TeamWithMembers {
+    return {
+        id: teamId,
+        organizationId,
+        editionId,
+        divisionId: null,
+        name: "Fixture Team",
+        description: "",
+        status: "ready",
+        captainUserId: userId,
+        memberCount: 1,
+        maxMembers: 4,
+        members: [
+            {
+                userId,
+                displayName: "Fixture Organizer",
+                role: "captain",
+                joinedAt: "2026-01-01T00:00:00.000Z",
+            },
+        ],
+    };
+}
+
+function submission(status: SubmissionStatus): SubmissionSummary {
+    return {
+        id: submissionId,
+        organizationId,
+        editionId,
+        projectId: "77777777-7777-4777-8777-777777777777",
+        teamId,
+        status,
+        currentVersion: 1,
+        submittedAt: "2026-01-02T00:00:00.000Z",
+        title: "Fixture Project",
+        summary: "",
+    };
+}
+
+function result(submittedCount: number): JudgingResult {
+    return {
+        submissionId,
+        projectId: "77777777-7777-4777-8777-777777777777",
+        projectTitle: "Fixture Project",
+        teamId,
+        teamName: "Fixture Team",
+        assignmentCount: 2,
+        submittedCount,
+        averageScore: null,
+        rank: null,
+        evaluations: [],
+    };
+}
+
+function sources(options: {
+    readonly team?: TeamWithMembers;
+    readonly submission?: SubmissionSummary | null;
+    readonly results?: readonly JudgingResult[];
+    readonly teamSubmissions?: number;
+}): {
+    readonly sources: EditionAdministrationSources;
+    readonly updateTeamStatus: ReturnType<typeof vi.fn>;
+    readonly deleteTeam: ReturnType<typeof vi.fn>;
+    readonly reopenSubmission: ReturnType<typeof vi.fn>;
+} {
+    const updateTeamStatus = vi.fn(async () => undefined);
+    const deleteTeam = vi.fn(async () => undefined);
+    const reopenSubmission = vi.fn(async () => undefined);
+    return {
+        sources: {
+            editions: { getEdition: async () => edition() },
+            teams: {
+                listEditionTeamsWithMembers: async () => [options.team ?? team()],
+                updateTeamStatus,
+                deleteTeam,
+            },
+            submissions: {
+                getSubmission: async () => options.submission ?? submission("submitted"),
+                listEditionSubmissions: async () => [submission("submitted")],
+                countTeamSubmissions: async () => options.teamSubmissions ?? 0,
+                reopenSubmission,
+            },
+            judging: {
+                listEditionResults: async () => options.results ?? [result(0)],
+            },
+        },
+        updateTeamStatus,
+        deleteTeam,
+        reopenSubmission,
+    };
+}
+
+describe("EditionAdministrationService", () => {
+    it("composes teams, members, and submissions from contracts", async () => {
+        const { sources: contractSources } = sources({});
+        const teams = await new EditionAdministrationService(contractSources).listTeams(
+            organizationId,
+            editionId,
+        );
+
+        expect(teams).toHaveLength(1);
+        expect(teams[0]?.members[0]?.displayName).toBe("Fixture Organizer");
+        expect(teams[0]?.submissions[0]?.projectTitle).toBe("Fixture Project");
+    });
+
+    it("delegates team status changes with the acting user", async () => {
+        const { sources: contractSources, updateTeamStatus } = sources({});
+        await new EditionAdministrationService(contractSources).updateTeamStatus(
+            auth(),
+            organizationId,
+            editionId,
+            teamId,
+            "disbanded",
+            "127.0.0.1",
+        );
+
+        expect(updateTeamStatus).toHaveBeenCalledWith(
+            { userId, ip: "127.0.0.1" },
+            organizationId,
+            editionId,
+            teamId,
+            "disbanded",
+        );
+    });
+
+    it("blocks team deletion while a submission exists", async () => {
+        const { sources: contractSources, deleteTeam } = sources({ teamSubmissions: 1 });
+
+        await expect(
+            new EditionAdministrationService(contractSources).deleteTeam(
+                auth(),
+                organizationId,
+                editionId,
+                teamId,
+                null,
+            ),
+        ).rejects.toBeInstanceOf(ConflictError);
+        expect(deleteTeam).not.toHaveBeenCalled();
+    });
+
+    it("deletes an empty team through the teams contract", async () => {
+        const { sources: contractSources, deleteTeam } = sources({ teamSubmissions: 0 });
+        await new EditionAdministrationService(contractSources).deleteTeam(
+            auth(),
+            organizationId,
+            editionId,
+            teamId,
+            null,
+        );
+
+        expect(deleteTeam).toHaveBeenCalledWith(
+            { userId, ip: null },
+            organizationId,
+            editionId,
+            teamId,
+        );
+    });
+
+    it("blocks reopening after a submitted evaluation", async () => {
+        const { sources: contractSources, reopenSubmission } = sources({
+            results: [result(1)],
+        });
+
+        await expect(
+            new EditionAdministrationService(contractSources).reopenSubmission(
+                auth(),
+                organizationId,
+                editionId,
+                submissionId,
+                { status: "draft" },
+                null,
+            ),
+        ).rejects.toBeInstanceOf(ConflictError);
+        expect(reopenSubmission).not.toHaveBeenCalled();
+    });
+
+    it("reopens a submission through the submissions contract", async () => {
+        const { sources: contractSources, reopenSubmission } = sources({
+            results: [result(0)],
+        });
+
+        await new EditionAdministrationService(contractSources).reopenSubmission(
+            auth(),
+            organizationId,
+            editionId,
+            submissionId,
+            { status: "changes_requested" },
+            null,
+        );
+
+        expect(reopenSubmission).toHaveBeenCalledWith(
+            { userId, ip: null },
+            organizationId,
+            submissionId,
+            "changes_requested",
+        );
+    });
+});

@@ -29,8 +29,10 @@ import type { ParticipantsContract } from "../../participants/contracts.js";
 import type { SubmissionsContract } from "../../submissions/contracts.js";
 import type { TeamsContract } from "../../teams/contracts.js";
 import { toVotableSubmissions } from "../domain/votable-submissions.js";
+import { rankVoteTallies } from "../domain/voting-results.js";
 import { normalizeEligibleRoles, VotingRules } from "../domain/voting-rules.js";
 import type {
+    BallotRow,
     NewVoteValues,
     VotingRepository,
     VotingRoundRow,
@@ -301,7 +303,7 @@ export class VotingService {
         return {
             roundId,
             userId: auth.user.id,
-            submissionIds: [...found.submissionIds],
+            scores: [...found.scores],
             submittedAt: found.ballot.submittedAt.toISOString(),
         };
     }
@@ -317,9 +319,13 @@ export class VotingService {
         const round = await this.requireRound(organizationId, roundId);
         const now = this.clock.now();
         VotingRules.assertBallotWindow(round, now);
-        VotingRules.assertSelections(input.submissionIds, round.maxSelections);
+        VotingRules.assertScores(input.scores, round.maxSelections);
         await this.assertVoterEligible(organizationId, round, auth.user.id, role);
-        await this.assertSelectionsAreVotable(organizationId, round, input.submissionIds);
+        await this.assertSelectionsAreVotable(
+            organizationId,
+            round,
+            input.scores.map((score) => score.submissionId),
+        );
 
         try {
             const ballot = await this.database.transaction(
@@ -334,23 +340,34 @@ export class VotingService {
                         roundId,
                         auth.user.id,
                     );
-                    if (existing !== null) {
-                        throw new ConflictError(
-                            "You have already submitted a ballot for this round.",
+                    let current: BallotRow;
+                    if (existing === null) {
+                        current = await this.repository.insertBallot(session, {
+                            organizationId,
+                            roundId,
+                            userId: auth.user.id,
+                            submittedAt: lockedAt,
+                        });
+                    } else {
+                        await this.repository.deleteVotes(session, organizationId, existing.id);
+                        const updated = await this.repository.touchBallot(
+                            session,
+                            organizationId,
+                            existing.id,
+                            lockedAt,
                         );
+                        if (updated === null) {
+                            throw new NotFoundError("The ballot was not found.");
+                        }
+                        current = updated;
                     }
-                    const inserted = await this.repository.insertBallot(session, {
+                    const voteRows: NewVoteValues[] = input.scores.map((score) => ({
                         organizationId,
                         roundId,
+                        ballotId: current.id,
                         userId: auth.user.id,
-                        submittedAt: lockedAt,
-                    });
-                    const voteRows: NewVoteValues[] = input.submissionIds.map((submissionId) => ({
-                        organizationId,
-                        roundId,
-                        ballotId: inserted.id,
-                        userId: auth.user.id,
-                        submissionId,
+                        submissionId: score.submissionId,
+                        stars: score.stars,
                     }));
                     await this.repository.insertVotes(session, voteRows);
                     await this.audit.record(session, {
@@ -358,17 +375,22 @@ export class VotingService {
                         actorUserId: auth.user.id,
                         action: "voting.ballot.cast",
                         entityType: "ballot",
-                        entityId: inserted.id,
-                        metadata: { editionId: round.editionId, selections: voteRows.length },
+                        entityId: current.id,
+                        metadata: {
+                            editionId: round.editionId,
+                            selections: voteRows.length,
+                            stars: input.scores.reduce((sum, score) => sum + score.stars, 0),
+                            replaced: existing !== null,
+                        },
                         ip,
                     });
-                    return inserted;
+                    return current;
                 },
             );
             return {
                 roundId,
                 userId: auth.user.id,
-                submissionIds: [...input.submissionIds],
+                scores: [...input.scores],
                 submittedAt: ballot.submittedAt.toISOString(),
             };
         } catch (error) {
@@ -453,21 +475,21 @@ export class VotingService {
             round.editionId,
         );
         const titles = new Map<string, string>();
+        const teamNamesBySubmission = new Map<string, string | null>();
+        const teamNames = await this.resolveTeamNames(
+            organizationId,
+            submissions.flatMap((submission) =>
+                submission.teamId === null ? [] : [submission.teamId],
+            ),
+        );
         for (const submission of submissions) {
             titles.set(submission.id, submission.title);
+            teamNamesBySubmission.set(
+                submission.id,
+                submission.teamId === null ? null : (teamNames.get(submission.teamId) ?? null),
+            );
         }
-        const entries = counts
-            .map((row) => ({
-                submissionId: row.submissionId,
-                projectTitle: titles.get(row.submissionId) ?? "",
-                teamName: null,
-                votes: row.votes,
-            }))
-            .toSorted(
-                (left, right) =>
-                    right.votes - left.votes || left.projectTitle.localeCompare(right.projectTitle),
-            )
-            .slice(0, RESULT_LIMIT);
+        const entries = rankVoteTallies(counts, titles, RESULT_LIMIT, teamNamesBySubmission);
         return {
             roundId: round.id,
             roundName: round.name,
@@ -583,15 +605,12 @@ export class VotingService {
         for (const submissionId of submissionIds) {
             const submission = byId.get(submissionId);
             if (submission === undefined || submission.editionId !== round.editionId) {
-                throw new ValidationError(
-                    "A selected submission does not belong to this edition.",
-                    {
-                        submissionIds: ["A selected submission does not belong to this edition."],
-                    },
-                );
+                throw new ValidationError("A scored submission does not belong to this edition.", {
+                    scores: ["A scored submission does not belong to this edition."],
+                });
             }
             if (!VotingRules.isVotableSubmission(submission.status)) {
-                throw new ConflictError("A selected submission is not open for voting.");
+                throw new ConflictError("A scored submission is not open for voting.");
             }
         }
     }

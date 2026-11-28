@@ -35,6 +35,10 @@ export interface TeamMemberRow {
     readonly joinedAt: Date;
 }
 
+export interface EditionTeamMemberRow extends TeamMemberRow {
+    readonly teamId: string;
+}
+
 export interface TeamInvitationRow {
     readonly id: string;
     readonly teamId: string;
@@ -212,6 +216,35 @@ export class TeamRepository {
             );
     }
 
+    async membersForEdition(
+        db: DatabaseExecutor,
+        organizationId: string,
+        editionId: string,
+    ): Promise<readonly EditionTeamMemberRow[]> {
+        return db
+            .select({
+                teamId: teamMembers.teamId,
+                userId: teamMembers.userId,
+                displayName: users.displayName,
+                role: teamMembers.role,
+                joinedAt: teamMembers.joinedAt,
+            })
+            .from(teamMembers)
+            .innerJoin(users, eq(users.id, teamMembers.userId))
+            .innerJoin(
+                teams,
+                and(
+                    eq(teams.id, teamMembers.teamId),
+                    eq(teams.organizationId, teamMembers.organizationId),
+                ),
+            )
+            .where(and(eq(teams.organizationId, organizationId), eq(teams.editionId, editionId)))
+            .orderBy(
+                sql`case when ${teamMembers.role} = 'captain' then 0 else 1 end`,
+                teamMembers.joinedAt,
+            );
+    }
+
     async findMember(
         db: DatabaseExecutor,
         teamId: string,
@@ -273,6 +306,25 @@ export class TeamRepository {
             throw new Error("The team could not be updated.");
         }
         return row;
+    }
+
+    async delete(
+        session: DatabaseSession,
+        organizationId: string,
+        editionId: string,
+        teamId: string,
+    ): Promise<boolean> {
+        const rows = await session.db
+            .delete(teams)
+            .where(
+                and(
+                    eq(teams.organizationId, organizationId),
+                    eq(teams.editionId, editionId),
+                    eq(teams.id, teamId),
+                ),
+            )
+            .returning({ id: teams.id });
+        return rows.length > 0;
     }
 
     async insertMember(

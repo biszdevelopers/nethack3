@@ -5,10 +5,13 @@ import type {
     CreateRubricRequest,
     Criterion,
     Evaluation,
-    JudgingResult,
-    JudgingRubric,
     JudgeAssignment,
     JudgeAssignmentStatus,
+    JudgeFlag,
+    JudgingCoverage,
+    JudgingHistoryItem,
+    JudgingResult,
+    JudgingRubric,
     OrganizationRole,
     SaveEvaluationRequest,
 } from "@nethack/contracts";
@@ -33,6 +36,8 @@ import type { OrganizationSummary, OrganizationsContract } from "../../organizat
 import type { SubmissionSummary, SubmissionsContract } from "../../submissions/contracts.js";
 import type { TeamsContract } from "../../teams/contracts.js";
 import { nextEvaluationRevision, toEvaluationVersion } from "../domain/evaluation-history.js";
+import { JudgeFlagRules } from "../domain/judge-flags.js";
+import { summarizeJudgeCoverage } from "../domain/judging-coverage.js";
 import { aggregateJudgingResults } from "../domain/judging-results.js";
 import { JudgingRules, type ScorableCriterion } from "../domain/judging-rules.js";
 import type { JudgingSummary } from "../contracts.js";
@@ -40,6 +45,7 @@ import type {
     AssignmentView,
     CriterionRow,
     EvaluationRow,
+    JudgeFlagView,
     JudgingRepository,
     RubricWithCriteria,
 } from "../infrastructure/judging-repository.js";
@@ -335,6 +341,230 @@ export class JudgingService {
             ),
         );
         return this.toAssignments(organizationId, views);
+    }
+
+    async reportFlag(
+        auth: AuthContext,
+        organizationId: string,
+        assignmentId: string,
+        reason: string,
+        ip: string | null,
+    ): Promise<JudgeFlag> {
+        this.requireMembership(auth, organizationId);
+        try {
+            return await this.database.transaction(
+                { organizationId, userId: auth.user.id },
+                async (session) => {
+                    const assignment = await this.repository.findAssignmentForUpdate(
+                        session,
+                        organizationId,
+                        assignmentId,
+                    );
+                    if (assignment === null) {
+                        throw new NotFoundError("The judging assignment was not found.");
+                    }
+                    if (assignment.judgeUserId !== auth.user.id) {
+                        throw new ForbiddenError("Only the assigned judge may report a flag.");
+                    }
+                    JudgeFlagRules.assertCanFlag(assignment.status);
+                    const existing = await this.repository.findFlagByAssignmentAndJudge(
+                        session.db,
+                        organizationId,
+                        assignmentId,
+                        auth.user.id,
+                    );
+                    if (existing !== null) {
+                        throw new ConflictError("You already reported a flag for this project.");
+                    }
+                    const flag = await this.repository.insertFlag(session, {
+                        organizationId,
+                        editionId: assignment.editionId,
+                        assignmentId,
+                        submissionId: assignment.submissionId,
+                        reportedByUserId: auth.user.id,
+                        reason,
+                        status: "open",
+                    });
+                    await this.audit.record(session, {
+                        organizationId,
+                        actorUserId: auth.user.id,
+                        action: "judging.flag.reported",
+                        entityType: "judge_flag",
+                        entityId: flag.id,
+                        metadata: {
+                            assignmentId,
+                            submissionId: assignment.submissionId,
+                        },
+                        ip,
+                    });
+                    const view = await this.repository.findFlagViewById(
+                        session.db,
+                        organizationId,
+                        flag.id,
+                    );
+                    if (view === null) {
+                        throw new InternalError("The judging flag could not be read back.");
+                    }
+                    return toJudgeFlag(view);
+                },
+            );
+        } catch (error) {
+            if (isUniqueViolation(error)) {
+                throw new ConflictError("You already reported a flag for this project.");
+            }
+            throw error;
+        }
+    }
+
+    async listEditionFlags(
+        auth: AuthContext,
+        organizationId: string,
+        editionId: string,
+    ): Promise<readonly JudgeFlag[]> {
+        this.assertOrganizer(auth, organizationId);
+        await this.requireEdition(organizationId, editionId);
+        const views = await this.database.transaction({ organizationId }, async (session) =>
+            this.repository.listFlagsForEdition(session.db, organizationId, editionId),
+        );
+        return views.map(toJudgeFlag);
+    }
+
+    async resolveFlag(
+        auth: AuthContext,
+        organizationId: string,
+        flagId: string,
+        ip: string | null,
+    ): Promise<JudgeFlag> {
+        this.assertOrganizer(auth, organizationId);
+        const now = this.clock.now();
+        return this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const existing = await this.repository.findFlagForUpdate(
+                    session,
+                    organizationId,
+                    flagId,
+                );
+                if (existing === null) {
+                    throw new NotFoundError("The judging flag was not found.");
+                }
+                const next = JudgeFlagRules.resolution(existing.status);
+                if (next !== null) {
+                    const resolved = await this.repository.resolveFlag(
+                        session,
+                        organizationId,
+                        flagId,
+                        { resolvedByUserId: auth.user.id, resolvedAt: now },
+                    );
+                    if (resolved === null) {
+                        throw new NotFoundError("The judging flag was not found.");
+                    }
+                    await this.audit.record(session, {
+                        organizationId,
+                        actorUserId: auth.user.id,
+                        action: "judging.flag.resolved",
+                        entityType: "judge_flag",
+                        entityId: flagId,
+                        metadata: {
+                            assignmentId: existing.assignmentId,
+                            submissionId: existing.submissionId,
+                        },
+                        ip,
+                    });
+                }
+                const view = await this.repository.findFlagViewById(
+                    session.db,
+                    organizationId,
+                    flagId,
+                );
+                if (view === null) {
+                    throw new NotFoundError("The judging flag was not found.");
+                }
+                return toJudgeFlag(view);
+            },
+        );
+    }
+
+    async judgingCoverage(
+        auth: AuthContext,
+        organizationId: string,
+        editionId: string,
+    ): Promise<JudgingCoverage> {
+        this.assertOrganizer(auth, organizationId);
+        const edition = await this.requireEdition(organizationId, editionId);
+        const loaded = await this.database.transaction({ organizationId }, async (session) => ({
+            rows: await this.repository.listEditionEvaluationRows(
+                session.db,
+                organizationId,
+                editionId,
+            ),
+            flags: await this.repository.listFlagsForEdition(session.db, organizationId, editionId),
+        }));
+        const summary = summarizeJudgeCoverage(
+            loaded.rows,
+            loaded.flags.map((view) => ({
+                reportedByUserId: view.flag.reportedByUserId,
+                status: view.flag.status,
+            })),
+        );
+        return {
+            editionId,
+            editionName: edition.name,
+            judgeCount: summary.judges.length,
+            assignmentCount: summary.assignmentCount,
+            submittedCount: summary.submittedCount,
+            editionAverageScore: summary.editionAverageScore,
+            judges: [...summary.judges],
+            openFlags: loaded.flags.filter((view) => view.flag.status === "open").map(toJudgeFlag),
+        };
+    }
+
+    async judgingHistory(
+        auth: AuthContext,
+        organizationId: string,
+        editionId: string,
+    ): Promise<readonly JudgingHistoryItem[]> {
+        this.requireMembership(auth, organizationId);
+        await this.requireEdition(organizationId, editionId);
+        const [rows, submissionRows, teamRows] = await Promise.all([
+            this.database.transaction({ organizationId }, async (session) =>
+                this.repository.listSubmittedEvaluationRows(
+                    session.db,
+                    organizationId,
+                    auth.user.id,
+                    editionId,
+                ),
+            ),
+            this.contracts.submissions.listEditionSubmissions(organizationId, editionId),
+            this.contracts.teams.listEditionTeams(organizationId, editionId),
+        ]);
+        const submissionsById = new Map(
+            submissionRows.map((submission) => [submission.id, submission] as const),
+        );
+        const teamsById = new Map(teamRows.map((team) => [team.id, team] as const));
+        return rows.map((row) => {
+            const submission = submissionsById.get(row.submissionId);
+            if (submission === undefined) {
+                throw new InternalError("A judging evaluation references a missing submission.");
+            }
+            return {
+                assignmentId: row.assignmentId,
+                submissionId: row.submissionId,
+                projectId: submission.projectId,
+                projectTitle: submission.title,
+                teamId: submission.teamId,
+                teamName:
+                    submission.teamId === null
+                        ? null
+                        : (teamsById.get(submission.teamId)?.name ?? null),
+                rubricName: row.rubricName,
+                evaluationId: row.evaluationId,
+                weightedScore: row.weightedScore,
+                overallComment: row.overallComment,
+                submittedAt: row.submittedAt.toISOString(),
+                scores: row.scores.map((score) => ({ ...score })),
+            };
+        });
     }
 
     async assignmentDetail(
@@ -776,6 +1006,12 @@ export class JudgingService {
         );
     }
 
+    async countOpenFlags(organizationId: string, editionId: string): Promise<number> {
+        return this.database.transaction({ organizationId }, async (session) =>
+            this.repository.countOpenFlags(session.db, organizationId, editionId),
+        );
+    }
+
     async getEvaluation(organizationId: string, assignmentId: string): Promise<Evaluation | null> {
         return this.database.transaction({ organizationId }, async (session) => {
             const loaded = await this.repository.findEvaluationWithScores(
@@ -943,6 +1179,24 @@ export function toEvaluation(
         weightedScore: evaluation.weightedScore === null ? null : Number(evaluation.weightedScore),
         submittedAt: nullableIso(evaluation.submittedAt),
         updatedAt: evaluation.updatedAt.toISOString(),
+    };
+}
+
+function toJudgeFlag(view: JudgeFlagView): JudgeFlag {
+    return {
+        id: view.flag.id,
+        organizationId: view.flag.organizationId,
+        editionId: view.flag.editionId,
+        assignmentId: view.flag.assignmentId,
+        submissionId: view.flag.submissionId,
+        reportedByUserId: view.flag.reportedByUserId,
+        reportedByDisplayName: view.reportedByDisplayName,
+        reason: view.flag.reason,
+        status: view.flag.status,
+        resolvedByUserId: view.flag.resolvedByUserId,
+        resolvedByDisplayName: view.resolvedByDisplayName,
+        resolvedAt: nullableIso(view.flag.resolvedAt),
+        createdAt: view.flag.createdAt.toISOString(),
     };
 }
 

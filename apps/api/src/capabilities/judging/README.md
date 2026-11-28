@@ -18,11 +18,14 @@ Owns judging rubrics, criteria, judge assignments, evaluations, evaluation score
 | --- | --- |
 | `getAssignment(organizationId, assignmentId)` | Assignment summary and whether its evaluation is submitted. Runs in an organization-scoped transaction. |
 | `countSubmittedEvaluations(organizationId, editionId)` | Count of submitted evaluations for an edition. Runs in an organization-scoped transaction. |
+| `countOpenFlags(organizationId, editionId)` | Count of `judge_flags` with status `open` for an edition. Runs in an organization-scoped transaction. |
 | `getEvaluation(organizationId, assignmentId)` | The evaluation with scores, or `null`. Runs in an organization-scoped transaction. |
 
 ## Tables
 
-Owned writes: `judging_rubrics`, `judging_criteria`, `judge_assignments`, `evaluations`, `evaluation_scores`, `evaluation_versions`. All access is organization-scoped through row-level security.
+Owned writes: `judging_rubrics`, `judging_criteria`, `judge_assignments`, `evaluations`, `evaluation_scores`, `evaluation_versions`, `judge_flags`. All access is organization-scoped through row-level security.
+
+`judge_flags` stores judge-reported concerns with organization, edition, assignment, and submission scope. `status` moves from `open` to `resolved`; `resolved_by_user_id` and `resolved_at` record the organizer decision. A judge can report at most one flag per assignment (`unique(assignment_id, reported_by_user_id)`).
 
 `evaluation_versions` stores immutable snapshots of every saved draft and submitted evaluation. Rows are only inserted, never updated or deleted by the capability. `revision` is scoped per evaluation and increments from the previous maximum. Migration `0003_evaluation-history.sql` creates the table, its composite FK to `evaluations(id, organization_id)`, the revision index, RLS, and the `nethack_app` grant.
 
@@ -43,8 +46,13 @@ All routes require authentication. Routes without an organization in the path us
 | GET | `/api/v1/competitions/:editionId/judging-results` | Owner or organizer; ranked mean of submitted evaluations |
 | POST | `/api/v1/competitions/:editionId/assignments` | Owner or organizer |
 | GET | `/api/v1/judging/assignments?status=` | Active organization member; returns only the caller's assignments |
+| GET | `/api/v1/judging/history?editionId=` | Active organization member; returns only the caller's submitted evaluations |
+| GET | `/api/v1/competitions/:editionId/judging-coverage` | Owner or organizer; per-judge progress, calibration, open flags |
+| GET | `/api/v1/competitions/:editionId/judging-flags` | Owner or organizer |
+| POST | `/api/v1/judging-flags/:flagId/resolve` | Owner or organizer; idempotent |
 | GET | `/api/v1/assignments/:assignmentId` | Assigned judge or owner/organizer |
 | POST | `/api/v1/assignments/:assignmentId/conflict` | Assigned judge |
+| POST | `/api/v1/assignments/:assignmentId/flag` | Assigned judge |
 | PUT | `/api/v1/assignments/:assignmentId/evaluation` | Assigned judge |
 | POST | `/api/v1/assignments/:assignmentId/evaluation/submit` | Assigned judge |
 | GET | `/api/v1/assignments/:assignmentId/history` | Assigned judge or owner/organizer |
@@ -71,6 +79,9 @@ The assignment is the scoring authority. An organizer who is not the assigned ju
 - Every successful draft save and submission inserts an `evaluation_versions` snapshot in the same transaction. The snapshot contains the full scorecard, status, overall comment, weighted score, and submission timestamp. Revision `n` is built from the previous maximum revision plus one; existing snapshots are never mutated.
 - `GET /history` returns `{ evaluation, versions }`: the current single-row evaluation and up to 50 snapshots ordered newest revision first. The evaluation table remains the current state; `evaluation_versions` is the revision history.
 - `GET /judging-results` groups active assignments by submission, averages only submitted weighted scores, excludes drafts and revoked assignments, ranks ties equally, and places unscored submissions last with a null rank. Each row includes the assignment count, submitted count, average score, rank, and per-judge status and score.
+- `GET /judging/history` reads the caller's submitted evaluations from judging-owned tables and enriches them with submission metadata from `submissions.v1` and team names from `teams.v1`. It does not require judging to be open.
+- `GET /judging-coverage` aggregates non-revoked assignments per judge: assignment count, submitted count, recusals, open flags, and the mean submitted weighted score. Calibration compares each judge's average with the edition average; a delta of at least 10 points is `above`, at most -10 is `below`, otherwise `in_line`. Judges without submitted scores are `insufficient_data`.
+- A flag requires the caller to be the assigned judge and an assignment that is `assigned`, `in_progress`, or `submitted`. Resolving an already-resolved flag returns the existing flag without a second audit record.
 
 ## Audit
 
@@ -79,10 +90,12 @@ The assignment is the scoring authority. An organizer who is not the assigned ju
 - `judging.assignment.revoked`
 - `judging.assignment.conflict_declared`
 - `judging.evaluation.submitted`
+- `judging.flag.reported`
+- `judging.flag.resolved`
 
 ## Tests
 
-`tests/judging-rules.test.ts` covers scoring math, weight and maximum-score handling, rounding, missing/duplicate/extra criteria, score bounds, deadline checks, assignment state transitions, and judge eligibility. `tests/evaluation-history.test.ts` covers revision numbering and snapshot mapping. `tests/judging-results.test.ts` covers submitted-only averaging, draft exclusion, tie ranking, and unscored submissions. `tests/e2e/04-judge-workflow.spec.ts` verifies that an organizer sees the submitted score and rank in the edition results. The unit tests are pure and do not require a database.
+`tests/judging-rules.test.ts` covers scoring math, weight and maximum-score handling, rounding, missing/duplicate/extra criteria, score bounds, deadline checks, assignment state transitions, and judge eligibility. `tests/evaluation-history.test.ts` covers revision numbering and snapshot mapping. `tests/judging-results.test.ts` covers submitted-only averaging, draft exclusion, tie ranking, and unscored submissions. `tests/judging-coverage.test.ts` covers coverage counts, draft exclusion, revoked exclusion, calibration labels, and the threshold. `tests/judge-flags.test.ts` covers flag eligibility and resolution transitions. `tests/e2e/04-judge-workflow.spec.ts` verifies that an organizer sees the submitted score and rank in the edition results; `tests/e2e/12-judging-workflow.spec.ts` covers the judge queue, submission, history, flag, and organizer coverage. The unit tests are pure and do not require a database.
 
 ## Extraction
 

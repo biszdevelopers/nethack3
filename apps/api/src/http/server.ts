@@ -67,6 +67,24 @@ export function createBaseServer(config: AppConfig): BaseServer {
     app.setValidatorCompiler(validatorCompiler);
     app.setSerializerCompiler(serializerCompiler);
     app.server.requestTimeout = 30_000;
+
+    // Treat an empty JSON body as absent instead of Fastify's 500 parser error.
+    app.addContentTypeParser("application/json", { parseAs: "string" }, (_request, body, done) => {
+        const text = typeof body === "string" ? body : body.toString("utf8");
+        if (text.length === 0) {
+            done(null, undefined);
+            return;
+        }
+        try {
+            done(null, JSON.parse(text));
+        } catch {
+            const error = new Error("The JSON request body is invalid.") as Error & {
+                statusCode: number;
+            };
+            error.statusCode = 400;
+            done(error, undefined);
+        }
+    });
     app.server.headersTimeout = 35_000;
 
     const logger = new FastifyLoggerAdapter(app.log);

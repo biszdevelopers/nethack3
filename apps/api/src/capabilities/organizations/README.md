@@ -27,6 +27,15 @@ Owns organizations, settings, memberships, invitations, audit-log reads, and edi
 
 Organization events are published through the transactional outbox and consumed by the notifications capability: invitations, membership changes, and ownership decisions.
 
+## Contracts
+
+`organizations.v1` exposes organization summaries, public-showcase settings, and membership administration:
+
+- `listMembershipsWithUsers(organizationId)` returns membership summaries with user id, display name, email, role, status, and created timestamp. Status is `active` or `suspended`; pending invitations are managed by the invitation routes and are not memberships. It exposes no invitation tokens or secrets.
+- `updateMemberRole(actor, organizationId, userId, role)` locks the organization's membership rows, enforces last-owner protection with `OrganizationRules.assertRoleChangeIsSafe`, updates the role, writes an `organization.membership.updated` audit row, and returns the updated summary.
+
+Membership administration assumes the caller has already established an owner/organizer membership. The contract enforces organization scope, the last-owner rule, and auditing; it does not re-check the caller's role.
+
 ## Tests
 
 - `tests/organization-rules.test.ts` covers role ranking, owner-only management, and last-owner protection.

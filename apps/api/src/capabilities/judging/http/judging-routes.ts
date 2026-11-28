@@ -4,10 +4,14 @@ import {
     assignmentHistorySchema,
     conflictDeclarationRequestSchema,
     createAssignmentRequestSchema,
+    createJudgeFlagRequestSchema,
     createRubricRequestSchema,
     evaluationSchema,
     judgeAssignmentSchema,
     judgeAssignmentStatusSchema,
+    judgeFlagSchema,
+    judgingCoverageSchema,
+    judgingHistoryItemSchema,
     judgingResultSchema,
     judgingRubricSchema,
     listResponseSchema,
@@ -20,7 +24,9 @@ import type { JudgingService } from "../application/judging-service.js";
 
 const editionParams = z.object({ editionId: z.uuid() });
 const assignmentParams = z.object({ assignmentId: z.uuid() });
+const flagParams = z.object({ flagId: z.uuid() });
 const assignmentQuerySchema = z.object({ status: judgeAssignmentStatusSchema.optional() });
+const historyQuerySchema = z.object({ editionId: z.uuid() });
 
 export async function registerJudgingRoutes(
     app: NethackServer,
@@ -115,6 +121,64 @@ export async function registerJudgingRoutes(
         },
     );
 
+    app.get(
+        "/api/v1/competitions/:editionId/judging-coverage",
+        {
+            schema: {
+                params: editionParams,
+                response: { 200: judgingCoverageSchema },
+            },
+        },
+        async (request) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            guard.requireOrganizer(access);
+            return service.judgingCoverage(auth, access.organizationId, request.params.editionId);
+        },
+    );
+
+    app.get(
+        "/api/v1/competitions/:editionId/judging-flags",
+        {
+            schema: {
+                params: editionParams,
+                response: { 200: listResponseSchema(judgeFlagSchema) },
+            },
+        },
+        async (request) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            guard.requireOrganizer(access);
+            const items = await service.listEditionFlags(
+                auth,
+                access.organizationId,
+                request.params.editionId,
+            );
+            return { items: [...items], nextCursor: null };
+        },
+    );
+
+    app.post(
+        "/api/v1/judging-flags/:flagId/resolve",
+        {
+            schema: {
+                params: flagParams,
+                response: { 200: judgeFlagSchema },
+            },
+        },
+        async (request) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            guard.requireOrganizer(access);
+            return service.resolveFlag(
+                auth,
+                access.organizationId,
+                request.params.flagId,
+                request.ip,
+            );
+        },
+    );
+
     app.post(
         "/api/v1/competitions/:editionId/assignments",
         {
@@ -160,6 +224,26 @@ export async function registerJudgingRoutes(
     );
 
     app.get(
+        "/api/v1/judging/history",
+        {
+            schema: {
+                querystring: historyQuerySchema,
+                response: { 200: listResponseSchema(judgingHistoryItemSchema) },
+            },
+        },
+        async (request) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            const items = await service.judgingHistory(
+                auth,
+                access.organizationId,
+                request.query.editionId,
+            );
+            return { items: [...items], nextCursor: null };
+        },
+    );
+
+    app.get(
         "/api/v1/assignments/:assignmentId",
         {
             schema: {
@@ -197,6 +281,29 @@ export async function registerJudgingRoutes(
                 request.ip,
             );
             return reply.status(204).send();
+        },
+    );
+
+    app.post(
+        "/api/v1/assignments/:assignmentId/flag",
+        {
+            schema: {
+                params: assignmentParams,
+                body: createJudgeFlagRequestSchema,
+                response: { 201: judgeFlagSchema },
+            },
+        },
+        async (request, reply) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            const flag = await service.reportFlag(
+                auth,
+                access.organizationId,
+                request.params.assignmentId,
+                request.body.reason,
+                request.ip,
+            );
+            return reply.status(201).send(flag);
         },
     );
 

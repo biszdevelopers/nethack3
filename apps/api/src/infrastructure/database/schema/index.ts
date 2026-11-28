@@ -7,4 +7,5 @@ export * from "./participation.js";
 export * from "./submissions.js";
 export * from "./judging.js";
 export * from "./voting.js";
+export * from "./recognition.js";
 export * from "./communications.js";

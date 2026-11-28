@@ -8,6 +8,7 @@ import type {
     TeamInvitation,
     TeamInvitationAcceptance,
     TeamInvitationStatus,
+    TeamStatus,
     UpdateTeamRequest,
 } from "@nethack/contracts";
 import { randomToken, sha256Hex } from "../../../authentication/crypto.js";
@@ -35,6 +36,7 @@ import type {
 import type { ParticipantsContract } from "../../participants/contracts.js";
 import type { OrganizationsContract } from "../../organizations/contracts.js";
 import { TeamRules } from "../domain/team-rules.js";
+import type { TeamMemberSummary, TeamWithMembers } from "../contracts.js";
 import type {
     InvitationWithTeam,
     TeamInvitationRow,
@@ -89,6 +91,112 @@ export class TeamService {
             const rows = await this.repository.listForUser(session.db, organizationId, userId);
             return rows.map((row) => toTeam(row, row.memberCount));
         });
+    }
+
+    async listEditionTeamsWithMembers(
+        organizationId: string,
+        editionId: string,
+    ): Promise<readonly TeamWithMembers[]> {
+        await this.resolveEdition(organizationId, editionId);
+        return this.database.transaction({ organizationId }, async (session) => {
+            const rows = await this.repository.listByEdition(session.db, organizationId, editionId);
+            const members = await this.repository.membersForEdition(
+                session.db,
+                organizationId,
+                editionId,
+            );
+            const byTeam = new Map<string, TeamMemberSummary[]>();
+            for (const member of members) {
+                const list = byTeam.get(member.teamId) ?? [];
+                list.push({
+                    userId: member.userId,
+                    displayName: member.displayName,
+                    role: member.role,
+                    joinedAt: member.joinedAt.toISOString(),
+                });
+                byTeam.set(member.teamId, list);
+            }
+            return rows.map((row) => ({
+                ...toTeam(row, row.memberCount),
+                members: byTeam.get(row.id) ?? [],
+            }));
+        });
+    }
+
+    async updateTeamStatus(
+        actor: { readonly userId: string; readonly ip: string | null },
+        organizationId: string,
+        editionId: string,
+        teamId: string,
+        status: TeamStatus,
+    ): Promise<void> {
+        await this.database.transaction(
+            { organizationId, userId: actor.userId },
+            async (session) => {
+                const team = await this.repository.findByIdForUpdate(
+                    session,
+                    organizationId,
+                    teamId,
+                );
+                if (team === null || team.editionId !== editionId) {
+                    throw new NotFoundError("The team was not found in this edition.");
+                }
+                await this.repository.update(session, teamId, {
+                    status,
+                    updatedAt: this.clock.now(),
+                });
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: actor.userId,
+                    action: "team.updated",
+                    entityType: "team",
+                    entityId: teamId,
+                    metadata: { fields: ["status"], status },
+                    ip: actor.ip,
+                });
+            },
+        );
+    }
+
+    async deleteTeam(
+        actor: { readonly userId: string; readonly ip: string | null },
+        organizationId: string,
+        editionId: string,
+        teamId: string,
+    ): Promise<void> {
+        await this.database.transaction(
+            { organizationId, userId: actor.userId },
+            async (session) => {
+                const team = await this.repository.findByIdForUpdate(
+                    session,
+                    organizationId,
+                    teamId,
+                );
+                if (team === null || team.editionId !== editionId) {
+                    throw new NotFoundError("The team was not found in this edition.");
+                }
+                const memberCount = await this.repository.countMembers(session.db, teamId);
+                TeamRules.assertCanDelete(memberCount);
+                const deleted = await this.repository.delete(
+                    session,
+                    organizationId,
+                    editionId,
+                    teamId,
+                );
+                if (!deleted) {
+                    throw new NotFoundError("The team was not found in this edition.");
+                }
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: actor.userId,
+                    action: "team.deleted",
+                    entityType: "team",
+                    entityId: teamId,
+                    metadata: { name: team.name, editionId },
+                    ip: actor.ip,
+                });
+            },
+        );
     }
 
     async create(

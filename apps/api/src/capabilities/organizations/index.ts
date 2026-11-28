@@ -56,6 +56,12 @@ export const organizationsCapability: CapabilityDefinition = {
                     return false;
                 }
             },
+            async listMembershipsWithUsers(organizationId) {
+                return service.listMembershipsWithUsers(organizationId);
+            },
+            async updateMemberRole(actor, organizationId, userId, role) {
+                return service.updateMemberRole(actor, organizationId, userId, role);
+            },
         };
 
         return {

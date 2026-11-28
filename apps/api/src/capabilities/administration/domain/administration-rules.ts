@@ -6,4 +6,10 @@ export class AdministrationRules {
             throw new ConflictError("The platform must retain at least one global administrator.");
         }
     }
+
+    static assertNoSubmittedEvaluations(submittedEvaluationCount: number): void {
+        if (submittedEvaluationCount > 0) {
+            throw new ConflictError("A submission with a submitted evaluation cannot be reopened.");
+        }
+    }
 }

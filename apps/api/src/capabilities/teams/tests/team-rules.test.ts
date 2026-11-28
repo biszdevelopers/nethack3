@@ -118,6 +118,16 @@ describe("TeamRules registration eligibility", () => {
     });
 });
 
+describe("TeamRules deletion", () => {
+    it("allows deleting a team without members", () => {
+        expect(() => TeamRules.assertCanDelete(0)).not.toThrow();
+    });
+
+    it("refuses to delete a team with members", () => {
+        expect(() => TeamRules.assertCanDelete(1)).toThrow(ConflictError);
+    });
+});
+
 describe("TeamRules captain rules", () => {
     const captainUserId = "captain";
     const memberUserId = "member";

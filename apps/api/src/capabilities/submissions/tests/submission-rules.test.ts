@@ -207,4 +207,19 @@ describe("SubmissionRules revision and withdrawal", () => {
             expect(() => SubmissionRules.assertWithdrawable(status)).toThrow(ConflictError);
         }
     });
+
+    it("reopens only submitted submissions", () => {
+        expect(() => SubmissionRules.assertReopenable("submitted")).not.toThrow();
+        for (const status of [
+            "draft",
+            "under_review",
+            "changes_requested",
+            "accepted",
+            "rejected",
+            "withdrawn",
+            "disqualified",
+        ] as const) {
+            expect(() => SubmissionRules.assertReopenable(status)).toThrow(ConflictError);
+        }
+    });
 });

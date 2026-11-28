@@ -39,6 +39,9 @@ export const judgingCapability: CapabilityDefinition = {
             async countSubmittedEvaluations(organizationId, editionId) {
                 return service.countSubmittedEvaluations(organizationId, editionId);
             },
+            async countOpenFlags(organizationId, editionId) {
+                return service.countOpenFlags(organizationId, editionId);
+            },
             async getEvaluation(organizationId, assignmentId) {
                 return service.getEvaluation(organizationId, assignmentId);
             },

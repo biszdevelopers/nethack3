@@ -3,9 +3,13 @@ import {
     assignmentHistorySchema,
     conflictDeclarationRequestSchema,
     createAssignmentRequestSchema,
+    createJudgeFlagRequestSchema,
     createRubricRequestSchema,
     evaluationSchema,
     judgeAssignmentSchema,
+    judgeFlagSchema,
+    judgingCoverageSchema,
+    judgingHistoryItemSchema,
     judgingResultSchema,
     judgingRubricSchema,
     listResponseSchema,
@@ -14,10 +18,14 @@ import {
     type AssignmentHistory,
     type ConflictDeclarationRequest,
     type CreateAssignmentRequest,
+    type CreateJudgeFlagRequest,
     type CreateRubricRequest,
     type Evaluation,
     type JudgeAssignment,
     type JudgeAssignmentStatus,
+    type JudgeFlag,
+    type JudgingCoverage,
+    type JudgingHistoryItem,
     type JudgingResult,
     type JudgingRubric,
     type ListResponse,
@@ -28,6 +36,8 @@ import type { ApiClient } from "./client.js";
 const rubricListSchema = listResponseSchema(judgingRubricSchema);
 const assignmentListSchema = listResponseSchema(judgeAssignmentSchema);
 const resultListSchema = listResponseSchema(judgingResultSchema);
+const flagListSchema = listResponseSchema(judgeFlagSchema);
+const historyListSchema = listResponseSchema(judgingHistoryItemSchema);
 
 function organizationHeader(organizationId: string): Record<string, string> {
     return { "X-Nethack-Organization-Id": organizationId };
@@ -140,6 +150,50 @@ export class JudgingApi {
     async history(organizationId: string, assignmentId: string): Promise<AssignmentHistory> {
         return this.client.request("GET", `/api/v1/assignments/${assignmentId}/history`, {
             schema: assignmentHistorySchema,
+            headers: organizationHeader(organizationId),
+        });
+    }
+
+    async judgingHistory(
+        organizationId: string,
+        editionId: string,
+    ): Promise<ListResponse<JudgingHistoryItem>> {
+        return this.client.request("GET", "/api/v1/judging/history", {
+            query: { editionId },
+            schema: historyListSchema,
+            headers: organizationHeader(organizationId),
+        });
+    }
+
+    async flagAssignment(
+        organizationId: string,
+        assignmentId: string,
+        input: CreateJudgeFlagRequest,
+    ): Promise<JudgeFlag> {
+        return this.client.request("POST", `/api/v1/assignments/${assignmentId}/flag`, {
+            body: createJudgeFlagRequestSchema.parse(input),
+            schema: judgeFlagSchema,
+            headers: organizationHeader(organizationId),
+        });
+    }
+
+    async flags(organizationId: string, editionId: string): Promise<ListResponse<JudgeFlag>> {
+        return this.client.request("GET", `/api/v1/competitions/${editionId}/judging-flags`, {
+            schema: flagListSchema,
+            headers: organizationHeader(organizationId),
+        });
+    }
+
+    async resolveFlag(organizationId: string, flagId: string): Promise<JudgeFlag> {
+        return this.client.request("POST", `/api/v1/judging-flags/${flagId}/resolve`, {
+            schema: judgeFlagSchema,
+            headers: organizationHeader(organizationId),
+        });
+    }
+
+    async coverage(organizationId: string, editionId: string): Promise<JudgingCoverage> {
+        return this.client.request("GET", `/api/v1/competitions/${editionId}/judging-coverage`, {
+            schema: judgingCoverageSchema,
             headers: organizationHeader(organizationId),
         });
     }

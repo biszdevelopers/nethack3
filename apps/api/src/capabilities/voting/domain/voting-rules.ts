@@ -1,4 +1,10 @@
-import type { OrganizationRole, SubmissionStatus, VotingRoundStatus } from "@nethack/contracts";
+import type {
+    BallotScore,
+    OrganizationRole,
+    SubmissionStatus,
+    VotingRoundStatus,
+} from "@nethack/contracts";
+import { BALLOT_MAX_STARS_PER_SUBMISSION, BALLOT_TOTAL_STARS } from "@nethack/contracts";
 import { ConflictError, ForbiddenError, ValidationError } from "../../../core/errors.js";
 
 export type VotingEligibleRole = "participant" | "judge" | "organizer";
@@ -71,20 +77,43 @@ export class VotingRules {
         }
     }
 
-    static assertSelections(submissionIds: readonly string[], maxSelections: number): void {
-        if (submissionIds.length === 0) {
-            throw new ValidationError("Select at least one submission.", {
-                submissionIds: ["Select at least one submission."],
+    static assertScores(scores: readonly BallotScore[], maxSelections: number): void {
+        if (scores.length === 0) {
+            throw new ValidationError("Score at least one submission.", {
+                scores: ["Score at least one submission."],
             });
         }
-        if (new Set(submissionIds).size !== submissionIds.length) {
-            throw new ValidationError("Each submission may be selected only once.", {
-                submissionIds: ["Each submission may be selected only once."],
+        if (new Set(scores.map((score) => score.submissionId)).size !== scores.length) {
+            throw new ValidationError("Each submission may be scored only once.", {
+                scores: ["Each submission may be scored only once."],
             });
         }
-        if (submissionIds.length > maxSelections) {
-            throw new ValidationError(`Select at most ${maxSelections} submissions.`, {
-                submissionIds: [`Select at most ${maxSelections} submissions.`],
+        if (scores.length > maxSelections) {
+            throw new ValidationError(`Score at most ${String(maxSelections)} submissions.`, {
+                scores: [`Score at most ${String(maxSelections)} submissions.`],
+            });
+        }
+        let total = 0;
+        for (const score of scores) {
+            if (
+                !Number.isInteger(score.stars) ||
+                score.stars < 1 ||
+                score.stars > BALLOT_MAX_STARS_PER_SUBMISSION
+            ) {
+                throw new ValidationError(
+                    `Each scored submission needs between 1 and ${String(BALLOT_MAX_STARS_PER_SUBMISSION)} stars.`,
+                    {
+                        scores: [
+                            `Each scored submission needs between 1 and ${String(BALLOT_MAX_STARS_PER_SUBMISSION)} stars.`,
+                        ],
+                    },
+                );
+            }
+            total += score.stars;
+        }
+        if (total !== BALLOT_TOTAL_STARS) {
+            throw new ValidationError(`Distribute exactly ${String(BALLOT_TOTAL_STARS)} stars.`, {
+                scores: [`Distribute exactly ${String(BALLOT_TOTAL_STARS)} stars.`],
             });
         }
     }

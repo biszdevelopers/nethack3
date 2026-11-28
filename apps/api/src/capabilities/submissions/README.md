@@ -30,13 +30,14 @@ draft               -> (version + submit) -> submitted
 submitted           -> under_review | changes_requested | accepted | rejected | disqualified
 under_review        -> changes_requested | accepted | rejected | disqualified
 changes_requested   -> under_review | accepted | rejected
+submitted           -> (administrative reopen) -> draft | changes_requested
 accepted            -> accepted (idempotent only)
 rejected            -> rejected (idempotent only)
 withdrawn           -> terminal
 disqualified        -> terminal
 ```
 
-`REVIEW_TRANSITIONS` in `domain/submission-rules.ts` is the single authority. Statuses outside the map reject review transitions with a conflict.
+`REVIEW_TRANSITIONS` in `domain/submission-rules.ts` is the single authority for review. `assertReopenable` allows the administrative reopen only from `submitted`; the caller must first confirm through `judging.v1` that no evaluation is submitted.
 
 ## Versioning and deadlines
 
@@ -55,11 +56,13 @@ disqualified        -> terminal
 ## Events and auditing
 
 - `submissions.submission.reviewed` carries `submissionId`, `projectId`, `projectTitle`, `ownerUserId`, `userId` (notification recipient), `teamId`, `status`, `organizationId`, `organizationName`, and `note`.
-- Audit actions: `submission.created`, `submission.version.created`, `submission.submitted`, `submission.reviewed`, `submission.withdrawn`. Audit rows and outbox events are written inside the mutation transaction.
+- Audit actions: `submission.created`, `submission.version.created`, `submission.submitted`, `submission.reviewed`, `submission.withdrawn`, `submission.reopened`. Audit rows and outbox events are written inside the mutation transaction. Administrative reopen writes an audit row only, matching withdrawal.
 
 ## Contract
 
-`submissions.v1` exposes `getSubmission`, `listEditionSubmissions`, `isSubmittedForProject`, and `countSubmissions`, always inside an organization-scoped transaction. Summaries include the current version's `title` and `summary`, falling back to the project title/summary and finally `Untitled project` for the title when no version exists.
+`submissions.v1` exposes `getSubmission`, `listEditionSubmissions`, `isSubmittedForProject`, `countSubmissions`, `countTeamSubmissions`, and `reopenSubmission`, always inside an organization-scoped transaction. Summaries include the current version's `title` and `summary`, falling back to the project title/summary and finally `Untitled project` for the title when no version exists.
+
+`reopenSubmission` takes a `{ userId, ip }` actor and assumes authorization was already established. It locks the submission row, allows only a `submitted` source, moves to `draft` or `changes_requested`, and audits `submission.reopened`. Moving to `draft` clears `submitted_at`. The submitted-evaluation guard is the caller's responsibility because judging depends on submissions and cannot be called back from here.
 
 ## Query shape
 

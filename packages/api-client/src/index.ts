@@ -11,4 +11,5 @@ export * from "./announcements.js";
 export * from "./notifications.js";
 export * from "./judging.js";
 export * from "./voting.js";
+export * from "./recognition.js";
 export * from "./administration.js";

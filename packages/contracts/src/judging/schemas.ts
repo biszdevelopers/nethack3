@@ -176,3 +176,85 @@ export const judgingResultSchema = z.object({
     evaluations: z.array(judgingResultEvaluationSchema),
 });
 export type JudgingResult = z.infer<typeof judgingResultSchema>;
+
+export const judgeFlagStatusSchema = z.enum(["open", "resolved"]);
+export type JudgeFlagStatus = z.infer<typeof judgeFlagStatusSchema>;
+
+export const judgeFlagSchema = z.object({
+    id: idSchema,
+    organizationId: idSchema,
+    editionId: idSchema,
+    assignmentId: idSchema,
+    submissionId: idSchema,
+    reportedByUserId: idSchema,
+    reportedByDisplayName: z.string(),
+    reason: z.string(),
+    status: judgeFlagStatusSchema,
+    resolvedByUserId: idSchema.nullable(),
+    resolvedByDisplayName: z.string().nullable(),
+    resolvedAt: isoDateTimeSchema.nullable(),
+    createdAt: isoDateTimeSchema,
+});
+export type JudgeFlag = z.infer<typeof judgeFlagSchema>;
+
+export const createJudgeFlagRequestSchema = z
+    .object({
+        reason: z.string().trim().min(5).max(2000),
+    })
+    .strict();
+export type CreateJudgeFlagRequest = z.infer<typeof createJudgeFlagRequestSchema>;
+
+export const judgingCalibrationSchema = z.enum(["above", "in_line", "below", "insufficient_data"]);
+export type JudgingCalibration = z.infer<typeof judgingCalibrationSchema>;
+
+export const judgingCoverageJudgeSchema = z.object({
+    judgeUserId: idSchema,
+    judgeDisplayName: z.string(),
+    assignmentCount: z.number().int().nonnegative(),
+    submittedCount: z.number().int().nonnegative(),
+    conflictCount: z.number().int().nonnegative(),
+    openFlagCount: z.number().int().nonnegative(),
+    averageWeightedScore: z.number().nullable(),
+    editionAverageScore: z.number().nullable(),
+    calibrationDelta: z.number().nullable(),
+    calibration: judgingCalibrationSchema,
+});
+export type JudgingCoverageJudge = z.infer<typeof judgingCoverageJudgeSchema>;
+
+export const judgingCoverageSchema = z.object({
+    editionId: idSchema,
+    editionName: z.string(),
+    judgeCount: z.number().int().nonnegative(),
+    assignmentCount: z.number().int().nonnegative(),
+    submittedCount: z.number().int().nonnegative(),
+    editionAverageScore: z.number().nullable(),
+    judges: z.array(judgingCoverageJudgeSchema),
+    openFlags: z.array(judgeFlagSchema),
+});
+export type JudgingCoverage = z.infer<typeof judgingCoverageSchema>;
+
+export const judgingHistoryCriterionScoreSchema = z.object({
+    criterionId: idSchema,
+    criterionName: z.string(),
+    maxScore: z.number().int().positive(),
+    weight: z.number(),
+    score: z.number().int().nonnegative(),
+    comment: z.string(),
+});
+export type JudgingHistoryCriterionScore = z.infer<typeof judgingHistoryCriterionScoreSchema>;
+
+export const judgingHistoryItemSchema = z.object({
+    assignmentId: idSchema,
+    submissionId: idSchema,
+    projectId: idSchema,
+    projectTitle: z.string(),
+    teamId: idSchema.nullable(),
+    teamName: z.string().nullable(),
+    rubricName: z.string(),
+    evaluationId: idSchema,
+    weightedScore: z.number().nullable(),
+    overallComment: z.string(),
+    submittedAt: isoDateTimeSchema,
+    scores: z.array(judgingHistoryCriterionScoreSchema),
+});
+export type JudgingHistoryItem = z.infer<typeof judgingHistoryItemSchema>;

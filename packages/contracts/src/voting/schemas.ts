@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { idSchema, isoDateTimeSchema } from "../common/schemas.js";
 
+export const BALLOT_TOTAL_STARS = 10;
+export const BALLOT_MAX_STARS_PER_SUBMISSION = 5;
+
 export const votingRoundStatusSchema = z.enum(["draft", "open", "closed", "published"]);
 export type VotingRoundStatus = z.infer<typeof votingRoundStatusSchema>;
 
@@ -20,10 +23,16 @@ export const votingRoundSchema = z.object({
 });
 export type VotingRound = z.infer<typeof votingRoundSchema>;
 
+export const ballotScoreSchema = z.object({
+    submissionId: idSchema,
+    stars: z.number().int().min(1).max(BALLOT_MAX_STARS_PER_SUBMISSION),
+});
+export type BallotScore = z.infer<typeof ballotScoreSchema>;
+
 export const ballotSchema = z.object({
     roundId: idSchema,
     userId: idSchema,
-    submissionIds: z.array(idSchema),
+    scores: z.array(ballotScoreSchema),
     submittedAt: isoDateTimeSchema.nullable(),
 });
 export type Ballot = z.infer<typeof ballotSchema>;
@@ -36,7 +45,7 @@ export const createVotingRoundRequestSchema = z
             .array(z.enum(["participant", "judge", "organizer"]))
             .min(1)
             .default(["participant"]),
-        maxSelections: z.number().int().min(1).max(50).default(1),
+        maxSelections: z.number().int().min(2).max(50).default(10),
         opensAt: isoDateTimeSchema.nullable().default(null),
         closesAt: isoDateTimeSchema.nullable().default(null),
     })
@@ -45,9 +54,31 @@ export type CreateVotingRoundRequest = z.infer<typeof createVotingRoundRequestSc
 
 export const castBallotRequestSchema = z
     .object({
-        submissionIds: z.array(idSchema).min(1).max(50),
+        scores: z.array(ballotScoreSchema).min(1).max(50),
     })
-    .strict();
+    .strict()
+    .superRefine(({ scores }, context) => {
+        const submissionIds = new Set<string>();
+        for (const score of scores) {
+            if (submissionIds.has(score.submissionId)) {
+                context.addIssue({
+                    code: "custom",
+                    message: "Each submission may be scored only once.",
+                    path: ["scores"],
+                });
+                break;
+            }
+            submissionIds.add(score.submissionId);
+        }
+        const total = scores.reduce((sum, score) => sum + score.stars, 0);
+        if (total !== BALLOT_TOTAL_STARS) {
+            context.addIssue({
+                code: "custom",
+                message: `Distribute exactly ${String(BALLOT_TOTAL_STARS)} stars.`,
+                path: ["scores"],
+            });
+        }
+    });
 export type CastBallotRequest = z.infer<typeof castBallotRequestSchema>;
 
 export const votableSubmissionSchema = z.object({
@@ -69,7 +100,10 @@ export const voteResultSchema = z.object({
             submissionId: idSchema,
             projectTitle: z.string(),
             teamName: z.string().nullable(),
+            rank: z.number().int().positive(),
             votes: z.number().int().nonnegative(),
+            totalStars: z.number().int().nonnegative(),
+            averageStars: z.number().nonnegative(),
         }),
     ),
 });

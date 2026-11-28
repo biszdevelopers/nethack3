@@ -237,3 +237,56 @@ export const evaluationVersions = pgTable(
         }).onDelete("cascade"),
     ],
 );
+
+export const judgeFlagStatusEnum = pgEnum("judge_flag_status", ["open", "resolved"]);
+
+export const judgeFlags = pgTable(
+    "judge_flags",
+    {
+        id: uuid("id").primaryKey().defaultRandom(),
+        organizationId: uuid("organization_id")
+            .notNull()
+            .references(() => organizations.id, { onDelete: "cascade" }),
+        editionId: uuid("edition_id").notNull(),
+        assignmentId: uuid("assignment_id").notNull(),
+        submissionId: uuid("submission_id").notNull(),
+        reportedByUserId: uuid("reported_by_user_id")
+            .notNull()
+            .references(() => users.id, { onDelete: "restrict" }),
+        reason: text("reason").notNull(),
+        status: judgeFlagStatusEnum("status").notNull().default("open"),
+        resolvedByUserId: uuid("resolved_by_user_id").references(() => users.id, {
+            onDelete: "set null",
+        }),
+        resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+        createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    },
+    (table) => [
+        unique("judge_flags_id_org_unique").on(table.id, table.organizationId),
+        uniqueIndex("judge_flags_assignment_judge_unique").on(
+            table.assignmentId,
+            table.reportedByUserId,
+        ),
+        index("judge_flags_edition_status_idx").on(
+            table.organizationId,
+            table.editionId,
+            table.status,
+        ),
+        index("judge_flags_judge_idx").on(table.organizationId, table.reportedByUserId),
+        foreignKey({
+            name: "judge_flags_edition_fk",
+            columns: [table.editionId, table.organizationId],
+            foreignColumns: [competitionEditions.id, competitionEditions.organizationId],
+        }).onDelete("cascade"),
+        foreignKey({
+            name: "judge_flags_assignment_fk",
+            columns: [table.assignmentId, table.organizationId],
+            foreignColumns: [judgeAssignments.id, judgeAssignments.organizationId],
+        }).onDelete("cascade"),
+        foreignKey({
+            name: "judge_flags_submission_fk",
+            columns: [table.submissionId, table.organizationId],
+            foreignColumns: [submissions.id, submissions.organizationId],
+        }).onDelete("cascade"),
+    ],
+);

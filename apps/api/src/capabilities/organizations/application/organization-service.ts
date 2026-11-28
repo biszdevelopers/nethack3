@@ -26,6 +26,7 @@ import type { DatabaseConnection } from "../../../infrastructure/database/client
 import type { OutboxPublisher } from "../../../core/outbox.js";
 import type { AuditLogger } from "../../../infrastructure/audit/audit-logger.js";
 import { OrganizationRules } from "../domain/organization-rules.js";
+import type { OrganizationMembershipActor } from "../contracts.js";
 import type { OrganizationRepository } from "../infrastructure/organization-repository.js";
 
 const INVITATION_TTL_MS = 14 * 24 * 60 * 60 * 1000;
@@ -163,15 +164,61 @@ export class OrganizationService {
 
     async members(organizationId: string): Promise<readonly OrganizationMembership[]> {
         const rows = await this.repository.listMembers(this.database.db, organizationId);
-        return rows.map((row) => ({
-            organizationId: row.organizationId,
-            userId: row.userId,
-            role: row.role,
-            status: row.status,
-            displayName: row.displayName,
-            email: row.email,
-            createdAt: row.createdAt.toISOString(),
-        }));
+        return rows.map(toOrganizationMembership);
+    }
+
+    async listMembershipsWithUsers(
+        organizationId: string,
+    ): Promise<readonly OrganizationMembership[]> {
+        return this.members(organizationId);
+    }
+
+    async updateMemberRole(
+        actor: OrganizationMembershipActor,
+        organizationId: string,
+        targetUserId: string,
+        role: OrganizationRole,
+    ): Promise<OrganizationMembership> {
+        const updated = await this.database.transaction(
+            { organizationId, userId: actor.userId },
+            async (session) => {
+                const memberships = await this.repository.lockMemberships(session, organizationId);
+                const target = memberships.find((row) => row.userId === targetUserId);
+                if (target === undefined) {
+                    throw new NotFoundError("The membership was not found.");
+                }
+                const ownerCount = memberships.filter((row) => row.role === "owner").length;
+                OrganizationRules.assertRoleChangeIsSafe(target.role, role, ownerCount);
+                const changed = await this.repository.updateMembership(
+                    session,
+                    organizationId,
+                    targetUserId,
+                    { role, updatedAt: this.clock.now() },
+                );
+                if (!changed) {
+                    throw new NotFoundError("The membership was not found.");
+                }
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: actor.userId,
+                    action: "organization.membership.updated",
+                    entityType: "organization_membership",
+                    entityId: targetUserId,
+                    metadata: { from: target.role, role },
+                    ip: actor.ip,
+                });
+                const member = await this.repository.memberWithUser(
+                    session.db,
+                    organizationId,
+                    targetUserId,
+                );
+                if (member === null) {
+                    throw new Error("The updated membership could not be read back.");
+                }
+                return member;
+            },
+        );
+        return toOrganizationMembership(updated);
     }
 
     async addMember(
@@ -551,6 +598,26 @@ export class OrganizationService {
             createdAt: row.createdAt.toISOString(),
         }));
     }
+}
+
+function toOrganizationMembership(row: {
+    organizationId: string;
+    userId: string;
+    role: OrganizationRole;
+    status: "active" | "suspended";
+    displayName: string;
+    email: string | null;
+    createdAt: Date;
+}): OrganizationMembership {
+    return {
+        organizationId: row.organizationId,
+        userId: row.userId,
+        role: row.role,
+        status: row.status,
+        displayName: row.displayName,
+        email: row.email,
+        createdAt: row.createdAt.toISOString(),
+    };
 }
 
 function toOrganization(row: {

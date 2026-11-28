@@ -1,7 +1,9 @@
 import type {
+    AdministrationUser,
     AuditLog,
     GlobalAdministrator,
     GrantGlobalAdministratorRequest,
+    OrganizationRole,
     RevokeGlobalAdministratorRequest,
 } from "@nethack/contracts";
 import type { AuthContext } from "../../../authentication/types.js";
@@ -9,10 +11,13 @@ import type { Clock } from "../../../core/clock.js";
 import { ConflictError, NotFoundError } from "../../../core/errors.js";
 import type { AuditLogger } from "../../../infrastructure/audit/audit-logger.js";
 import type { DatabaseConnection } from "../../../infrastructure/database/client.js";
+import type { OrganizationsContract } from "../../organizations/contracts.js";
 import { AdministrationRules } from "../domain/administration-rules.js";
 import type {
     AdministrationRepository,
+    AuditRow,
     GlobalAdministratorRow,
+    GlobalAuditOptions,
 } from "../infrastructure/administration-repository.js";
 
 export class AdministrationService {
@@ -20,17 +25,20 @@ export class AdministrationService {
     private readonly repository: AdministrationRepository;
     private readonly audit: AuditLogger;
     private readonly clock: Clock;
+    private readonly organizations: OrganizationsContract;
 
     constructor(
         database: DatabaseConnection,
         repository: AdministrationRepository,
         audit: AuditLogger,
         clock: Clock,
+        organizations: OrganizationsContract,
     ) {
         this.database = database;
         this.repository = repository;
         this.audit = audit;
         this.clock = clock;
+        this.organizations = organizations;
     }
 
     async listGlobalAdministrators(): Promise<readonly GlobalAdministrator[]> {
@@ -124,18 +132,62 @@ export class AdministrationService {
         actorUserId: string | null;
     }): Promise<readonly AuditLog[]> {
         const rows = await this.repository.auditPage(this.database.db, options);
-        return rows.map((row) => ({
-            id: row.id,
-            organizationId: row.organizationId,
-            actorUserId: row.actorUserId,
-            actorDisplayName: row.actorDisplayName,
-            action: row.action,
-            entityType: row.entityType,
-            entityId: row.entityId,
-            metadata: row.metadata,
-            createdAt: row.createdAt.toISOString(),
+        return rows.map(toAuditLog);
+    }
+
+    async globalAuditPage(options: GlobalAuditOptions): Promise<readonly AuditLog[]> {
+        const rows = await this.repository.globalAuditPage(this.database.db, options);
+        return rows.map(toAuditLog);
+    }
+
+    async listOrganizationUsers(organizationId: string): Promise<readonly AdministrationUser[]> {
+        const [memberships, administrators] = await Promise.all([
+            this.organizations.listMembershipsWithUsers(organizationId),
+            this.repository.listAdministrators(this.database.db),
+        ]);
+        const globalAdministratorIds = new Set(
+            administrators.map((administrator) => administrator.userId),
+        );
+        return memberships.map((membership) => ({
+            userId: membership.userId,
+            displayName: membership.displayName,
+            email: membership.email,
+            role: membership.role,
+            status: membership.status,
+            isJudge: membership.role === "judge",
+            isGlobalAdministrator: globalAdministratorIds.has(membership.userId),
+            joinedAt: membership.createdAt,
         }));
     }
+
+    async updateOrganizationUserRole(
+        auth: AuthContext,
+        organizationId: string,
+        targetUserId: string,
+        role: OrganizationRole,
+        ip: string | null,
+    ): Promise<void> {
+        await this.organizations.updateMemberRole(
+            { userId: auth.user.id, ip },
+            organizationId,
+            targetUserId,
+            role,
+        );
+    }
+}
+
+function toAuditLog(row: AuditRow): AuditLog {
+    return {
+        id: row.id,
+        organizationId: row.organizationId,
+        actorUserId: row.actorUserId,
+        actorDisplayName: row.actorDisplayName,
+        action: row.action,
+        entityType: row.entityType,
+        entityId: row.entityId,
+        metadata: row.metadata,
+        createdAt: row.createdAt.toISOString(),
+    };
 }
 
 function toGlobalAdministrator(row: GlobalAdministratorRow): GlobalAdministrator {

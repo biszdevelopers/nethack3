@@ -32,6 +32,7 @@ All routes require authentication (`AuthGuard`). Except for invitation acceptanc
 - Invitations use a 32-byte random token; only its SHA-256 hash is stored. Tokens expire after 7 days and are delivered through the outbox event, never in the API response.
 - PostgreSQL unique violations (`23505`) are mapped to `ConflictError` (team name, duplicate invitation, duplicate membership).
 - Members list is visible to team members and owners/organizers. Invitations are visible only to the captain and owners/organizers. Member emails are never returned by the team list.
+- Administration operations assume the caller is already an owner/organizer. A team with members cannot be deleted; the team row is locked, member rows are counted, and deletion refuses instead of removing members. Callers must also confirm through `submissions.v1` that the team has no submission.
 
 ## Domain events
 
@@ -44,4 +45,6 @@ Every mutation writes an `audit_logs` row with `entity_type = "team"` and `entit
 
 ## Contract
 
-`TeamsContract` (`teams.v1`) exposes `getTeam`, `isTeamMember`, and `getTeamForUser`. Each opens its own organization-scoped transaction and reports `memberCount` from `team_members`.
+`TeamsContract` (`teams.v1`) exposes `getTeam`, `listEditionTeams`, `listEditionTeamsWithMembers`, `isTeamMember`, `getTeamForUser`, `countTeams`, `updateTeamStatus`, and `deleteTeam`. Each opens its own organization-scoped transaction and reports `memberCount` from `team_members`.
+
+Administration methods (`updateTeamStatus`, `deleteTeam`) take a `{ userId, ip }` actor and assume authorization was already established. They enforce organization and edition scope, audit as `team.updated` / `team.deleted`, and never expose invitation tokens.
