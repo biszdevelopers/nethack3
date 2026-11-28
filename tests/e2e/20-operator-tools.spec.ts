@@ -96,7 +96,7 @@ test.describe("operator tools and public guidance", () => {
         });
     });
 
-    test("public FAQ and rules carry genuine competition guidance", async ({ page }) => {
+    test("public FAQ and rules carry the verbatim competition rules", async ({ page }) => {
         test.setTimeout(180_000);
 
         await page.goto(siteUrl("/faq"));
@@ -108,11 +108,27 @@ test.describe("operator tools and public guidance", () => {
 
         await page.goto(siteUrl("/rules"));
         await expect(
-            page.getByRole("heading", { name: "Competition rules", level: 1 }),
+            page.getByRole("heading", {
+                name: "Code of Conduct and Competition Rules",
+                level: 1,
+            }),
         ).toBeVisible({ timeout: 60_000 });
-        await expect(page.getByRole("heading", { name: "Submission requirements" })).toBeVisible();
-        await expect(page.getByRole("heading", { name: "AI-use disclosure" })).toBeVisible();
-        await expect(page.getByRole("heading", { name: "Conduct and security" })).toBeVisible();
-        await expect(page.getByRole("heading", { name: "Judging" })).toBeVisible();
+        await expect(page.getByText("Version 1.0.", { exact: false }).first()).toBeVisible();
+        await expect(
+            page.getByText("The video must contain absolutely no audio.", { exact: false }).first(),
+        ).toBeVisible();
+        await expect(
+            page.getByText("Your AI usage disclosure is complete and accurate.").first(),
+        ).toBeVisible();
+        await expect(
+            page.getByRole("heading", {
+                name: "Phase 6: General Terms and Responsibilities",
+                level: 3,
+            }),
+        ).toBeVisible();
+        await expect(page.getByText("devclub-bisz@basischina.com").first()).toBeVisible();
+        await expect(
+            page.getByText("May careful work take root and grow", { exact: false }).first(),
+        ).toBeVisible();
     });
 });

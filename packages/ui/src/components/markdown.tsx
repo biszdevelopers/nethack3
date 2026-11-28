@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-const SAFE_LINK = /^(https?:\/\/|\/|#)/i;
+const SAFE_LINK = /^(https?:\/\/|mailto:|\/|#)/i;
 
 function inline(text: string, keyPrefix: string): ReactNode[] {
     const nodes: ReactNode[] = [];
