@@ -1,6 +1,6 @@
 import { expect, test, type Locator } from "@playwright/test";
 import { API_ORIGIN, FIXTURE, SITE_ORIGIN, USERS } from "../support/e2e/config.js";
-import { expectToast, signIn } from "../support/e2e/app.js";
+import { chooseOption, expectToast, signIn } from "../support/e2e/app.js";
 
 function siteUrl(path: string): string {
     return new URL(path, SITE_ORIGIN).toString();
@@ -94,6 +94,58 @@ test.describe("edition theme and results visibility", () => {
             await expect(scores).not.toBeChecked();
             await editForm.getByRole("button", { name: "Save edition" }).click();
             await expectToast(page, "Edition saved");
+        });
+
+        await test.step("masks the theme while the edition is only published", async () => {
+            await page.getByRole("button", { name: "Reset to draft" }).click();
+            await page
+                .getByRole("alertdialog")
+                .getByRole("button", { name: "Reset to draft" })
+                .click();
+            await expectToast(page, "Edition reset to draft");
+            await expect(page.getByRole("button", { name: "Publish edition" })).toBeVisible();
+
+            await page.getByRole("button", { name: "Publish edition" }).click();
+            await expectToast(page, "Edition published");
+
+            const response = await fetch(
+                `${API_ORIGIN}/api/v1/public/competitions/${FIXTURE.editionSlug}`,
+            );
+            expect(response.status).toBe(200);
+            const competition: unknown = await response.json();
+            expect(competition).toMatchObject({
+                status: "published",
+                themeName: null,
+                themeDescription: null,
+            });
+
+            await page.goto(siteUrl(`/competitions/${FIXTURE.editionSlug}`));
+            await expect(
+                page.getByRole("heading", { name: FIXTURE.editionName, level: 1 }),
+            ).toBeVisible({ timeout: 60_000 });
+            await expect(page.getByText("Theme", { exact: true })).toHaveCount(0);
+
+            await page.goto(`/competitions/manage?edition=${FIXTURE.editionId}`);
+            const statusForm = page
+                .getByRole("button", { name: "Save edition" })
+                .locator("xpath=ancestor::form");
+            for (const status of [
+                "Registration open",
+                "Registration closed",
+                "Active",
+                "Judging",
+                "Voting",
+            ]) {
+                const saved = page.waitForResponse(
+                    (candidate) =>
+                        candidate.request().method() === "PATCH" &&
+                        candidate.url().endsWith(`/api/v1/competitions/${FIXTURE.editionId}`),
+                );
+                await chooseOption(statusForm.getByLabel("Status"), status);
+                await statusForm.getByRole("button", { name: "Save edition" }).click();
+                expect((await saved).ok()).toBe(true);
+            }
+            await expect(page.getByText("Voting", { exact: true }).first()).toBeVisible();
         });
     });
 });

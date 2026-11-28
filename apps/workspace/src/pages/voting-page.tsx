@@ -85,6 +85,13 @@ function roundStatusTone(status: VotingRound["status"]): "neutral" | "primary" |
     }
 }
 
+function isForbiddenError(error: unknown): boolean {
+    if (typeof error !== "object" || error === null || !("status" in error)) {
+        return false;
+    }
+    return error.status === 403;
+}
+
 export function VotingPage(): ReactNode {
     const { session, membership } = useActiveMembership();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -824,10 +831,17 @@ function BallotCard({
                 ) : submissions.isPending ? (
                     <LoadingBlock rows={3} label="Loading submissions" />
                 ) : submissions.isError ? (
-                    <RequestError
-                        error={submissions.error}
-                        onRetry={() => void submissions.refetch()}
-                    />
+                    isForbiddenError(submissions.error) ? (
+                        <EmptyState
+                            title="No ballot for your role"
+                            description="Participants need an approved registration, an active team in this edition, and at least one submitted project to vote. Judges and organizers can still vote when a round includes their role."
+                        />
+                    ) : (
+                        <RequestError
+                            error={submissions.error}
+                            onRetry={() => void submissions.refetch()}
+                        />
+                    )
                 ) : submissionItems.length === 0 ? (
                     <EmptyState
                         title="No eligible projects"

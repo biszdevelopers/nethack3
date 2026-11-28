@@ -30,6 +30,18 @@ function requestHeaders(token: string): Record<string, string> {
     };
 }
 
+async function reopenSubmission(page: Page, submissionId: string): Promise<number> {
+    const token = await csrfToken(page);
+    const response = await page.request.post(
+        `${API_ORIGIN}/api/v1/administration/editions/${FIXTURE.editionId}/submissions/${submissionId}/reopen`,
+        {
+            headers: requestHeaders(token),
+            data: { status: "changes_requested" },
+        },
+    );
+    return response.status();
+}
+
 async function submissionIdsByTitle(): Promise<ReadonlyMap<string, string>> {
     const rows = await ownerTenantQuery<{ id: string; title: string }>(
         FIXTURE.organizationId,
@@ -59,6 +71,35 @@ async function openRoundCount(): Promise<number> {
         [FIXTURE.editionId],
     );
     return rows[0]?.count ?? 0;
+}
+
+async function roundVoteCount(roundId: string, submissionId: string): Promise<number> {
+    const rows = await ownerTenantQuery<{ count: number }>(
+        FIXTURE.organizationId,
+        `select count(*)::int as count
+           from votes
+          where organization_id = $1 and round_id = $2 and submission_id = $3`,
+        [FIXTURE.organizationId, roundId, submissionId],
+    );
+    return rows[0]?.count ?? 0;
+}
+
+async function submissionVoteCount(submissionId: string): Promise<number> {
+    const rows = await ownerTenantQuery<{ count: number }>(
+        FIXTURE.organizationId,
+        "select count(*)::int as count from votes where organization_id = $1 and submission_id = $2",
+        [FIXTURE.organizationId, submissionId],
+    );
+    return rows[0]?.count ?? 0;
+}
+
+async function submissionStatus(submissionId: string): Promise<string> {
+    const rows = await ownerTenantQuery<{ status: string }>(
+        FIXTURE.organizationId,
+        "select status from submissions where organization_id = $1 and id = $2",
+        [FIXTURE.organizationId, submissionId],
+    );
+    return rows[0]?.status ?? "";
 }
 
 test.describe("results publication freeze", () => {
@@ -228,6 +269,13 @@ test.describe("results publication freeze", () => {
                     expect(await openRoundCount()).toBe(0);
                 });
 
+                await test.step("reopening a submission after publication is refused", async () => {
+                    expect(await roundVoteCount(roundId, fixtureId)).toBe(1);
+                    expect(await reopenSubmission(page, fixtureId)).toBe(409);
+                    expect(await roundVoteCount(roundId, fixtureId)).toBe(1);
+                    expect(await submissionStatus(fixtureId)).toBe("submitted");
+                });
+
                 await test.step("voting mutations are frozen", async () => {
                     const blockedRound = await page.request.post(
                         `${API_ORIGIN}/api/v1/competitions/${FIXTURE.editionId}/voting-rounds`,
@@ -306,6 +354,15 @@ test.describe("results publication freeze", () => {
                     await expectToast(page, "Results unpublished");
                     await expect.poll(editionStatus).toBe(previousStatus);
                     expect(await openRoundCount()).toBe(0);
+                });
+
+                await test.step("reopening clears the submission's peer votes", async () => {
+                    expect(await roundVoteCount(roundId, fixtureId)).toBe(1);
+                    expect(await reopenSubmission(page, fixtureId)).toBe(204);
+                    expect(await submissionStatus(fixtureId)).toBe("changes_requested");
+                    expect(await roundVoteCount(roundId, fixtureId)).toBe(0);
+                    expect(await roundVoteCount(roundId, labId)).toBe(1);
+                    expect(await submissionVoteCount(fixtureId)).toBe(0);
                 });
 
                 await test.step("voting and judging accept writes again after the explicit reopen", async () => {

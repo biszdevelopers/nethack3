@@ -10,7 +10,9 @@ import {
     editionLifecycleRequestSchema,
     listResponseSchema,
     milestoneSchema,
+    organizerEditionSchema,
     publicCompetitionSchema,
+    updateEditionApprovalRequestSchema,
     updateEditionRequestSchema,
     type CompetitionEdition,
     type CompetitionEditionDetail,
@@ -23,7 +25,9 @@ import {
     type EditionLifecycleRequest,
     type ListResponse,
     type Milestone,
+    type OrganizerEdition,
     type PublicCompetition,
+    type UpdateEditionApprovalRequest,
     type UpdateEditionRequest,
 } from "@nethack/contracts";
 import { apiClient } from "../../application/api.js";
@@ -31,6 +35,7 @@ import { apiClient } from "../../application/api.js";
 const seriesListSchema = listResponseSchema(competitionSeriesSchema);
 const divisionListSchema = listResponseSchema(divisionSchema);
 const milestoneListSchema = listResponseSchema(milestoneSchema);
+const organizerEditionListSchema = listResponseSchema(organizerEditionSchema);
 const publicCompetitionListSchema = listResponseSchema(publicCompetitionSchema);
 
 function organizationHeader(organizationId: string): Record<string, string> {
@@ -72,6 +77,17 @@ export const competitionsApi = {
         );
     },
 
+    async listEditions(
+        organizationId: string,
+        seriesId: string | null,
+    ): Promise<ListResponse<OrganizerEdition>> {
+        return apiClient.request("GET", `/api/v1/organizations/${organizationId}/editions`, {
+            query: { seriesId: seriesId ?? undefined, limit: 100 },
+            schema: organizerEditionListSchema,
+            headers: organizationHeader(organizationId),
+        });
+    },
+
     async edition(organizationId: string, editionId: string): Promise<CompetitionEditionDetail> {
         return apiClient.request("GET", `/api/v1/competitions/${editionId}`, {
             schema: competitionEditionDetailSchema,
@@ -86,6 +102,18 @@ export const competitionsApi = {
     ): Promise<CompetitionEdition> {
         return apiClient.request("PATCH", `/api/v1/competitions/${editionId}`, {
             body: updateEditionRequestSchema.parse(input),
+            schema: competitionEditionSchema,
+            headers: organizationHeader(organizationId),
+        });
+    },
+
+    async setEditionApproval(
+        organizationId: string,
+        editionId: string,
+        input: UpdateEditionApprovalRequest,
+    ): Promise<CompetitionEdition> {
+        return apiClient.request("PATCH", `/api/v1/competitions/${editionId}/approval`, {
+            body: updateEditionApprovalRequestSchema.parse(input),
             schema: competitionEditionSchema,
             headers: organizationHeader(organizationId),
         });

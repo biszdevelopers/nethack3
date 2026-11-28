@@ -64,6 +64,28 @@ export function useMilestones(organizationId: string | null, editionId: string |
     });
 }
 
+export function useOrganizationEditions(
+    organizationId: string | null,
+    seriesId: string | null,
+    enabled = true,
+) {
+    return useQuery({
+        queryKey: [
+            "competitions",
+            "organizer-editions",
+            organizationId ?? "none",
+            seriesId ?? "all",
+        ],
+        queryFn: async () => {
+            if (organizationId === null) {
+                return { items: [], nextCursor: null };
+            }
+            return competitionsApi.listEditions(organizationId, seriesId);
+        },
+        enabled: organizationId !== null && enabled,
+    });
+}
+
 export function useCreateSeries(organizationId: string | null) {
     const queryClient = useQueryClient();
     return useMutation({
@@ -104,6 +126,9 @@ export function useCreateEdition(organizationId: string | null) {
                 queryClient.invalidateQueries({
                     queryKey: queryKeys.publicCompetitions(),
                 }),
+                queryClient.invalidateQueries({
+                    queryKey: ["competitions", "organizer-editions"],
+                }),
             ]);
         },
     });
@@ -133,6 +158,25 @@ export function useUpdateEdition(organizationId: string | null) {
                     queryKey: queryKeys.publicCompetitions(),
                 }),
             ]);
+        },
+    });
+}
+
+export function useSetEditionApproval(organizationId: string | null) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (input: { editionId: string; approved: boolean }) => {
+            if (organizationId === null) {
+                throw new Error("Select an organization first.");
+            }
+            return competitionsApi.setEditionApproval(organizationId, input.editionId, {
+                approved: input.approved,
+            });
+        },
+        onSuccess: async (edition) => {
+            await queryClient.invalidateQueries({
+                queryKey: queryKeys.edition(edition.id),
+            });
         },
     });
 }

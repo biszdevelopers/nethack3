@@ -181,6 +181,17 @@ export function TeamDetailPage(): ReactNode {
                                     </dd>
                                 </div>
                             </dl>
+                            {detail.lockedAt === null ? null : (
+                                <Alert
+                                    tone="warning"
+                                    title="Team locked after submission"
+                                    className="mt-4"
+                                >
+                                    The roster, division, and team details are fixed after the first
+                                    submitted project. Ask an organizer to reopen the submission to
+                                    make changes.
+                                </Alert>
+                            )}
                         </CardContent>
                     </Card>
 

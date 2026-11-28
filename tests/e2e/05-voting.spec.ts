@@ -117,6 +117,18 @@ test.describe("voting", () => {
             await signIn(participantPage, USERS.participant);
             await participantPage.goto(`/voting?edition=${FIXTURE.editionId}`);
 
+            await test.step("a participant with a submitted project receives a ballot", async () => {
+                const response = await participantPage.request.get(
+                    `${API_ORIGIN}/api/v1/competitions/${FIXTURE.editionId}/votable-submissions`,
+                    { headers: { "x-nethack-organization-id": FIXTURE.organizationId } },
+                );
+                expect(response.status()).toBe(200);
+                const body = (await response.json()) as {
+                    items: readonly { id: string }[];
+                };
+                expect(body.items.length).toBeGreaterThan(0);
+            });
+
             await test.step("results stay hidden before publication", async () => {
                 await expect(
                     participantPage.getByRole("heading", { name: "Results", level: 2 }),

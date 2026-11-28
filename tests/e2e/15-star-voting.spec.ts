@@ -225,6 +225,25 @@ test.describe("star voting", () => {
                 expect(await castBallotWithCsrf(judgePage, roundId, scores)).toBe(201);
             });
 
+            await test.step("a participant with a submitted project still receives a ballot", async () => {
+                const participantContext = await newAppContext(browser);
+                try {
+                    const participantPage = await participantContext.newPage();
+                    await signIn(participantPage, USERS.participant);
+                    const response = await participantPage.request.get(
+                        `${API_ORIGIN}/api/v1/competitions/${FIXTURE.editionId}/votable-submissions`,
+                        { headers: { "x-nethack-organization-id": FIXTURE.organizationId } },
+                    );
+                    expect(response.status()).toBe(200);
+                    const body = (await response.json()) as {
+                        items: readonly { id: string }[];
+                    };
+                    expect(body.items.length).toBeGreaterThan(0);
+                } finally {
+                    await participantContext.close();
+                }
+            });
+
             await test.step("results stay hidden before publication", async () => {
                 const hidden = await judgePage.request.get(
                     `${API_ORIGIN}/api/v1/voting-rounds/${roundId}/results`,

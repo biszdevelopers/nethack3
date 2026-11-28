@@ -183,6 +183,53 @@ test.describe("organizer workflow", () => {
         });
     });
 
+    test("keeps a blank-shell edition unpublished until approval and schedule exist", async ({
+        page,
+    }) => {
+        test.setTimeout(240_000);
+        const editionName = "E2E Blank Shell";
+
+        await signIn(page, USERS.organizer);
+        await page.goto("/competitions/manage");
+        await expect(
+            page.getByRole("heading", { name: "Competition management", level: 1 }),
+        ).toBeVisible();
+
+        const form = page
+            .getByRole("button", { name: "Create edition" })
+            .locator("xpath=ancestor::form");
+        await chooseOption(form.getByLabel("Series"), "E2E Series");
+        await chooseOption(form.getByLabel("Start from"), "Blank shell");
+        await form.getByLabel("Edition name").fill(editionName);
+        await form.getByLabel("Slug").fill("e2e-blank-shell");
+        await form.getByRole("button", { name: "Create edition" }).click();
+        await expectToast(page, "Edition created");
+        await page.waitForURL(/[?&]edition=[0-9a-f-]{36}/);
+        await expect(page.getByRole("heading", { name: editionName, level: 2 })).toBeVisible();
+
+        const blockers = page.getByRole("status").filter({ hasText: "Not ready to publish" });
+        await expect(blockers).toBeVisible();
+        for (const item of ["Theme name", "Start date", "End date", "Board approval"]) {
+            await expect(blockers.getByText(item, { exact: true })).toBeVisible();
+        }
+
+        await page.getByRole("button", { name: "Approve edition" }).click();
+        await expectToast(page, "Board approval recorded");
+        await expect(page.getByText(/Approved by .* on /)).toBeVisible();
+
+        const editForm = page
+            .getByRole("button", { name: "Save edition" })
+            .locator("xpath=ancestor::form");
+        await editForm.getByLabel("Theme name").fill("Blank shell theme");
+        await editForm.getByLabel("Starts").fill(localDateTime(30));
+        await editForm.getByLabel("Ends").fill(localDateTime(32));
+        await editForm.getByRole("button", { name: "Save edition" }).click();
+        await expectToast(page, "Edition saved");
+
+        await page.getByRole("button", { name: "Publish edition" }).click();
+        await expectToast(page, "Edition published");
+    });
+
     test("edits a team profile as an organizer", async ({ page }) => {
         await signIn(page, USERS.organizer);
         await page.goto(`/teams/${FIXTURE.disposableTeamId}`);

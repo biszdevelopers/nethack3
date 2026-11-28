@@ -1,5 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
-import { API_ORIGIN, FIXTURE, USERS, WORKSPACE_ORIGIN } from "../support/e2e/config.js";
+import {
+    API_ORIGIN,
+    AUTH_ORIGIN,
+    FIXTURE,
+    USERS,
+    WORKSPACE_ORIGIN,
+    type MockUser,
+} from "../support/e2e/config.js";
 import { chooseOption, expectToast, newAppContext, signIn } from "../support/e2e/app.js";
 import { ownerTenantBatch, ownerTenantQuery } from "../support/e2e/db.js";
 
@@ -16,6 +23,12 @@ const OPEN_EXTRA_VERSION_ID = "f5000000-0000-4000-8000-000000000051";
 const JUNIOR_PROJECT_TITLE = "Junior Track Project";
 const OPEN_EXTRA_PROJECT_TITLE = "Open Extra Project";
 const ROUND_NAME = "E2E Eligibility Scope";
+const TEAMLESS_USER_ID = "f5000000-0000-4000-8000-000000000061";
+const TEAMLESS_USER: MockUser = {
+    subject: "fixture-teamless-participant",
+    email: "teamless-participant@fixture.invalid",
+    name: "Teamless Participant",
+};
 
 interface VotableSubmissionBody {
     readonly items: readonly {
@@ -158,6 +171,49 @@ async function seedTracks(): Promise<void> {
                 OPEN_EXTRA_SUBMISSION_ID,
                 OPEN_EXTRA_PROJECT_TITLE,
                 FIXTURE.participantId,
+            ],
+        },
+        {
+            text: `insert into users (id, display_name, email, locale)
+                   values ($1, $2, $3, 'en')
+                   on conflict do nothing`,
+            values: [TEAMLESS_USER_ID, TEAMLESS_USER.name, TEAMLESS_USER.email],
+        },
+        {
+            text: `insert into external_identities (user_id, issuer, subject, email_at_login)
+                   values ($1, $2, $3, $4)
+                   on conflict do nothing`,
+            values: [TEAMLESS_USER_ID, AUTH_ORIGIN, TEAMLESS_USER.subject, TEAMLESS_USER.email],
+        },
+        {
+            text: `insert into organization_memberships (organization_id, user_id, role)
+                   values ($1, $2, 'participant')
+                   on conflict do nothing`,
+            values: [FIXTURE.organizationId, TEAMLESS_USER_ID],
+        },
+        {
+            text: `insert into registrations
+                       (organization_id, edition_id, user_id, division_id, status,
+                        decided_by_user_id, decided_at)
+                   values ($1, $2, $3, $4, 'approved', $5, now())
+                   on conflict do nothing`,
+            values: [
+                FIXTURE.organizationId,
+                FIXTURE.editionId,
+                TEAMLESS_USER_ID,
+                FIXTURE.divisionId,
+                FIXTURE.organizerId,
+            ],
+        },
+        {
+            text: `insert into participants (organization_id, edition_id, user_id, division_id)
+                   values ($1, $2, $3, $4)
+                   on conflict do nothing`,
+            values: [
+                FIXTURE.organizationId,
+                FIXTURE.editionId,
+                TEAMLESS_USER_ID,
+                FIXTURE.divisionId,
             ],
         },
     ]);
@@ -316,6 +372,41 @@ test.describe("voting eligibility", () => {
                     { submissionId: openExtraId, stars: 5 },
                 ]);
                 expect(result.status).toBe(201);
+            });
+
+            await test.step("a teamless participant is refused discovery and cast", async () => {
+                const teamlessContext = await newAppContext(browser);
+                try {
+                    const teamlessPage = await teamlessContext.newPage();
+                    await signIn(teamlessPage, TEAMLESS_USER);
+                    const discovery = await teamlessPage.request.get(
+                        `${API_ORIGIN}/api/v1/competitions/${FIXTURE.editionId}/votable-submissions`,
+                        { headers: { "x-nethack-organization-id": FIXTURE.organizationId } },
+                    );
+                    expect(discovery.status()).toBe(403);
+                    expect(await discovery.json()).toMatchObject({
+                        error: {
+                            code: "forbidden",
+                            message:
+                                "Only participants with an active team can vote in this round.",
+                        },
+                    });
+
+                    const result = await castBallot(teamlessPage, roundId, [
+                        { submissionId: labId, stars: 5 },
+                        { submissionId: openExtraId, stars: 5 },
+                    ]);
+                    expect(result.status).toBe(403);
+                    expect(result.body).toMatchObject({
+                        error: {
+                            code: "forbidden",
+                            message:
+                                "Only participants with an active team can vote in this round.",
+                        },
+                    });
+                } finally {
+                    await teamlessContext.close();
+                }
             });
         } finally {
             await participantContext.close();

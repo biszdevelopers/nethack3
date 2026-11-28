@@ -269,11 +269,11 @@ Current distribution across 228 tracked requirements: 146 Verified, 71 Implement
 | ID | Requirement | Plan section | Implementation | Verification | Status |
 | --- | --- | --- | --- | --- | --- |
 | QA-001 | Stack: Vitest unit/integration/API injection, Playwright E2E, axe, k6 load, architecture checks, visual, dependency scanning, static analysis | 16.1 | tests + configs | Vitest, Playwright, axe, screenshots, architecture, k6 (executed), Lighthouse, audit, secret scan, and SBOM are wired. | Verified |
-| QA-002 | Every capability independently testable: domain, operations, contracts, persistence, authorization, events, errors, concurrency | 16.2 | capability tests | All 13 capabilities have local tests; 717 unit/architecture/UI tests and 84 integration/security/fuzz/worker tests pass. Cross-cutting dimensions are covered by integration suites. | Verified |
+| QA-002 | Every capability independently testable: domain, operations, contracts, persistence, authorization, events, errors, concurrency | 16.2 | capability tests | All 13 capabilities have local tests; 764 unit/architecture/UI tests and 84 integration/security/fuzz/worker tests pass. Cross-cutting dimensions are covered by integration suites. | Verified |
 | QA-003 | Architecture checks: private imports, cycles, DB access, server modules in browser, exposed secrets, duplicate contracts, unregistered deps, runtime imports | 16.3 | tests/architecture | Architecture suite passes | Verified |
 | QA-004 | Visual tests desktop/tablet/mobile/light/dark/loading/error/empty | 16.4 | tests/visual | Visual baselines cover desktop dark/light, tablet, mobile, loading, empty, error, not-found, and the component laboratory. | Verified |
 | QA-005 | Accessibility: keyboard, focus, labels, semantics, contrast, errors, dialogs, touch, reduced motion, zoom | 16.5 | E2E + axe | Full Playwright suite (including axe and mobile overflow checks) passes | Verified |
-| QA-006 | E2E full journey sign-in → onboarding → org → register → team → invite → project → files → submit → assign judge → evaluate → vote → results → logout → invalidation | 16.6 | tests/e2e | 82 Playwright cases cover sign-in, organization creation, onboarding guidance, participant, organizer, judge scoring and ranked results, voting and eligibility, public site, showcase, project media, rubrics, edition theme, team invitations/edit/disband, profile parity, submission integrity, judge feedback, results parity/feedback, results freeze, admin tools, operator tools, logout, negative paths, command palette, axe, and visuals. | Verified |
+| QA-006 | E2E full journey sign-in → onboarding → org → register → team → invite → project → files → submit → assign judge → evaluate → vote → results → logout → invalidation | 16.6 | tests/e2e | 83 Playwright cases cover sign-in, organization creation, onboarding guidance, participant, organizer, judge scoring and ranked results, voting and eligibility, public site, showcase, project media, rubrics, edition lifecycle/approval/theme, team invitations/lock/disband, profile parity, submission integrity, judge feedback, results parity/feedback, results freeze/reopen, admin tools, operator tools, logout, negative paths, command palette, axe, and visuals. | Verified |
 | QA-007 | Negative paths tested for every important workflow | 16.6 | tests/e2e, tests/security | Negative-path E2E and security suites pass | Verified |
 
 ## 17. Deployment and operations
@@ -388,3 +388,15 @@ The final functional audit closed result integrity, lifecycle recovery, and judg
 | Administration | Standings CSV includes status, track, exact/display scores, live awards, links, and submitted state; competing participants cannot hold judge/organizer roles or join a team as a judge | `13`, `20` E2E; standings and role-conflict unit tests |
 | Public gallery | Public project list/detail require the edition to be in voting or a finished state | `06`, `21` E2E; project visibility tests |
 | Persistence | Migration `0011_amusing_virginia_dare.sql` adds the paused status, `status_before_pause`, and `ballots.voter_team_id` | Development and test databases migrate cleanly; integration, security, and E2E pass |
+
+## 25. Sixth parity wave
+
+The final audit closed voter eligibility, roster locking, reopen integrity, and season governance.
+
+| Area | Implementation | Verification |
+| --- | --- | --- |
+| Voting eligibility | Participants need an approved registration, an active team, and a submitted project; teamless/non-submitting participants cannot discover or cast ballots and are excluded from turnout and units; judges/organizers keep their scope | Voting unit tests; `05`, `15`, `25` E2E |
+| Reopen integrity | Reopen is refused after results publication; successful reopen clears the submission's peer votes and audits the cleanup | Administration/voting unit tests; `19` E2E |
+| Team lock | `teams.locked_at` locks roster, division, and metadata on first submitted version; organizer reopen unlocks; the workspace hides edit/invite/leave/disband controls and shows a locked notice | Team/submission unit tests; `02`, `03`, `18`, `25` E2E |
+| Season governance | Optional board approval with approver/time, revoke, and a publish gate; blank-shell and copy-schedule/theme/divisions/milestones creation; activation blockers for theme/dates/approval; upcoming themes masked publicly until the event starts | Season approval/readiness unit tests; `03`, `06`, `23` E2E |
+| Persistence | Migration `0012_legal_stingray.sql` adds approval/blank-start fields and `teams.locked_at`; `0011` added paused status, `status_before_pause`, and ballot team attribution | Development and test databases migrate cleanly; integration, security, and E2E pass |

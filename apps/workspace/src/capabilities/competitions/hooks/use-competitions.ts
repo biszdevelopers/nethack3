@@ -34,6 +34,31 @@ export function useCompetitionSeries(organizationId: string | null) {
     });
 }
 
+export function useOrganizationEditions(
+    organizationId: string | null,
+    seriesId: string | null,
+    enabled = true,
+) {
+    return useQuery({
+        queryKey: [
+            "competitions",
+            "organizer-editions",
+            organizationId ?? "none",
+            seriesId ?? "all",
+        ] as const,
+        queryFn: async () => {
+            if (organizationId === null) {
+                return { items: [], nextCursor: null };
+            }
+            return resources.competitions.listEditions(
+                organizationId,
+                seriesId === null ? {} : { seriesId },
+            );
+        },
+        enabled: organizationId !== null && enabled,
+    });
+}
+
 export function usePublicCompetitions(enabled = true) {
     return useQuery({
         queryKey: competitionKeys.publicList,
@@ -108,7 +133,10 @@ export function useCreateEdition(organizationId: string) {
         mutationFn: (input: { seriesId: string; request: CreateEditionRequest }) =>
             resources.competitions.createEdition(organizationId, input.seriesId, input.request),
         onSuccess: async () => {
-            await queryClient.invalidateQueries({ queryKey: competitionKeys.all });
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: competitionKeys.all }),
+                queryClient.invalidateQueries({ queryKey: ["competitions", "organizer-editions"] }),
+            ]);
         },
     });
 }

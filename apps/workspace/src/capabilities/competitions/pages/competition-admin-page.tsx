@@ -69,9 +69,11 @@ import {
     useEdition,
     useEditionLifecycle,
     useMilestones,
+    useOrganizationEditions,
     useOrganizerEditions,
     usePublishEdition,
     useSeries,
+    useSetEditionApproval,
     useUpdateEdition,
 } from "../hooks.js";
 
@@ -205,6 +207,7 @@ function toEditionForm(edition: CompetitionEditionDetail): EditionForm {
         contactUrl: edition.contactUrl ?? "",
         showScores: edition.showScores,
         showRanking: edition.showRanking,
+        requiresBoardApproval: edition.requiresBoardApproval,
         timezone: edition.timezone,
         status: edition.status,
         registrationOpensAt: isoToLocalInput(edition.registrationOpensAt),
@@ -217,6 +220,26 @@ function toEditionForm(edition: CompetitionEditionDetail): EditionForm {
         rulesMarkdown: edition.rulesMarkdown,
         resultsOpenAt: isoToLocalInput(edition.resultsOpenAt),
     };
+}
+
+function activationBlockers(edition: CompetitionEditionDetail): readonly string[] {
+    const blockers: string[] = [];
+    if (edition.isBlankStart && (edition.themeName ?? "").trim().length === 0) {
+        blockers.push("Theme name");
+    }
+    if (edition.isBlankStart && edition.startsAt === null) {
+        blockers.push("Start date");
+    }
+    if (edition.isBlankStart && edition.endsAt === null) {
+        blockers.push("End date");
+    }
+    if (
+        (edition.isBlankStart || edition.requiresBoardApproval) &&
+        edition.boardApprovedAt === null
+    ) {
+        blockers.push("Board approval");
+    }
+    return blockers;
 }
 
 function timezoneDefault(): string {
@@ -238,6 +261,8 @@ export function CompetitionAdminPage(): ReactNode {
     const organizerEditions = useOrganizerEditions(organizationId, isOrganizer);
     const editionId = searchParams.get("edition");
     const [editionSeriesId, setEditionSeriesId] = useState<string | null>(null);
+    const [createStartMode, setCreateStartMode] = useState<"new" | "blank" | "copy">("new");
+    const [copyFromEditionId, setCopyFromEditionId] = useState("");
     const [lifecycleConfirmation, setLifecycleConfirmation] =
         useState<LifecycleConfirmation | null>(null);
     const edition = useEdition(organizationId, editionId);
@@ -248,7 +273,13 @@ export function CompetitionAdminPage(): ReactNode {
     const createEdition = useCreateEdition(organizationId);
     const updateEdition = useUpdateEdition(organizationId);
     const publishEdition = usePublishEdition(organizationId);
+    const setEditionApproval = useSetEditionApproval(organizationId);
     const lifecycle = useEditionLifecycle(organizationId);
+    const copySources = useOrganizationEditions(
+        organizationId,
+        editionSeriesId,
+        createStartMode === "copy" && editionSeriesId !== null,
+    );
     const createDivision = useCreateDivision(organizationId);
     const createMilestone = useCreateMilestone(organizationId);
 
@@ -268,6 +299,7 @@ export function CompetitionAdminPage(): ReactNode {
             contactUrl: "",
             showScores: false,
             showRanking: false,
+            requiresBoardApproval: false,
             timezone: timezoneDefault(),
             status: "draft",
             registrationOpensAt: "",
@@ -293,6 +325,7 @@ export function CompetitionAdminPage(): ReactNode {
             contactUrl: "",
             showScores: false,
             showRanking: false,
+            requiresBoardApproval: false,
             timezone: timezoneDefault(),
             status: "draft",
             registrationOpensAt: "",
@@ -401,6 +434,14 @@ export function CompetitionAdminPage(): ReactNode {
             });
             return;
         }
+        if (createStartMode === "copy" && copyFromEditionId.length === 0) {
+            toast({
+                title: "Select a source edition",
+                description: "Choose the edition whose settings should be copied.",
+                tone: "critical",
+            });
+            return;
+        }
         try {
             const created = await createEdition.mutateAsync({
                 seriesId: editionSeriesId,
@@ -415,6 +456,8 @@ export function CompetitionAdminPage(): ReactNode {
                     contactUrl: values.contactUrl.length === 0 ? null : values.contactUrl,
                     showScores: values.showScores,
                     showRanking: values.showRanking,
+                    requiresBoardApproval:
+                        values.requiresBoardApproval || createStartMode === "blank",
                     timezone: values.timezone,
                     registrationOpensAt: localInputToIso(values.registrationOpensAt),
                     registrationClosesAt: localInputToIso(values.registrationClosesAt),
@@ -425,9 +468,13 @@ export function CompetitionAdminPage(): ReactNode {
                     maxParticipants: values.maxParticipants,
                     rulesMarkdown: values.rulesMarkdown,
                     resultsOpenAt: localInputToIso(values.resultsOpenAt),
+                    copyFromEditionId: createStartMode === "copy" ? copyFromEditionId : null,
+                    isBlankStart: createStartMode === "blank",
                 },
             });
             setEdition(created.id);
+            setCreateStartMode("new");
+            setCopyFromEditionId("");
             createEditionForm.reset({
                 name: "",
                 slug: "",
@@ -438,6 +485,7 @@ export function CompetitionAdminPage(): ReactNode {
                 contactUrl: "",
                 showScores: false,
                 showRanking: false,
+                requiresBoardApproval: false,
                 timezone: timezoneDefault(),
                 status: "draft",
                 registrationOpensAt: "",
@@ -544,6 +592,7 @@ export function CompetitionAdminPage(): ReactNode {
                     contactUrl: values.contactUrl.length === 0 ? null : values.contactUrl,
                     showScores: values.showScores,
                     showRanking: values.showRanking,
+                    requiresBoardApproval: values.requiresBoardApproval,
                     timezone: values.timezone,
                     ...(editionData !== null && values.status !== editionData.status
                         ? { status: values.status }
@@ -597,6 +646,30 @@ export function CompetitionAdminPage(): ReactNode {
 
     const confirmLifecycle = (action: ConfirmedLifecycleAction): void => {
         setLifecycleConfirmation({ action, ...LIFECYCLE_CONFIRMATIONS[action] });
+    };
+
+    const onSetApproval = (approved: boolean): void => {
+        if (editionId === null) {
+            return;
+        }
+        setEditionApproval.mutate(
+            { editionId, approved },
+            {
+                onSuccess: () => {
+                    toast({
+                        title: approved ? "Board approval recorded" : "Board approval revoked",
+                        tone: "success",
+                    });
+                },
+                onError: (error) => {
+                    toast({
+                        title: "Could not update board approval",
+                        description: describeError(error),
+                        tone: "critical",
+                    });
+                },
+            },
+        );
     };
 
     return (
@@ -749,6 +822,48 @@ export function CompetitionAdminPage(): ReactNode {
                                         placeholder="Select a series"
                                         disabled={seriesItems.length === 0}
                                     />
+                                    <Select
+                                        label="Start from"
+                                        options={[
+                                            { value: "new", label: "New edition" },
+                                            { value: "blank", label: "Blank shell" },
+                                            {
+                                                value: "copy",
+                                                label: "Copy an existing edition",
+                                            },
+                                        ]}
+                                        value={createStartMode}
+                                        onValueChange={(value) => {
+                                            setCreateStartMode(
+                                                value === "blank" || value === "copy"
+                                                    ? value
+                                                    : "new",
+                                            );
+                                            setCopyFromEditionId("");
+                                        }}
+                                        description="A blank shell requires board approval before publishing. A copy inherits theme, schedule, rules, divisions, and milestones."
+                                    />
+                                    {createStartMode !== "copy" ? null : (
+                                        <Select
+                                            label="Copy from"
+                                            options={(copySources.data?.items ?? []).map(
+                                                (item) => ({
+                                                    value: item.id,
+                                                    label: item.name,
+                                                }),
+                                            )}
+                                            value={copyFromEditionId}
+                                            onValueChange={setCopyFromEditionId}
+                                            placeholder={
+                                                copySources.isPending
+                                                    ? "Loading editions"
+                                                    : "Select an edition"
+                                            }
+                                            disabled={
+                                                editionSeriesId === null || copySources.isPending
+                                            }
+                                        />
+                                    )}
                                     <FormField name="name" label="Edition name" required>
                                         {(field) => (
                                             <Input
@@ -842,6 +957,11 @@ export function CompetitionAdminPage(): ReactNode {
                                             name="showRanking"
                                             label="Show rankings publicly"
                                             description="Publish rank order on the public results page."
+                                        />
+                                        <FormSwitch<EditionForm>
+                                            name="requiresBoardApproval"
+                                            label="Require board approval"
+                                            description="The edition cannot be published until the board approves it."
                                         />
                                     </div>
                                     <FormField
@@ -1047,6 +1167,17 @@ export function CompetitionAdminPage(): ReactNode {
                         </Alert>
                     ) : null}
 
+                    {editionData.status === "draft" &&
+                    activationBlockers(editionData).length > 0 ? (
+                        <Alert tone="warning" title="Not ready to publish">
+                            <ul className="flex list-disc flex-col gap-1 pl-5">
+                                {activationBlockers(editionData).map((blocker) => (
+                                    <li key={blocker}>{blocker}</li>
+                                ))}
+                            </ul>
+                        </Alert>
+                    ) : null}
+
                     <KeyValue
                         columns={2}
                         items={[
@@ -1074,6 +1205,40 @@ export function CompetitionAdminPage(): ReactNode {
                             },
                         ]}
                     />
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Board approval</CardTitle>
+                            <CardDescription>
+                                {editionData.requiresBoardApproval
+                                    ? "Publishing is blocked until the board approves this edition."
+                                    : "This edition does not require board approval. Approval is still recorded when granted."}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex flex-col gap-3">
+                            <p className="text-sm text-ink-muted">
+                                {editionData.boardApprovedAt === null
+                                    ? "Not approved."
+                                    : `Approved by ${editionData.boardApprovedByName ?? "a former member"} on ${formatDateTime(editionData.boardApprovedAt)}.`}
+                            </p>
+                            <div>
+                                <Button
+                                    type="button"
+                                    variant={
+                                        editionData.boardApprovedAt === null ? "solid" : "outline"
+                                    }
+                                    loading={setEditionApproval.isPending}
+                                    onClick={() => {
+                                        onSetApproval(editionData.boardApprovedAt === null);
+                                    }}
+                                >
+                                    {editionData.boardApprovedAt === null
+                                        ? "Approve edition"
+                                        : "Revoke approval"}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
 
                     <Card>
                         <CardHeader>
@@ -1279,6 +1444,11 @@ export function CompetitionAdminPage(): ReactNode {
                                             name="showRanking"
                                             label="Show rankings publicly"
                                             description="Publish rank order on the public results page."
+                                        />
+                                        <FormSwitch<EditionForm>
+                                            name="requiresBoardApproval"
+                                            label="Require board approval"
+                                            description="The edition cannot be published until the board approves it."
                                         />
                                     </div>
                                     <FormField

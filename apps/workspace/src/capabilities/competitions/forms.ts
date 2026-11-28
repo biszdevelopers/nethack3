@@ -55,6 +55,7 @@ export const editionSchema = z.object({
     contactUrl: contactUrlField,
     showScores: z.boolean(),
     showRanking: z.boolean(),
+    requiresBoardApproval: z.boolean(),
     timezone: z.string().min(1, "Enter an IANA time zone.").max(64),
     status: competitionEditionStatusSchema,
     registrationOpensAt: optionalDateTime,

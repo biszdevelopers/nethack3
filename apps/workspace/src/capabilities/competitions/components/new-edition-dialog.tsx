@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { z } from "zod";
 import {
     Alert,
@@ -14,12 +14,13 @@ import {
     Form,
     FormField,
     Input,
+    Select,
     Textarea,
 } from "@nethack/ui";
 import type { CompetitionSeries } from "@nethack/contracts";
 import { errorMessage } from "../../../lib/errors.js";
 import { toIsoOrNull } from "../../../lib/format.js";
-import { useCreateEdition } from "../hooks/use-competitions.js";
+import { useCreateEdition, useOrganizationEditions } from "../hooks/use-competitions.js";
 
 const integerText = (min: number, max: number) =>
     z
@@ -108,6 +109,13 @@ export function NewEditionDialog({
     readonly onCreated?: (editionId: string) => void;
 }): ReactNode {
     const createEdition = useCreateEdition(organizationId);
+    const [startMode, setStartMode] = useState<"new" | "blank" | "copy">("new");
+    const [copyFromEditionId, setCopyFromEditionId] = useState("");
+    const existingEditions = useOrganizationEditions(
+        organizationId,
+        series?.id ?? null,
+        open && series !== null,
+    );
     const form = useForm<NewEditionValues>({
         resolver: zodResolver(newEditionSchema),
         defaultValues: {
@@ -129,6 +137,8 @@ export function NewEditionDialog({
         if (!next) {
             form.reset();
             createEdition.reset();
+            setStartMode("new");
+            setCopyFromEditionId("");
         }
         onOpenChange(next);
     };
@@ -150,6 +160,7 @@ export function NewEditionDialog({
                     contactUrl: null,
                     showScores: false,
                     showRanking: false,
+                    requiresBoardApproval: startMode === "blank",
                     timezone: values.timezone,
                     registrationOpensAt: toIsoOrNull(values.registrationOpensAt),
                     registrationClosesAt: toIsoOrNull(values.registrationClosesAt),
@@ -160,6 +171,8 @@ export function NewEditionDialog({
                     maxParticipants: null,
                     rulesMarkdown: values.rulesMarkdown,
                     resultsOpenAt: null,
+                    copyFromEditionId: startMode === "copy" ? copyFromEditionId : null,
+                    isBlankStart: startMode === "blank",
                 },
             });
             close(false);
@@ -181,6 +194,37 @@ export function NewEditionDialog({
                     </DialogDescription>
                 </DialogHeader>
                 <Form form={form} onSubmit={submit} className="flex flex-col gap-4">
+                    <Select
+                        label="Start from"
+                        options={[
+                            { value: "new", label: "New edition" },
+                            { value: "blank", label: "Blank shell" },
+                            { value: "copy", label: "Copy an existing edition" },
+                        ]}
+                        value={startMode}
+                        onValueChange={(value) => {
+                            setStartMode(value === "blank" || value === "copy" ? value : "new");
+                            setCopyFromEditionId("");
+                        }}
+                        description="A blank shell requires board approval before publishing. A copy inherits theme, schedule, rules, divisions, and milestones."
+                    />
+                    {startMode !== "copy" ? null : (
+                        <Select
+                            label="Copy from"
+                            options={(existingEditions.data?.items ?? []).map((item) => ({
+                                value: item.id,
+                                label: item.name,
+                            }))}
+                            value={copyFromEditionId}
+                            onValueChange={setCopyFromEditionId}
+                            placeholder={
+                                existingEditions.isPending
+                                    ? "Loading editions"
+                                    : "Select an edition"
+                            }
+                            disabled={existingEditions.isPending}
+                        />
+                    )}
                     <div className="grid gap-4 sm:grid-cols-2">
                         <FormField name="name" label="Name" required>
                             {(field) => <Input {...field} autoComplete="off" />}
@@ -250,7 +294,10 @@ export function NewEditionDialog({
                         <Button
                             type="submit"
                             loading={createEdition.isPending}
-                            disabled={series === null}
+                            disabled={
+                                series === null ||
+                                (startMode === "copy" && copyFromEditionId.length === 0)
+                            }
                         >
                             Create edition
                         </Button>

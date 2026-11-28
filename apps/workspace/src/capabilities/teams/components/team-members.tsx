@@ -45,6 +45,7 @@ export function TeamMembers({
     const isCaptain = userId !== null && team.captainUserId === userId;
     const canManage = isCaptain || isOrganizer;
     const activeTeam = !isInactiveTeamStatus(team.status);
+    const locked = team.lockedAt !== null;
     const currentMember =
         userId === null ? null : (team.members.find((member) => member.userId === userId) ?? null);
 
@@ -136,7 +137,12 @@ export function TeamMembers({
                 <span className="text-xs text-ink-subtle">
                     {team.memberCount} of {team.maxMembers} members
                 </span>
-                {canManage && activeTeam ? (
+                {locked ? (
+                    <Badge tone="outline" size="sm">
+                        Locked
+                    </Badge>
+                ) : null}
+                {canManage && activeTeam && !locked ? (
                     <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
                         Edit team
                     </Button>
@@ -150,7 +156,7 @@ export function TeamMembers({
                         Mark ready
                     </Button>
                 ) : null}
-                {canManage && activeTeam ? (
+                {canManage && activeTeam && !locked ? (
                     <Button
                         variant="ghost"
                         size="sm"
@@ -159,12 +165,12 @@ export function TeamMembers({
                         Disband team
                     </Button>
                 ) : null}
-                {currentMember !== null && !isCaptain ? (
+                {currentMember !== null && !isCaptain && !locked ? (
                     <Button variant="ghost" size="sm" onClick={() => setPending({ kind: "leave" })}>
                         Leave team
                     </Button>
                 ) : null}
-                {isCaptain && activeTeam && team.members.length > 1 ? (
+                {isCaptain && activeTeam && !locked && team.members.length > 1 ? (
                     <span className="text-xs text-ink-subtle">
                         Transfer captaincy before leaving the team.
                     </span>
@@ -194,7 +200,7 @@ export function TeamMembers({
                             >
                                 {humanizeStatus(member.role)}
                             </Badge>
-                            {canManage && activeTeam && member.role !== "captain" ? (
+                            {canManage && activeTeam && !locked && member.role !== "captain" ? (
                                 <>
                                     <Button
                                         variant="outline"
@@ -229,7 +235,7 @@ export function TeamMembers({
                 ))}
             </ul>
 
-            {canManage && activeTeam ? (
+            {canManage && activeTeam && !locked ? (
                 <>
                     <Separator />
                     <div className="flex flex-col gap-2">
@@ -239,7 +245,7 @@ export function TeamMembers({
                 </>
             ) : null}
 
-            {canManage && activeTeam && isCaptain ? (
+            {canManage && activeTeam && !locked && isCaptain ? (
                 <>
                     <Separator />
                     <div className="flex flex-col gap-2">
