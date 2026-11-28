@@ -26,6 +26,8 @@ function isCapability(value: unknown): value is CapabilityShape {
 
 describe("capability extraction", () => {
     it("exports a self-contained capability definition from every folder", async () => {
+        // Dynamic TypeScript imports of every capability exceed the default timeout on Windows.
+
         const entries = readdirSync(CAPABILITIES, { withFileTypes: true })
             .filter((entry) => entry.isDirectory() && entry.name !== "tests")
             .map((entry) => entry.name)
@@ -50,5 +52,5 @@ describe("capability extraction", () => {
             expect(ids.has(definition.id), `${name} id must be unique`).toBe(false);
             ids.add(definition.id);
         }
-    });
+    }, 90_000);
 });

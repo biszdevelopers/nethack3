@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { SITE_ORIGIN, USERS } from "../support/e2e/config.js";
+import { FIXTURE, SITE_ORIGIN, USERS } from "../support/e2e/config.js";
 import { signIn } from "../support/e2e/app.js";
 
 const PUBLIC_PAGES = [
@@ -11,6 +11,10 @@ const PUBLIC_PAGES = [
     "/about",
     "/faq",
     "/past",
+    "/results",
+    "/contact",
+    "/contributing",
+    `/seasons/${FIXTURE.editionSlug}`,
 ] as const;
 
 function siteUrl(path: string): string {

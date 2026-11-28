@@ -111,4 +111,18 @@ describe("row-level security fails closed", () => {
             expect(count, `${probe.table} leaked to another tenant`).toBe(0);
         }
     });
+
+    it("enforces row-level security on recognition and judging workflow tables", async () => {
+        const tables = await queryAsOwner<{ tablename: string; rowsecurity: boolean }>(
+            "select tablename, rowsecurity from pg_tables where schemaname = 'public' and tablename in ('awards', 'team_awards', 'edition_results', 'judge_flags')",
+        );
+        expect(tables).toHaveLength(4);
+        for (const table of tables) {
+            expect(table.rowsecurity, `${table.tablename} must force RLS`).toBe(true);
+        }
+        const policies = await queryAsOwner<{ policyname: string }>(
+            "select policyname from pg_policies where schemaname = 'public' and policyname = 'edition_results_public_read'",
+        );
+        expect(policies).toHaveLength(1);
+    });
 });

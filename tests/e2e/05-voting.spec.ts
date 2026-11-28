@@ -26,8 +26,18 @@ async function createAndOpenRound(
     await expect(row.getByText("Open", { exact: true })).toBeVisible();
 }
 
+async function addStars(page: Page, projectTitle: string, times: number): Promise<void> {
+    const button = page.getByRole("button", {
+        name: `Add a star to ${projectTitle}`,
+        exact: true,
+    });
+    for (let index = 0; index < times; index += 1) {
+        await button.click();
+    }
+}
+
 test.describe("voting", () => {
-    test("hides unpublished results, records a ballot, rejects a duplicate, and publishes results", async ({
+    test("hides unpublished results, records a star ballot, replaces a recast, and publishes results", async ({
         page,
         browser,
     }) => {
@@ -43,19 +53,36 @@ test.describe("voting", () => {
         );
         const roundId = roundRows[0]?.id ?? "";
         expect(roundId).not.toBe("");
+        const submissionRows = await ownerTenantQuery<{ id: string; title: string }>(
+            FIXTURE.organizationId,
+            `select s.id, v.title
+               from submissions s
+               join submission_versions v
+                 on v.submission_id = s.id and v.version = s.current_version
+              where s.organization_id = $1 and s.edition_id = $2`,
+            [FIXTURE.organizationId, FIXTURE.editionId],
+        );
+        const fixtureSubmissionId =
+            submissionRows.find((row) => row.title === FIXTURE.projectTitle)?.id ?? "";
+        const labSubmissionId =
+            submissionRows.find((row) => row.title === FIXTURE.labProjectTitle)?.id ?? "";
+        expect(fixtureSubmissionId).not.toBe("");
+        expect(labSubmissionId).not.toBe("");
 
-        await test.step("organizer casts a ballot", async () => {
-            await page.getByRole("checkbox", { name: new RegExp(FIXTURE.projectTitle) }).check();
+        await test.step("organizer casts a star ballot", async () => {
+            await addStars(page, FIXTURE.projectTitle, 5);
+            await addStars(page, FIXTURE.labProjectTitle, 5);
+            await expect(page.getByText(/10 of 10 stars assigned/)).toBeVisible();
             await page.getByRole("button", { name: "Cast ballot" }).click();
             await expectToast(page, "Ballot submitted");
-            await expect(page.getByText(/^Submitted /)).toBeVisible();
+            await expect(page.getByText(/You submitted a ballot/)).toBeVisible();
         });
 
-        await test.step("a duplicate ballot is rejected", async () => {
+        await test.step("a recast replaces the previous ballot", async () => {
             const csrfResponse = await page.request.get(`${API_ORIGIN}/api/v1/auth/csrf`);
             expect(csrfResponse.status()).toBe(200);
             const { csrfToken } = (await csrfResponse.json()) as { csrfToken: string };
-            const duplicate = await page.request.post(
+            const recast = await page.request.post(
                 `${API_ORIGIN}/api/v1/voting-rounds/${roundId}/ballot`,
                 {
                     headers: {
@@ -64,10 +91,19 @@ test.describe("voting", () => {
                         "x-nethack-organization-id": FIXTURE.organizationId,
                         origin: WORKSPACE_ORIGIN,
                     },
-                    data: { submissionIds: [FIXTURE.submissionId] },
+                    data: {
+                        scores: [
+                            { submissionId: fixtureSubmissionId, stars: 5 },
+                            { submissionId: labSubmissionId, stars: 5 },
+                        ],
+                    },
                 },
             );
-            expect(duplicate.status()).toBe(409);
+            expect(recast.status()).toBe(201);
+            const body = (await recast.json()) as {
+                scores: readonly { submissionId: string; stars: number }[];
+            };
+            expect(body.scores).toHaveLength(2);
         });
 
         const participantContext = await newAppContext(browser);
@@ -96,20 +132,27 @@ test.describe("voting", () => {
                 await expectToast(page, "Results published");
             });
 
-            await test.step("participant reads the published results", async () => {
+            await test.step("participant reads the published star results", async () => {
                 await participantPage.reload();
                 await expect(
                     participantPage.getByRole("heading", { name: roundName }),
                 ).toBeVisible();
                 await expect(participantPage.getByText(FIXTURE.projectTitle)).toBeVisible();
+                await expect(participantPage.getByText(FIXTURE.labProjectTitle)).toBeVisible();
                 await expect(participantPage.getByText("1 ballots")).toBeVisible();
+                await expect(
+                    participantPage.getByText("People's choice", { exact: true }),
+                ).toBeVisible();
+                await expect(
+                    participantPage.getByRole("columnheader", { name: "Average stars" }),
+                ).toBeVisible();
             });
         } finally {
             await participantContext.close();
         }
     });
 
-    test("lets an eligible participant cast a ballot", async ({ page, browser }) => {
+    test("lets an eligible participant cast a star ballot", async ({ page, browser }) => {
         test.setTimeout(240_000);
         const roundName = "E2E Participant Ballot";
         await signIn(page, USERS.organizer);
@@ -121,6 +164,12 @@ test.describe("voting", () => {
             await signIn(participantPage, USERS.participant);
             await participantPage.goto(`/voting?edition=${FIXTURE.editionId}`);
             await expect(participantPage.getByRole("heading", { name: roundName })).toBeVisible();
+            await expect(
+                participantPage.getByRole("button", {
+                    name: `Add a star to ${FIXTURE.projectTitle}`,
+                    exact: true,
+                }),
+            ).toBeVisible();
             await expect(
                 participantPage.getByRole("button", { name: "Cast ballot" }).first(),
             ).toBeVisible();

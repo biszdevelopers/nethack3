@@ -33,9 +33,9 @@ test.describe("judge workflow", () => {
         ).toBeVisible();
         await expect(page.getByText("Assigned", { exact: true }).first()).toBeVisible();
 
-        await test.step("open the conflict flow without declaring a conflict", async () => {
-            await page.getByRole("button", { name: "Declare conflict" }).click();
-            const dialog = page.getByRole("dialog", { name: "Declare a judging conflict" });
+        await test.step("open the recusal flow without recusing", async () => {
+            await page.getByRole("button", { name: "Recuse from this project" }).click();
+            const dialog = page.getByRole("dialog", { name: "Recuse from this project" });
             await expect(dialog).toBeVisible();
             await dialog.getByRole("button", { name: "Cancel" }).click();
             await expect(dialog).toBeHidden();

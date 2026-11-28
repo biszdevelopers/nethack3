@@ -27,6 +27,7 @@ export interface SecurityFixture {
     readonly projectId: string;
     readonly projectSlug: string;
     readonly submissionId: string;
+    readonly secondSubmissionId: string;
     readonly submissionVersionId: string;
     readonly rubricId: string;
     readonly criterionId: string;
@@ -485,7 +486,7 @@ export async function buildSecurityFixture(harness: TestHarness): Promise<Securi
         payload: {
             name: "Security Round",
             eligibleRoles: ["participant"],
-            maxSelections: 1,
+            maxSelections: 2,
         },
         headers: { "x-nethack-organization-id": organizationId },
     });
@@ -499,10 +500,52 @@ export async function buildSecurityFixture(harness: TestHarness): Promise<Securi
     });
     expectStatus(opened, 200, "open voting round");
 
+    const secondProject = await harness.authenticatedRequest(participant, {
+        method: "POST",
+        url: "/api/v1/projects",
+        payload: {
+            editionId,
+            teamId,
+            title: `Security Second Project ${uniqueSlug("project")}`,
+            summary: "A second eligible project for star voting.",
+            descriptionMarkdown: "",
+            repositoryUrl: null,
+            demoUrl: null,
+            tags: [],
+        },
+        headers: { "x-nethack-organization-id": organizationId },
+    });
+    expectStatus(secondProject, 201, "create second project");
+    const secondSubmission = await harness.authenticatedRequest(participant, {
+        method: "POST",
+        url: "/api/v1/submissions",
+        payload: { projectId: stringField(secondProject, "id") },
+        headers: { "x-nethack-organization-id": organizationId },
+    });
+    expectStatus(secondSubmission, 201, "create second submission");
+    const secondSubmissionId = stringField(secondSubmission, "id");
+    const secondVersion = await harness.authenticatedRequest(participant, {
+        method: "POST",
+        url: `/api/v1/submissions/${secondSubmissionId}/versions`,
+        payload: {
+            title: "Submission Two",
+            summary: "The second submitted version.",
+            descriptionMarkdown: "A second eligible submission.",
+            submit: true,
+        },
+        headers: { "x-nethack-organization-id": organizationId },
+    });
+    expectStatus(secondVersion, 200, "submit second version");
+
     const ballot = await harness.authenticatedRequest(participant, {
         method: "POST",
         url: `/api/v1/voting-rounds/${roundId}/ballot`,
-        payload: { submissionIds: [submissionId] },
+        payload: {
+            scores: [
+                { submissionId, stars: 5 },
+                { submissionId: secondSubmissionId, stars: 5 },
+            ],
+        },
         headers: { "x-nethack-organization-id": organizationId },
     });
     expectStatus(ballot, 201, "cast ballot");
@@ -563,6 +606,7 @@ export async function buildSecurityFixture(harness: TestHarness): Promise<Securi
         projectId,
         projectSlug,
         submissionId,
+        secondSubmissionId,
         submissionVersionId,
         rubricId,
         criterionId,

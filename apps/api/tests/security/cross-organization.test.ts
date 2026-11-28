@@ -273,7 +273,12 @@ describe("cross-organization object access (IDOR/BOLA)", () => {
             fromOutsider({
                 method: "POST",
                 url: `/api/v1/voting-rounds/${fixture.roundId}/ballot`,
-                payload: { submissionIds: [fixture.submissionId] },
+                payload: {
+                    scores: [
+                        { submissionId: fixture.submissionId, stars: 5 },
+                        { submissionId: fixture.secondSubmissionId, stars: 5 },
+                    ],
+                },
             }),
             fromOutsider({
                 method: "GET",

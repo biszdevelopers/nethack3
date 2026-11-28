@@ -100,14 +100,14 @@ describe("duplicate and racing operations", () => {
         expect(rows[0]?.count).toBe("1");
     });
 
-    it("allows exactly one of two concurrent ballots from the same voter", async () => {
+    it("keeps one ballot row when two recasts race from the same voter", async () => {
         const round = await harness.authenticatedRequest(fixture.owner, {
             method: "POST",
             url: `/api/v1/competitions/${fixture.editionId}/voting-rounds`,
             payload: {
                 name: "Judge Race Round",
                 eligibleRoles: ["judge"],
-                maxSelections: 1,
+                maxSelections: 2,
             },
             headers: orgHeaders(fixture.organizationId),
         });
@@ -125,18 +125,28 @@ describe("duplicate and racing operations", () => {
             harness.authenticatedRequest(fixture.judge, {
                 method: "POST",
                 url: `/api/v1/voting-rounds/${roundId}/ballot`,
-                payload: { submissionIds: [fixture.submissionId] },
+                payload: {
+                    scores: [
+                        { submissionId: fixture.submissionId, stars: 5 },
+                        { submissionId: fixture.secondSubmissionId, stars: 5 },
+                    ],
+                },
                 headers: orgHeaders(fixture.organizationId),
             }),
             harness.authenticatedRequest(fixture.judge, {
                 method: "POST",
                 url: `/api/v1/voting-rounds/${roundId}/ballot`,
-                payload: { submissionIds: [fixture.submissionId] },
+                payload: {
+                    scores: [
+                        { submissionId: fixture.submissionId, stars: 5 },
+                        { submissionId: fixture.secondSubmissionId, stars: 5 },
+                    ],
+                },
                 headers: orgHeaders(fixture.organizationId),
             }),
         ]);
 
-        expect(statuses(requests)).toEqual([201, 409]);
+        expect(statuses(requests)).toEqual([201, 201]);
         const rows = await queryAsOwner<{ count: string }>(
             "select count(*)::text as count from ballots where organization_id = $1 and round_id = $2 and user_id = $3",
             [fixture.organizationId, roundId, fixture.judge.userId],
