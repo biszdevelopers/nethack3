@@ -2,7 +2,7 @@
 
 Status: implementation is complete for the repository scope. The tracker records 228 requirements: 146 Verified, 71 Implemented, 0 In progress, 0 Not started, and 11 Blocked; every blocked item requires external infrastructure, credentials, data, or an independent assessor. Production launch is not verified. External blockers are listed in section 5.
 
-Verification date: 2026-11-28, after the completion pass. The final working tree was checked with formatting, lint, type checking, unit/UI tests, integration/security/fuzz tests, the production build, 11 runtime checks under Node and Bun, 53 Playwright cases, 22 visual/axe checks, Lighthouse mobile and desktop, a k6 load run, Caddy validation, the dependency audit, the secret scan/SBOM generator, and a backup/restore plus retention drill. The requirement-by-requirement status is in `docs/implementation/REQUIREMENT_TRACKER.md`.
+Verification date: 2026-11-28, after the second parity pass. The final working tree was checked with formatting, lint, type checking, unit/UI tests, integration/security/fuzz tests, the production build, 11 runtime checks under Node and Bun, 69 Playwright cases, 26 visual/axe checks, Lighthouse mobile and desktop, Caddy validation, the dependency audit, and the secret scan/SBOM generator. A k6 load run and a backup/restore plus retention drill passed earlier in the same tree family; Docker images remain unavailable. The requirement-by-requirement status is in `docs/implementation/REQUIREMENT_TRACKER.md`.
 
 ## 1. Implemented system
 
@@ -11,8 +11,8 @@ Verification date: 2026-11-28, after the completion pass. The final working tree
 | Application | Implementation |
 | --- | --- |
 | `apps/api` | Fastify 5 authoritative API. Nethack3 Core with static capability registration, DAG validation, configuration, error handling, request IDs, structured logging, health endpoints, transactional outbox, PostgreSQL-backed job queue, and an OpenTelemetry-compatible tracing hook. 14 capabilities: identity, organizations, competitions, participants, teams, projects, files, submissions, judging, voting, recognition, announcements, notifications, administration. Versioned `/api/v1` routes generated from shared contracts, including organizer-ranked judging results. OpenAPI 3.1 at `/api/v1/openapi.json` with Swagger UI gated by `API_DOCS_ENABLED`. |
-| `apps/site` | Next.js 16 App Router public site. Landing with event phase and next milestone, competition directory, competition detail, rules, schedule, project showcase, project detail, past competitions, season archive, published results, printable certificates, public profiles, contact, contributing, about, FAQ, announcements, sitemap, robots, error, loading, and not-found routes. Server-rendered from the public API only, with a nonce-based CSP and `private, no-store` HTML caching. |
-| `apps/workspace` | React 19 + Vite 8 static authenticated workspace. Sign-in, auth error, dashboard, competitions, competition detail, competition administration, teams, team detail, projects, project detail, submissions, submission detail, judging with queue/history/coverage/ranked results, assignment detail, voting with star ballots, organization with first-run creation, award and results publication, administration with users/teams/standings, participant results, profile, presentation, notifications, settings, and component lab. React Router 7 with lazy route modules and nested layouts; TanStack Query for server state. |
+| `apps/site` | Next.js 16 App Router public site. Landing with event phase and next milestone, competition directory, competition detail, rules, schedule, project showcase, the Signal and Beneath the Surface showcase experiences, project detail, past competitions, season archive, published results, printable certificates, public profiles with themes, contact, contributing, about, FAQ, announcements, sitemap, robots, error, loading, and not-found routes. Server-rendered from the public API only, with a nonce-based CSP and `private, no-store` HTML caching. |
+| `apps/workspace` | React 19 + Vite 8 static authenticated workspace. Sign-in, auth error, dashboard, competitions, competition detail, competition administration, teams, team detail, projects, project detail, submissions, submission detail, judging with queue/history/coverage/ranked results, rubric manager, assignment detail, voting with star ballots, organization with first-run creation, award and results publication, administration with users/teams/standings and database export, developer debug and documentation tools, participant results, profile with theme image, presentation, notifications, settings, and component lab. React Router 7 with lazy route modules and nested layouts; TanStack Query for server state. |
 
 ### Packages
 
@@ -32,6 +32,11 @@ The implementation now covers the event surfaces the BIBS-C reference deployment
 - Organizer award catalog, team award assignment, result publication with an immutable snapshot, and unpublishing.
 - Organization administration for members and roles, edition teams and members, team status, team deletion, submission reopening, standings CSV, and preflight readiness.
 - Ten-star peer voting: exact total, five-star per-project cap, transactional recasting, ranked results, and People's Choice.
+- Full showcase experience: showcase index, Signal scroll experience with featured winners and an interactive project marquee, Beneath the Surface data-driven six-winner experience with keyboard project modals, and season archives with results-aware rankings.
+- Rubric parity: division/track rubrics, min/max criteria, comment guidance and templates, immutable rubric versions pinned to assignments, a reusable template library, and edition score curves with judge-facing display scores.
+- Team and profile parity: withdrawn, disqualified, and no-show team states with terminal transition rules and blocked submissions; validated PNG/JPEG/WebP profile theme images.
+- Results publication freezes judging and voting transactionally, closes open voting rounds, restores the previous edition status on unpublish, and notifies affected participants.
+- Operator tooling: anonymized database export, read-only stored-file/reference browsing, persisted operator AI chat with honest not-configured behavior, a protected documentation index, and event-specific FAQ/rules guidance.
 
 ### Authentication
 
@@ -49,9 +54,9 @@ All of this was exercised against a contract-compliant mock OIDC provider, not a
 
 ### Database
 
-- PostgreSQL 18 with Drizzle ORM and six migrations (`0000` through `0005`).
-- 46 tables covering identity, sessions, auth transactions, revoked access tokens, backchannel events/challenges, global administrators, idempotency keys, outbox events, jobs, audit logs, organizations, settings, memberships, invitations, competition series/editions/divisions/milestones, registrations, participants, teams, team members/invitations, projects, project members, submissions, submission versions/files, judging rubrics/criteria/assignments/evaluations/scores/flags, voting rounds/ballots/votes, awards/team awards/published results, announcements, and notifications.
-- Organization scope on organization-owned records, composite foreign keys, unique constraints, and 29 `FORCE ROW LEVEL SECURITY` tables and 30 policies applied through a non-owner runtime role with transaction-local tenant context.
+- PostgreSQL 18 with Drizzle ORM and seven migrations (`0000` through `0006`).
+- 51 tables covering identity, sessions, auth transactions, revoked access tokens, backchannel events/challenges, global administrators, idempotency keys, outbox events, jobs, audit logs, organizations, settings, memberships, invitations, competition series/editions/divisions/milestones, registrations, participants, teams, team members/invitations, projects, project members, submissions, submission versions/files, judging rubrics/criteria/templates/score curves/assignments/evaluations/scores/flags, voting rounds/ballots/votes, profile themes, debug AI sessions/messages, awards/team awards/published results, announcements, and notifications.
+- Organization scope on organization-owned records, composite foreign keys, unique constraints, and 34 `FORCE ROW LEVEL SECURITY` tables and 36 policies applied through a non-owner runtime role with transaction-local tenant context.
 - Separate runtime and migration credentials, parameterized queries, cursor pagination, idempotency records for critical mutations, and audit records for privileged operations.
 
 ### Deployment and operations
@@ -71,20 +76,20 @@ All results below were executed on this host unless marked otherwise.
 | Linting | `bun run lint` | Pass, 0 errors; warnings only |
 | Type checking | `bun run typecheck` | Pass for contracts, UI, API, workspace, and site |
 | Combined quality gate | `bun run check` | Pass (format, lint, typecheck, Vitest) |
-| Unit, architecture, security, migration, UI | `bun run test` | 39 root files / 342 tests and 17 UI files / 35 tests passed |
+| Unit, architecture, security, migration, UI | `bun run test` | 44 root files / 388 tests and 17 UI files / 35 tests passed |
 | Integration, API security, fuzzing, and worker | `bun run test:integration`; `bun run test:security` | 18 files / 84 API/auth/security/fuzz/worker tests and 17 files / 80 API/auth/security tests passed against local PostgreSQL 18 |
 | Production build | `bun run build` | Pass: contracts, UI, API, workspace, site |
-| End-to-end | `bun run test:e2e` | 53 cases in 15 files, 1 desktop skip, 52 passed; accessibility/visual spec 22/22 |
+| End-to-end | `bun run test:e2e` | 69 cases in 20 files, 1 desktop skip, 68 passed; showcase, rubric, team/profile, results-freeze, and operator journeys included |
 | Runtime matrix | `bun run verify:runtime` | 11/11 checks passed and exited 0: API health, site HTTP, migrations, and worker startup under Node 24 and Bun 1.3.14, plus package builds |
 | Dependency audit | `bun audit --audit-level=high` | Pass, no high-severity advisory reported |
-| Secret scan and SBOM | `bun run security:scan` | Pass; 71-component CycloneDX SBOM written and uploaded by CI, plus a daily scheduled audit workflow |
-| Performance | `bun run test:performance` | Lighthouse 13.6.0: 100 performance, 100 accessibility, 100 best practices, 100 SEO on mobile and desktop |
-| Load | `bun run test:load` with k6 2.4.0 | 0% failed requests, public p95 96 ms, health p95 31 ms, 20 VUs |
+| Secret scan and SBOM | `bun run security:scan` | Pass; 740 text files scanned and a 71-component CycloneDX SBOM written |
+| Performance | `bun run test:performance` | Lighthouse 13.6.0 against the production site: mobile 99 performance / 100 / 100 / 100; desktop 100 / 100 / 100 / 100 |
+| Load | `bun run test:load` with k6 2.4.0 | Not rerun in this pass; k6 is not installed on this host. An earlier run in this workspace passed with 0% failed requests, public p95 96 ms, health p95 31 ms, 20 VUs. |
 | Migration tool | `tests/migration/migrate-legacy.test.ts` | 22 tests passed |
-| Backup and restore | `scripts/backup-database.ts`, `scripts/restore-database.ts` | 170 KiB custom-format dump created and restored into a scratch database with 42 tables; a restore-script import bug was fixed and the drill re-ran cleanly |
+| Backup and restore | `scripts/backup-database.ts`, `scripts/restore-database.ts` | 170 KiB custom-format dump created and restored into a scratch database (42 tables at the time of the drill; the schema now has 51); a restore-script import bug was fixed and the drill re-ran cleanly |
 | Container images | Docker | Not executed; Docker is not installed |
-| Caddy | `caddy validate` | Valid configuration (Caddy 2.11.9) |
-| Visual matrix | `bun run test:visual` | 18/18 checks: public-page axe scans, mobile-overflow scan, workspace axe, command palette, loading state, component lab dark/light, desktop dark/light, tablet, mobile, empty archive, and not found |
+| Caddy | `caddy validate` | Earlier validation passed (Caddy 2.11.9); the Caddy binary is not present in this pass, so the current configuration was not revalidated |
+| Visual matrix | `bun run test:visual` | 26/26 checks: public-page axe scans including all showcase routes, mobile-overflow scan, workspace axe, command palette, loading state, component lab dark/light, desktop dark/light, tablet, mobile, empty archive, and not found |
 | Live Basis Auth conformance | SETUP_GUIDE section 9 checklist | Not executed; no live issuer or credentials |
 
 ### What the tests cover
@@ -94,7 +99,7 @@ All results below were executed on this host unless marked otherwise.
 - Input and transport: CSRF (missing token, wrong token, foreign origin, missing Origin, bearer exemption), SQL injection payloads, invalid identifiers and limits, public slug injection, URL scheme rejection, and open-redirect allowlisting.
 - Files: signature-valid PNG, structurally valid ZIP, SVG/HTML/executable rejection, oversize rejection, ZIP traversal and absolute-path rejection, entry-count limits, authorized download, public visibility after publication, withdrawal, and file snapshot into a new submission version.
 - Concurrency and state: concurrent registrations, duplicate ballots, duplicate invitations, team capacity under concurrent acceptance, duplicate slugs, unique project slugs, competition/submission/voting state transitions, and judging status transitions.
-- Product journeys: sign-in, participant workflow, organizer workflow (4 cases), judge workflow, voting, public site (desktop and mobile), logout, and negative paths. The accessibility suite runs axe on seven public pages, a mobile-overflow check, the authenticated workspace overview, and a public-home visual baseline.
+- Product journeys: sign-in, participant workflow, organizer workflow (4 cases), judge workflow, voting, public site (desktop and mobile), logout, and negative paths. The accessibility suite runs axe on fifteen public pages including the showcase routes, a mobile-overflow check, the authenticated workspace overview, and a public-home visual baseline. Additional journeys cover the full showcase, rubric versions/templates/score curves, team status and profile theme parity, results publication freeze and participant notification, and operator export/debug/docs tools.
 
 ## 3. Verified security posture
 
@@ -146,6 +151,6 @@ Not verified:
 
 ## 6. Readiness statement
 
-The repository contains a working, tested implementation of the product surface described in `FULL_PLAN.md`: the capability-based Fastify API, organization-aware PostgreSQL schema with RLS, Basis Auth OIDC integration, Nethack UI catalog, public Next.js site, authenticated React workspace, background worker, deployment definitions, and engineering documentation. The current tree passes formatting, linting, type checking, the combined quality gate, 377 unit/architecture/security/UI tests, 84 integration/API-security/fuzz/worker tests, the production build, 11 runtime checks under Node and Bun, 38 Playwright cases, 18 visual/axe checks, Lighthouse 100/100/100/100 mobile and desktop, k6 load thresholds, Caddy validation, the high-severity dependency audit, the secret scan/SBOM generator, and a backup/restore plus retention drill.
+The repository contains a working, tested implementation of the product surface described in `FULL_PLAN.md`: the capability-based Fastify API, organization-aware PostgreSQL schema with RLS, Basis Auth OIDC integration, Nethack UI catalog, public Next.js site, authenticated React workspace, background worker, deployment definitions, and engineering documentation. The current tree passes formatting, linting, type checking, the combined quality gate, 388 unit/architecture/security tests plus 35 UI tests, 84 integration/API-security/fuzz/worker tests, 80 security tests, the production build, 11 runtime checks under Node and Bun, 69 Playwright cases with 68 passed and 1 intentionally skipped mobile case, 26 visual/axe checks, Lighthouse mobile 99 and desktop 100 performance with 100 accessibility/best-practices/SEO, earlier Caddy validation, the high-severity dependency audit, and the secret scan/SBOM generator.
 
 It is not a verified production release. Production launch is blocked by the absence of Docker-based deployment verification and a live Basis Auth conformance run. The remaining gaps are tracked explicitly: partial per-component hover/active coverage, no DAST or independent security assessment, and production deployment/auth conformance that require external infrastructure. The legacy migration is a tested tool with a synthetic fixture, not a completed data migration.

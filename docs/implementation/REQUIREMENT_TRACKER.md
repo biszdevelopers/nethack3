@@ -2,7 +2,7 @@
 
 Source of truth: `FULL_PLAN.md` (sections 1-24) and `SETUP_GUIDE.md` (Basis Auth downstream contract). Status values: Not started, In progress, Implemented, Verified, Blocked. "Verified" requires an executed check, not file presence.
 
-Verification snapshot: 2026-11-28, after the completion pass. Executed on this host: `bun run format:check`, `bun run lint` (0 errors), `bun run typecheck`, `bun run check`, `bun run test` (39 files / 342 tests plus 17 UI files / 35 tests), `bun run test:integration` (18 files / 84 tests), `bun run test:security`, `bun run build`, `bun run verify:runtime` (11/11), `bun run test:e2e` (53 cases), `bun run test:visual` (22/22), `bun run test:performance` (Lighthouse 100/100/100/100 mobile and desktop), k6 load thresholds (p95 96 ms, 0% failures), `bun audit --audit-level=high`, `bun run security:scan`, Caddy validation, and a 42-table backup/restore with retention pruning. Not executed: Docker images/Compose, live Basis Auth/Entra, or an independent penetration test.
+Verification snapshot: 2026-11-28, after the second parity pass. Executed on this host: `bun run format:check`, `bun run lint` (0 errors), `bun run typecheck`, `bun run check`, `bun run test` (44 files / 388 tests plus 17 UI files / 35 tests), `bun run test:integration` (18 files / 84 tests), `bun run test:security` (17 files / 80 tests), `bun run build`, `bun run verify:runtime` (11/11), `bun run test:e2e` (69 cases; 68 passed, 1 skipped), `bun run test:visual` (26/26), `bun run test:performance` (Lighthouse mobile 99/100/100/100, desktop 100/100/100/100), `bun audit --audit-level=high`, `bun run security:scan` (740 files, 71-component SBOM), earlier Caddy validation, and a backup/restore drill with retention pruning. Not executed: Docker images/Compose, k6 on this host (not installed), live Basis Auth/Entra, or an independent penetration test.
 
 Current distribution across 228 tracked requirements: 146 Verified, 71 Implemented, 0 In progress, 0 Not started, 11 Blocked.
 
@@ -68,7 +68,7 @@ Current distribution across 228 tracked requirements: 146 Verified, 71 Implement
 | A-001 | Public frontend Next.js App Router with SSR/SSG/ISR/streaming | 4.1-4.4 | apps/site | All routes are dynamic so the per-request CSP nonce survives; SSR/streaming is verified by build and runtime checks. No SSG/ISR route segment exists. | Implemented |
 | A-002 | Authenticated frontend React + Vite, static build | 4.1, 4.5 | apps/workspace | `bun run build` emits static assets; Playwright workspace cases pass | Verified |
 | A-003 | Fastify authoritative API | 4.1, 4.6 | apps/api | Integration and E2E suites pass | Verified |
-| A-004 | PostgreSQL + Drizzle | 4.1 | apps/api/src/infrastructure/database | 5 migrations, 42 tables; integration suite passes against PostgreSQL 18 | Verified |
+| A-004 | PostgreSQL + Drizzle | 4.1 | apps/api/src/infrastructure/database | 7 migrations, 51 tables; integration suite passes against PostgreSQL 18 | Verified |
 | A-005 | React Router 7 only routing library in workspace | 4.5 | apps/workspace/src/application/router.tsx | React Router 7.18.7 is the only routing library; workspace typecheck and E2E pass. | Verified |
 | A-006 | Public site does not use Next.js as API, Server Actions for mutations, middleware auth, DB access, private credentials, user-specific caching, arbitrary remote fetch | 4.4 | apps/site | `runtime-parity.test.ts` checks DB/secrets/imports; `proxy.ts` only sets security headers; no Server Actions found | Verified |
 | A-007 | Public site consumes only public API data | 4.4 | apps/site/src/lib/public-api.ts | Site calls only `/api/v1/public/*`; Playwright public-site cases pass | Verified |
@@ -273,7 +273,7 @@ Current distribution across 228 tracked requirements: 146 Verified, 71 Implement
 | QA-003 | Architecture checks: private imports, cycles, DB access, server modules in browser, exposed secrets, duplicate contracts, unregistered deps, runtime imports | 16.3 | tests/architecture | Architecture suite passes | Verified |
 | QA-004 | Visual tests desktop/tablet/mobile/light/dark/loading/error/empty | 16.4 | tests/visual | Visual baselines cover desktop dark/light, tablet, mobile, loading, empty, error, not-found, and the component laboratory. | Verified |
 | QA-005 | Accessibility: keyboard, focus, labels, semantics, contrast, errors, dialogs, touch, reduced motion, zoom | 16.5 | E2E + axe | Full Playwright suite (including axe and mobile overflow checks) passes | Verified |
-| QA-006 | E2E full journey sign-in → onboarding → org → register → team → invite → project → files → submit → assign judge → evaluate → vote → results → logout → invalidation | 16.6 | tests/e2e | 38 Playwright cases cover sign-in, organization creation, onboarding guidance, participant, organizer, judge scoring and ranked results, voting, public site, logout, negative paths, command palette, axe, and visuals. | Verified |
+| QA-006 | E2E full journey sign-in → onboarding → org → register → team → invite → project → files → submit → assign judge → evaluate → vote → results → logout → invalidation | 16.6 | tests/e2e | 69 Playwright cases cover sign-in, organization creation, onboarding guidance, participant, organizer, judge scoring and ranked results, voting, public site, showcase, rubrics, team/profile parity, results freeze, operator tools, logout, negative paths, command palette, axe, and visuals. | Verified |
 | QA-007 | Negative paths tested for every important workflow | 16.6 | tests/e2e, tests/security | Negative-path E2E and security suites pass | Verified |
 
 ## 17. Deployment and operations
@@ -333,3 +333,16 @@ Current distribution across 228 tracked requirements: 146 Verified, 71 Implement
 | AC-08 | Final engineering constitution applied | 22 | repo | Document review | Implemented |
 | AC-09 | First deliverables: runtime proof, constitution, repo foundation, core, UI foundation, Basis Auth, org DB, Fastify, Teams capability, vertical slice | 23 | repo | All deliverables exist and the runtime proof now exits successfully. | Verified |
 | AC-10 | Do not overabstract UI; do not compromise runtime; do not confuse visual complexity with quality | 24 | repo | Design review | Implemented |
+
+## 21. Second parity wave
+
+The reference-parity completion pass added the remaining public and operator surfaces without changing the capability architecture.
+
+| Area | Implementation | Verification |
+| --- | --- | --- |
+| Showcase | `/showcase` index with featured Beneath the Surface and Signal cards, `/showcase/signal` scroll experience with featured winners and an interactive project marquee, `/showcase/beneath-the-surface` six-winner experience with keyboard modals, and `/showcase/seasons/[slug]` archives with published ranks and awards | `tests/e2e/16-showcase.spec.ts`; public axe/mobile suite covers every showcase route |
+| Rubrics | Division/track rubrics, min/max criteria, weighted totals, immutable versions, assignment pinning, comment guidance/templates, reusable template library, and edition score curves applied to displayed judge scores | `tests/e2e/17-rubric-tracks.spec.ts`; `rubric-model` and `edition-freeze` unit tests |
+| Teams and profiles | `withdrawn`, `disqualified`, and `no_show` statuses with terminal transitions and API-level submission/project blocking; validated 1 MB PNG/JPEG/WebP profile theme images rendered on public and workspace profiles | `tests/e2e/18-team-profile-parity.spec.ts`; `team-rules` and `profile-theme` unit tests |
+| Results and voting | Ballot reasoning, explicit per-voter scored-project cap, transactional results publication that freezes judging and voting, closes open rounds, restores the prior status on unpublish, and notifies affected participants | `tests/e2e/19-results-freeze.spec.ts`; updated voting journeys |
+| Operator tools | Anonymized database export, read-only stored-file/reference browser, persisted operator AI chat with a real `503` when unconfigured, protected documentation index, and event-specific FAQ/rules guidance | `tests/e2e/20-operator-tools.spec.ts`; `database-export` and `debug-ai-service` unit tests |
+| Persistence | Migration `0006_lying_fallen_one.sql` adds rubric versions/templates/curves, profile themes, debug AI tables, voting cap/reasoning, and the prior edition status, with RLS policies, `current_user_id()`, and runtime grants | Development and test databases migrate cleanly; integration suite passes |
