@@ -9,6 +9,7 @@ import { resources } from "../../../application/resources.js";
 export const teamKeys = {
     all: ["teams"] as const,
     mine: ["teams", "mine"] as const,
+    invitations: ["teams", "invitations"] as const,
     edition: (editionId: string) => ["teams", "edition", editionId] as const,
     detail: (teamId: string) => ["teams", "detail", teamId] as const,
     activity: (teamId: string) => ["teams", "activity", teamId] as const,
@@ -90,10 +91,66 @@ export function useInviteTeamMember(teamId: string) {
     });
 }
 
+export function useMyTeamInvitations() {
+    return useQuery({
+        queryKey: teamKeys.invitations,
+        queryFn: () => resources.teams.mineInvitations(),
+    });
+}
+
 export function useAcceptTeamInvitation() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (token: string) => resources.teams.acceptInvitation(token),
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: teamKeys.all });
+            await queryClient.invalidateQueries({ queryKey: ["competitions"] });
+        },
+    });
+}
+
+export function useAcceptTeamInvitationById() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (invitationId: string) => resources.teams.acceptInvitationById(invitationId),
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: teamKeys.all });
+            await queryClient.invalidateQueries({ queryKey: ["competitions"] });
+        },
+    });
+}
+
+export function useDeclineTeamInvitation() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (invitationId: string) => resources.teams.declineInvitation(invitationId),
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: teamKeys.invitations });
+        },
+    });
+}
+
+export function useInvitationLink(teamId: string) {
+    return useMutation({
+        mutationFn: (invitationId: string) => resources.teams.invitationLink(teamId, invitationId),
+    });
+}
+
+export function useRevokeTeamInvitation(teamId: string) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (invitationId: string) =>
+            resources.teams.revokeInvitation(teamId, invitationId),
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: teamKeys.detail(teamId) });
+        },
+    });
+}
+
+export function useDisbandTeam(teamId: string) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: () => resources.teams.disband(teamId),
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: teamKeys.all });
             await queryClient.invalidateQueries({ queryKey: ["competitions"] });

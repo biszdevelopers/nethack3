@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { FIXTURE, USERS } from "../support/e2e/config.js";
 import { expectToast, newAppContext, signIn } from "../support/e2e/app.js";
-import { ownerTenantBatch } from "../support/e2e/db.js";
+import { ownerQuery, ownerTenantBatch } from "../support/e2e/db.js";
 
 const PROJECT_ID = "f5000000-0000-4000-8000-000000000060";
 const SUBMISSION_ID = "f5000000-0000-4000-8000-000000000070";
@@ -95,9 +95,9 @@ test.describe("judging workflow", () => {
         });
 
         await test.step("saves a draft and submits the evaluation", async () => {
-            await page.getByRole("spinbutton", { name: "Score for Impact" }).fill("7");
+            await page.getByRole("radio", { name: "7 of 10 for Impact" }).check();
             await page.getByLabel("Comment on Impact").fill("Useful reach.");
-            await page.getByRole("spinbutton", { name: "Score for Craft" }).fill("8");
+            await page.getByRole("radio", { name: "8 of 10 for Craft" }).check();
             await page.getByLabel("Comment on Craft").fill("Solid execution.");
             await page.getByLabel("Overall comment").fill("Queue workflow evaluation.");
             await page.getByRole("button", { name: "Save draft" }).click();
@@ -168,6 +168,27 @@ test.describe("judging workflow", () => {
                     organizerPage.getByRole("row", { name: new RegExp(FLAG_REASON) }),
                 ).toBeHidden();
                 await expect(organizerPage.getByText("No open flags")).toBeVisible();
+
+                await test.step("organizer receives the flag notification", async () => {
+                    await expect
+                        .poll(
+                            async () =>
+                                (
+                                    await ownerQuery<{ count: number }>(
+                                        `select count(*)::int as count
+                                           from notifications
+                                          where user_id = $1 and title = 'Judging flag reported'`,
+                                        [FIXTURE.organizerId],
+                                    )
+                                )[0]?.count ?? 0,
+                            { timeout: 20_000 },
+                        )
+                        .toBeGreaterThan(0);
+                    await organizerPage.goto("/notifications");
+                    await expect(
+                        organizerPage.getByText("Judging flag reported").first(),
+                    ).toBeVisible();
+                });
             } finally {
                 await organizerContext.close();
             }

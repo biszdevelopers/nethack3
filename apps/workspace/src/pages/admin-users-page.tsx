@@ -9,6 +9,7 @@ import {
 } from "@nethack/contracts";
 import {
     Alert,
+    AlertDialog,
     Badge,
     Button,
     Card,
@@ -38,6 +39,7 @@ import {
 import { useActiveMembership } from "../application/session.js";
 import {
     useAdministrationUsers,
+    useDeleteAdministrationUser,
     useGrantAdministrator,
     useRevokeAdministrator,
     useUpdateAdministrationUserRole,
@@ -64,15 +66,18 @@ export function AdminUsersPage(): ReactNode {
     const organizationId = membership?.organizationId ?? null;
     const canManage = membership?.role === "owner" || membership?.role === "organizer";
     const globalAdministrator = session.data?.globalAdministrator ?? false;
+    const currentUserId = session.data?.user.id ?? null;
     const { toast } = useToast();
 
     const users = useAdministrationUsers(organizationId, canManage);
     const updateRole = useUpdateAdministrationUserRole(organizationId);
     const grantAdministrator = useGrantAdministrator();
     const revokeAdministrator = useRevokeAdministrator();
+    const deleteUser = useDeleteAdministrationUser();
 
     const [grantTarget, setGrantTarget] = useState<AdministrationUser | null>(null);
     const [revokeTarget, setRevokeTarget] = useState<AdministrationUser | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<AdministrationUser | null>(null);
 
     const grantForm = useForm<GrantForm>({
         resolver: zodResolver(grantSchema),
@@ -171,6 +176,27 @@ export function AdminUsersPage(): ReactNode {
         }
     });
 
+    const onDeleteAccount = async (): Promise<void> => {
+        if (deleteTarget === null) {
+            return;
+        }
+        try {
+            await deleteUser.mutateAsync(deleteTarget.userId);
+            toast({
+                title: "Account deleted",
+                description: `${deleteTarget.displayName} and their dependent records were removed.`,
+                tone: "success",
+            });
+            setDeleteTarget(null);
+        } catch (error) {
+            toast({
+                title: "Could not delete the account",
+                description: describeError(error),
+                tone: "critical",
+            });
+        }
+    };
+
     const changeRole = (member: AdministrationUser, value: string): void => {
         const parsed = organizationRoleSchema.safeParse(value);
         if (!parsed.success) {
@@ -229,6 +255,7 @@ export function AdminUsersPage(): ReactNode {
                                 <TableHead>Judge</TableHead>
                                 <TableHead>Platform access</TableHead>
                                 <TableHead>Joined</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -313,6 +340,19 @@ export function AdminUsersPage(): ReactNode {
                                     </TableCell>
                                     <TableCell className="text-ink-muted">
                                         {formatDateTime(member.joinedAt)}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        {globalAdministrator && member.userId !== currentUserId ? (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                aria-label={`Delete account for ${member.displayName}`}
+                                                onClick={() => setDeleteTarget(member)}
+                                            >
+                                                Delete account
+                                            </Button>
+                                        ) : null}
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -429,6 +469,23 @@ export function AdminUsersPage(): ReactNode {
                     </Form>
                 </DialogContent>
             </Dialog>
+
+            <AlertDialog
+                open={deleteTarget !== null}
+                onOpenChange={(open) => {
+                    if (!open && !deleteUser.isPending) {
+                        setDeleteTarget(null);
+                    }
+                }}
+                title="Delete account"
+                description={`Delete ${
+                    deleteTarget?.displayName ?? "this account"
+                } permanently? Sessions, identities, memberships, registrations, team and project links, notifications, and preferences are removed. This cannot be undone.`}
+                confirmLabel="Delete account"
+                tone="destructive"
+                loading={deleteUser.isPending}
+                onConfirm={onDeleteAccount}
+            />
         </div>
     );
 }

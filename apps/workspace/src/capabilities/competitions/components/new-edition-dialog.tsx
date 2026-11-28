@@ -146,6 +146,8 @@ export function NewEditionDialog({
                     description: values.description,
                     themeName: null,
                     themeDescription: null,
+                    contactEmail: null,
+                    contactUrl: null,
                     showScores: false,
                     showRanking: false,
                     timezone: values.timezone,

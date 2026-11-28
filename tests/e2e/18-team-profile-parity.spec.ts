@@ -28,7 +28,7 @@ test.describe("team status and profile theme parity", () => {
     test.afterAll(async () => {
         await ownerTenantQuery(
             FIXTURE.organizationId,
-            "update teams set status = 'ready' where id = $1",
+            "update teams set status = 'ready', status_reason = '' where id = $1",
             [FIXTURE.teamId],
         );
     });
@@ -37,6 +37,11 @@ test.describe("team status and profile theme parity", () => {
         page,
     }) => {
         test.setTimeout(180_000);
+        await ownerTenantQuery(
+            FIXTURE.organizationId,
+            "update teams set status = 'ready', status_reason = '' where id = $1",
+            [FIXTURE.teamId],
+        );
         await signIn(page, USERS.organizer);
 
         await page.goto("/admin/teams");
@@ -46,12 +51,26 @@ test.describe("team status and profile theme parity", () => {
         const row = page.getByRole("row", { name: /Fixture Team/ });
         await expect(row).toBeVisible();
         const status = row.getByLabel("Status for Fixture Team");
+        await expect(status).toHaveValue("ready");
 
-        if ((await status.inputValue()) !== "withdrawn") {
-            await status.selectOption("withdrawn");
-            await expectToast(page, "Team status updated");
-        }
+        await status.selectOption("withdrawn");
+        const dialog = page.getByRole("dialog", { name: "Change team status" });
+        await expect(dialog).toBeVisible();
+        await dialog.getByRole("button", { name: "Apply status" }).click();
+        await expect(dialog.getByText("Enter a reason of at least 5 characters.")).toBeVisible();
+        await dialog.getByRole("button", { name: "Cancel" }).click();
+        await expect(dialog).toHaveCount(0);
+        await expect(status).toHaveValue("ready");
+
+        const reason = "The team withdrew from the fixture event.";
+        await status.selectOption("withdrawn");
+        await expect(dialog).toBeVisible();
+        await dialog.getByLabel("Reason").fill(reason);
+        await dialog.getByRole("button", { name: "Apply status" }).click();
+        await expectToast(page, "Team status updated");
+        await expect(dialog).toHaveCount(0);
         await expect(status).toHaveValue("withdrawn");
+        await expect(row.getByText(reason)).toBeVisible();
 
         await signOutThroughMenu(page);
         await signIn(page, USERS.participant);
@@ -64,6 +83,8 @@ test.describe("team status and profile theme parity", () => {
                 "This team has withdrawn from the competition. Submissions cannot be created or marked ready.",
             ),
         ).toBeVisible();
+        await expect(page.getByRole("button", { name: "Edit team" })).toHaveCount(0);
+        await expect(page.getByRole("button", { name: "Disband team" })).toHaveCount(0);
     });
 
     test("profile theme upload reaches the public profile and removal clears it", async ({

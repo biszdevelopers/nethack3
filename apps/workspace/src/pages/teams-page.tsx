@@ -31,6 +31,7 @@ import { CreateTeamDialog } from "../capabilities/teams/components/create-team-d
 import {
     useAcceptTeamInvitation,
     useEditionTeams,
+    useMyTeamInvitations,
     useMyTeams,
 } from "../capabilities/teams/hooks/use-teams.js";
 import { teamStatusLabel, teamStatusTone } from "../capabilities/teams/status.js";
@@ -52,6 +53,7 @@ export function TeamsPage(): ReactNode {
     const [createOpen, setCreateOpen] = useState(false);
     const accept = useAcceptTeamInvitation();
     const myTeams = useMyTeams();
+    const invitations = useMyTeamInvitations();
     const participations = useMyParticipations();
     const projects = useProjects({});
     const organizationParticipations = (participations.data?.items ?? []).filter(
@@ -152,6 +154,25 @@ export function TeamsPage(): ReactNode {
                     </CardContent>
                 </Card>
             )}
+
+            {(invitations.data?.items.length ?? 0) > 0 ? (
+                <Card hoverable>
+                    <CardContent className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex flex-col gap-1">
+                            <p className="text-sm font-medium text-ink">
+                                {invitations.data?.items.length} pending team invitation
+                                {invitations.data?.items.length === 1 ? "" : "s"}
+                            </p>
+                            <p className="text-xs text-ink-muted">
+                                Invitations sent to your email address are waiting for a response.
+                            </p>
+                        </div>
+                        <Button asChild variant="outline" size="sm">
+                            <Link to="/invitations">Review invitations</Link>
+                        </Button>
+                    </CardContent>
+                </Card>
+            ) : null}
 
             <section className="flex flex-col gap-3" aria-label="Your teams">
                 <div className="flex flex-col gap-1">

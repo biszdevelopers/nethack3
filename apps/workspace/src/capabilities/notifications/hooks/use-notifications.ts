@@ -5,8 +5,18 @@ import { resources } from "../../../application/resources.js";
 export const notificationKeys = {
     all: ["notifications"] as const,
     list: (unread: boolean) => ["notifications", "list", unread ? "unread" : "all"] as const,
+    unreadCount: ["notifications", "unread-count"] as const,
     preferences: ["notifications", "preferences"] as const,
 };
+
+export function useNotificationUnreadCount() {
+    return useQuery({
+        queryKey: notificationKeys.unreadCount,
+        queryFn: () => resources.notifications.unreadCount(),
+        staleTime: 30_000,
+        refetchInterval: 60_000,
+    });
+}
 
 export function useNotifications(options: { readonly unread?: boolean } = {}) {
     const unread = options.unread === true;

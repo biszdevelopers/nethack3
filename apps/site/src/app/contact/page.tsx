@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Bug, Database, MessageSquare, Shield } from "lucide-react";
+import { Bug, Database, ExternalLink, Mail, MessageSquare, Shield } from "lucide-react";
 import { Alert, Badge, Button, Card, CardContent, CardHeader, CardTitle } from "@nethack/ui/static";
 import { Reveal, StaggerReveal } from "@nethack/ui/motion";
+import { getCompetitions } from "../../lib/public-api";
 
 export const metadata = {
     title: "Contact",
@@ -33,8 +34,22 @@ const ROUTES = [
     },
 ] as const;
 
-export default function ContactPage(): ReactNode {
+function linkHost(value: string): string {
+    try {
+        return new URL(value).hostname;
+    } catch {
+        return value;
+    }
+}
+
+export default async function ContactPage(): Promise<ReactNode> {
     const workspaceOrigin = process.env.WORKSPACE_ORIGIN ?? "http://localhost:5173";
+    const competitions = await getCompetitions()
+        .then((page) => page.items)
+        .catch(() => []);
+    const competitionContacts = competitions.filter(
+        (competition) => competition.contactEmail !== null || competition.contactUrl !== null,
+    );
 
     return (
         <div className="mx-auto flex w-full max-w-[1000px] flex-col gap-10 px-4 py-10 sm:px-6 md:py-14">
@@ -62,6 +77,56 @@ export default function ContactPage(): ReactNode {
                     </p>
                 </Alert>
             </Reveal>
+
+            {competitionContacts.length === 0 ? null : (
+                <Reveal className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-1">
+                        <h2 className="text-xl font-bold tracking-tight">Competition contacts</h2>
+                        <p className="text-sm text-ink-muted">
+                            Each organizer publishes its own channel. Only competitions that
+                            configured a contact channel are listed.
+                        </p>
+                    </div>
+                    <StaggerReveal className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        {competitionContacts.map((competition) => (
+                            <Card key={competition.editionId} variant="soft" className="h-full">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Mail className="size-4 text-primary" aria-hidden="true" />
+                                        <Link
+                                            href={`/competitions/${competition.slug}`}
+                                            className="transition-colors hover:text-primary"
+                                        >
+                                            {competition.name}
+                                        </Link>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="flex flex-col gap-2 text-sm leading-7">
+                                    {competition.contactEmail === null ? null : (
+                                        <a
+                                            href={`mailto:${competition.contactEmail}`}
+                                            className="text-primary underline underline-offset-2 hover:text-primary-hover"
+                                        >
+                                            {competition.contactEmail}
+                                        </a>
+                                    )}
+                                    {competition.contactUrl === null ? null : (
+                                        <a
+                                            href={competition.contactUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-primary underline underline-offset-2 hover:text-primary-hover"
+                                        >
+                                            {linkHost(competition.contactUrl)}
+                                            <ExternalLink className="size-3.5" aria-hidden="true" />
+                                        </a>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </StaggerReveal>
+                </Reveal>
+            )}
 
             <StaggerReveal className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {ROUTES.map((route) => {

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { Alert, Button, Form, FormField, Input } from "@nethack/ui";
 import { errorMessage } from "../../../lib/errors.js";
 import { useInviteTeamMember } from "../hooks/use-teams.js";
+import { InviteLink } from "./invite-link.js";
 
 const inviteSchema = z.object({
     email: z.email("Use a valid email address.").max(254),
@@ -46,10 +47,13 @@ export function InviteMemberForm({ teamId }: { readonly teamId: string }): React
                 </Alert>
             )}
             {invite.data === undefined ? null : (
-                <output className="block text-xs text-ink-muted">
-                    Invitation sent to {invite.data.email}. It expires{" "}
-                    {new Date(invite.data.expiresAt).toLocaleDateString()}.
-                </output>
+                <div className="flex flex-col gap-2">
+                    <output className="block text-xs text-ink-muted">
+                        Invitation sent to {invite.data.email}. It expires{" "}
+                        {new Date(invite.data.expiresAt).toLocaleDateString()}.
+                    </output>
+                    <InviteLink path={invite.data.inviteUrl} />
+                </div>
             )}
         </Form>
     );

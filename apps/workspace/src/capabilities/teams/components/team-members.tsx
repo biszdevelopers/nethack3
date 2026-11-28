@@ -1,23 +1,28 @@
 import { useState, type ReactNode } from "react";
+import { useNavigate } from "react-router";
 import type { TeamDetail } from "@nethack/contracts";
 import { Alert, AlertDialog, Badge, Button, Separator, UserDisplay } from "@nethack/ui";
 import { errorMessage } from "../../../lib/errors.js";
 import { formatDateTime } from "../../../lib/format.js";
-import { humanizeStatus, statusBadgeTone } from "../../../lib/status.js";
+import { humanizeStatus } from "../../../lib/status.js";
 import {
+    useDisbandTeam,
     useLeaveTeam,
     useRemoveTeamMember,
     useTransferCaptain,
     useUpdateTeam,
 } from "../hooks/use-teams.js";
 import { isInactiveTeamStatus, teamStatusLabel, teamStatusTone } from "../status.js";
+import { EditTeamDialog } from "./edit-team-dialog.js";
 import { InviteMemberForm } from "./invite-member-form.js";
+import { TeamInvitations } from "./team-invitations.js";
 
 type PendingAction =
     | { readonly kind: "transfer"; readonly userId: string; readonly name: string }
     | { readonly kind: "remove"; readonly userId: string; readonly name: string }
     | { readonly kind: "leave" }
-    | { readonly kind: "ready" };
+    | { readonly kind: "ready" }
+    | { readonly kind: "disband" };
 
 export function TeamMembers({
     team,
@@ -29,10 +34,13 @@ export function TeamMembers({
     readonly isOrganizer: boolean;
 }): ReactNode {
     const [pending, setPending] = useState<PendingAction | null>(null);
+    const [editOpen, setEditOpen] = useState(false);
+    const navigate = useNavigate();
     const transfer = useTransferCaptain(team.id);
     const remove = useRemoveTeamMember(team.id);
     const leave = useLeaveTeam(team.id);
     const update = useUpdateTeam(team.id);
+    const disband = useDisbandTeam(team.id);
 
     const isCaptain = userId !== null && team.captainUserId === userId;
     const canManage = isCaptain || isOrganizer;
@@ -40,7 +48,8 @@ export function TeamMembers({
     const currentMember =
         userId === null ? null : (team.members.find((member) => member.userId === userId) ?? null);
 
-    const error = transfer.error ?? remove.error ?? leave.error ?? update.error ?? null;
+    const error =
+        transfer.error ?? remove.error ?? leave.error ?? update.error ?? disband.error ?? null;
 
     const confirm = async (): Promise<void> => {
         if (pending === null) {
@@ -53,6 +62,11 @@ export function TeamMembers({
                 await remove.mutateAsync(pending.userId);
             } else if (pending.kind === "leave") {
                 await leave.mutateAsync();
+            } else if (pending.kind === "disband") {
+                await disband.mutateAsync();
+                setPending(null);
+                navigate("/teams");
+                return;
             } else {
                 await update.mutateAsync({ status: "ready" });
             }
@@ -96,6 +110,14 @@ export function TeamMembers({
                     confirmLabel: "Mark ready",
                     tone: "brand" as const,
                 };
+            case "disband":
+                return {
+                    title: "Disband team",
+                    description:
+                        "The team is marked disbanded, pending invitations are revoked, and every member is removed. Team history is kept, but a team with a submission cannot be disbanded.",
+                    confirmLabel: "Disband team",
+                    tone: "destructive" as const,
+                };
         }
     })();
 
@@ -114,6 +136,11 @@ export function TeamMembers({
                 <span className="text-xs text-ink-subtle">
                     {team.memberCount} of {team.maxMembers} members
                 </span>
+                {canManage && activeTeam ? (
+                    <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                        Edit team
+                    </Button>
+                ) : null}
                 {canManage && team.status === "forming" ? (
                     <Button
                         variant="outline"
@@ -123,10 +150,24 @@ export function TeamMembers({
                         Mark ready
                     </Button>
                 ) : null}
+                {canManage && activeTeam ? (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setPending({ kind: "disband" })}
+                    >
+                        Disband team
+                    </Button>
+                ) : null}
                 {currentMember !== null && !isCaptain ? (
                     <Button variant="ghost" size="sm" onClick={() => setPending({ kind: "leave" })}>
                         Leave team
                     </Button>
+                ) : null}
+                {isCaptain && activeTeam && team.members.length > 1 ? (
+                    <span className="text-xs text-ink-subtle">
+                        Transfer captaincy before leaving the team.
+                    </span>
                 ) : null}
             </div>
 
@@ -198,36 +239,12 @@ export function TeamMembers({
                 </>
             ) : null}
 
-            {canManage && activeTeam ? (
+            {canManage && activeTeam && isCaptain ? (
                 <>
                     <Separator />
                     <div className="flex flex-col gap-2">
-                        <h3 className="text-sm font-medium">Invitations</h3>
-                        {team.invitations.length === 0 ? (
-                            <p className="text-sm text-ink-muted">No invitations have been sent.</p>
-                        ) : (
-                            <ul className="flex flex-col divide-y divide-line">
-                                {team.invitations.map((invitation) => (
-                                    <li
-                                        key={invitation.id}
-                                        className="flex flex-wrap items-center justify-between gap-2 py-2 first:pt-0 last:pb-0"
-                                    >
-                                        <span className="text-sm text-ink">{invitation.email}</span>
-                                        <span className="flex items-center gap-2">
-                                            <Badge
-                                                tone={statusBadgeTone(invitation.status)}
-                                                size="sm"
-                                            >
-                                                {humanizeStatus(invitation.status)}
-                                            </Badge>
-                                            <span className="text-xs text-ink-subtle">
-                                                Expires {formatDateTime(invitation.expiresAt)}
-                                            </span>
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
+                        <h3 className="text-sm font-medium">Pending invitations</h3>
+                        <TeamInvitations team={team} />
                     </div>
                 </>
             ) : null}
@@ -241,6 +258,7 @@ export function TeamMembers({
                             remove.reset();
                             leave.reset();
                             update.reset();
+                            disband.reset();
                             setPending(null);
                         }
                     }}
@@ -252,11 +270,16 @@ export function TeamMembers({
                         transfer.isPending ||
                         remove.isPending ||
                         leave.isPending ||
-                        update.isPending
+                        update.isPending ||
+                        disband.isPending
                     }
                     onConfirm={confirm}
                 />
             )}
+
+            {canManage ? (
+                <EditTeamDialog team={team} open={editOpen} onOpenChange={setEditOpen} />
+            ) : null}
         </div>
     );
 }

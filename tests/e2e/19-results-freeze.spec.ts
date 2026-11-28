@@ -132,6 +132,11 @@ test.describe("results publication freeze", () => {
         const organizerToken = await csrfToken(page);
 
         await test.step("clear any earlier publication", async () => {
+            await ownerTenantQuery(
+                FIXTURE.organizationId,
+                "delete from notifications where organization_id = $1 and user_id = $2 and title = 'Results published'",
+                [FIXTURE.organizationId, FIXTURE.participantId],
+            );
             const cleanup = await page.request.delete(
                 `${API_ORIGIN}/api/v1/competitions/${FIXTURE.editionId}/results/publish`,
                 { headers: requestHeaders(organizerToken) },

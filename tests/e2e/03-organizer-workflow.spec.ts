@@ -99,8 +99,9 @@ test.describe("organizer workflow", () => {
         await test.step("assign the fixture judge to the seeded submission", async () => {
             await page.goto(`/judging?edition=${FIXTURE.editionId}`);
             const assignmentForm = page
-                .getByRole("button", { name: "Create assignment" })
+                .getByRole("button", { name: "Assign judge" })
                 .locator("xpath=ancestor::form");
+            await chooseOption(assignmentForm.getByLabel("Assignment scope"), "One submission");
             await chooseOption(
                 assignmentForm.getByLabel("Submission"),
                 new RegExp(FIXTURE.projectTitle),
@@ -111,11 +112,30 @@ test.describe("organizer workflow", () => {
             );
             await assignmentForm.getByLabel("Judge email").fill(USERS.judge.email);
             await assignmentForm.getByLabel("Assignment note").fill("E2E judging assignment.");
-            await assignmentForm.getByRole("button", { name: "Create assignment" }).click();
-            await expectToast(page, "Assignment created");
+            await assignmentForm.getByRole("button", { name: "Assign judge" }).click();
+            await expectToast(page, "Assignments updated");
             const row = page.getByRole("row", { name: /Fixture Project.*Fixture Judge/ });
             await expect(row).toBeVisible();
         });
+    });
+
+    test("edits a team profile as an organizer", async ({ page }) => {
+        await signIn(page, USERS.organizer);
+        await page.goto(`/teams/${FIXTURE.disposableTeamId}`);
+        await expect(
+            page.getByRole("heading", { name: FIXTURE.disposableTeamName, level: 1 }),
+        ).toBeVisible();
+
+        await page.getByRole("button", { name: "Edit team" }).click();
+        const dialog = page.getByRole("dialog", { name: "Edit team" });
+        await expect(dialog).toBeVisible();
+        await dialog.getByLabel("Description").fill("Edited by the E2E organizer journey.");
+        await dialog.getByRole("button", { name: "Save team" }).click();
+        await expectToast(page, "Team updated");
+        await expect(dialog).toBeHidden();
+        await expect(
+            page.getByText("Edited by the E2E organizer journey.", { exact: true }),
+        ).toBeVisible();
     });
 
     test("offers rubric creation in the judging workspace", async ({ page }) => {

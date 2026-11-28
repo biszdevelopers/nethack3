@@ -77,6 +77,7 @@ test.describe("participant workflow", () => {
             await expect(
                 page.getByText(`Invitation sent to ${USERS.judge.email}.`, { exact: false }),
             ).toBeVisible();
+            await expect(page.getByLabel("Invitation link")).toHaveValue(/\/invitations\?token=/);
 
             await expect
                 .poll(async () => invitationTokenForEmail(USERS.judge.email), { timeout: 20_000 })
@@ -90,13 +91,27 @@ test.describe("participant workflow", () => {
             try {
                 const judgePage = await judgeContext.newPage();
                 await signIn(judgePage, USERS.judge);
-                await judgePage.goto(`/teams?token=${encodeURIComponent(token)}`);
+                await judgePage.goto("/invitations");
+                await expect(
+                    judgePage.getByRole("heading", { name: "Invitations", level: 1 }),
+                ).toBeVisible();
+                const invitation = judgePage
+                    .getByRole("listitem")
+                    .filter({ hasText: teamName })
+                    .first();
+                await expect(invitation.getByRole("button", { name: "Accept" })).toBeVisible();
+                await expect(invitation.getByRole("button", { name: "Decline" })).toBeVisible();
+
+                await judgePage.goto(`/invitations?token=${encodeURIComponent(token)}`);
                 await expect(
                     judgePage.getByRole("heading", { name: "Team invitation" }),
                 ).toBeVisible();
                 await judgePage.getByRole("button", { name: "Accept invitation" }).click();
                 await expect(judgePage.getByText("Invitation accepted")).toBeVisible();
                 await expect(judgePage.getByText(`You joined ${teamName}.`)).toBeVisible();
+
+                await judgePage.goto("/invitations");
+                await expect(judgePage.getByText("No pending invitations")).toBeVisible();
             } finally {
                 await judgeContext.close();
             }

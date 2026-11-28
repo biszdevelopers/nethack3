@@ -1,8 +1,12 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { JudgeAssignment, JudgeAssignmentStatus } from "@nethack/contracts";
+import type {
+    BulkAssignmentResult,
+    JudgeAssignment,
+    JudgeAssignmentStatus,
+} from "@nethack/contracts";
 import {
     Alert,
     Badge,
@@ -47,11 +51,12 @@ import { RubricBuilder } from "../capabilities/judging/components/rubric-builder
 import { buildJudgeEditionOptions } from "../capabilities/judging/edition-options.js";
 import {
     useEdition,
+    useDivisions,
     useOrganizerEditions,
     usePublicEditionOptions,
 } from "../capabilities/competitions/hooks.js";
 import {
-    useCreateAssignment,
+    useCreateBulkAssignment,
     useEditionAssignments,
     useEditionRubrics,
     useEditionSubmissions,
@@ -67,6 +72,12 @@ const STATUS_OPTIONS = [
     { value: "submitted", label: "Submitted" },
     { value: "conflict_declared", label: "Conflict declared" },
     { value: "revoked", label: "Revoked" },
+] as const;
+
+const SCOPE_OPTIONS = [
+    { value: "submission", label: "One submission" },
+    { value: "division", label: "One division" },
+    { value: "all", label: "Every submitted project" },
 ] as const;
 
 function readStatus(value: string | null): JudgeAssignmentStatus | "all" {
@@ -131,13 +142,17 @@ export function JudgingPage(): ReactNode {
         isOrganizer ? editionId : null,
         isOrganizer,
     );
+    const divisions = useDivisions(organizationId, isOrganizer ? editionId : null);
 
-    const createAssignment = useCreateAssignment(organizationId, editionId);
+    const createAssignment = useCreateBulkAssignment(organizationId, editionId);
     const revokeAssignment = useRevokeAssignment(organizationId, editionId);
+    const [bulkResult, setBulkResult] = useState<BulkAssignmentResult | null>(null);
 
     const assignmentForm = useForm<AssignmentForm>({
         resolver: zodResolver(assignmentSchema),
         defaultValues: {
+            scope: "submission",
+            divisionId: "",
             submissionId: "",
             rubricId: "",
             judgeEmail: "",
@@ -147,6 +162,11 @@ export function JudgingPage(): ReactNode {
     });
 
     const allMyItems = myAssignments.data?.items ?? [];
+    const divisionItems = divisions.data?.items ?? [];
+    const assignmentScope = useWatch({
+        control: assignmentForm.control,
+        name: "scope",
+    });
     const judgeEditionOptions = buildJudgeEditionOptions(allMyItems, [
         ...publicEditions.editions,
         ...organizerEditions.editions,
@@ -214,7 +234,10 @@ export function JudgingPage(): ReactNode {
         const params = new URLSearchParams(searchParams);
         params.set("edition", next);
         setSearchParams(params, { replace: true });
+        setBulkResult(null);
         assignmentForm.reset({
+            scope: "submission",
+            divisionId: "",
             submissionId: "",
             rubricId: "",
             judgeEmail: "",
@@ -232,7 +255,10 @@ export function JudgingPage(): ReactNode {
         }
         setSearchParams(params, { replace: true });
         if (next !== "all") {
+            setBulkResult(null);
             assignmentForm.reset({
+                scope: "submission",
+                divisionId: "",
                 submissionId: "",
                 rubricId: "",
                 judgeEmail: "",
@@ -255,24 +281,33 @@ export function JudgingPage(): ReactNode {
     const onCreateAssignment = assignmentForm.handleSubmit(async (values) => {
         const dueAt = values.dueAt.trim().length === 0 ? null : localInputToIso(values.dueAt);
         try {
-            await createAssignment.mutateAsync({
-                submissionId: values.submissionId,
+            const result = await createAssignment.mutateAsync({
                 judgeEmail: values.judgeEmail,
                 rubricId: values.rubricId,
+                scope: values.scope,
+                ...(values.scope === "submission" ? { submissionId: values.submissionId } : {}),
+                ...(values.scope === "division" ? { divisionId: values.divisionId } : {}),
                 dueAt,
                 note: values.note,
             });
+            setBulkResult(result);
             assignmentForm.reset({
+                scope: "submission",
+                divisionId: "",
                 submissionId: "",
                 rubricId: "",
                 judgeEmail: "",
                 dueAt: "",
                 note: "",
             });
-            toast({ title: "Assignment created", tone: "success" });
+            toast({
+                title: "Assignments updated",
+                description: `${String(result.assigned.length)} assigned · ${String(result.skipped)} skipped.`,
+                tone: "success",
+            });
         } catch (error) {
             toast({
-                title: "Could not create the assignment",
+                title: "Could not create the assignments",
                 description: describeError(error),
                 tone: "critical",
             });
@@ -757,19 +792,14 @@ export function JudgingPage(): ReactNode {
                                                 <div className="flex flex-col gap-4">
                                                     <Controller
                                                         control={assignmentForm.control}
-                                                        name="submissionId"
+                                                        name="scope"
                                                         render={({ field, fieldState }) => (
                                                             <Select
-                                                                label="Submission"
-                                                                options={submissionItems.map(
-                                                                    (submission) => ({
-                                                                        value: submission.id,
-                                                                        label: `${submission.projectTitle} · ${submission.teamName ?? "No team"} (${humanizeToken(submission.status)})`,
-                                                                    }),
-                                                                )}
+                                                                label="Assignment scope"
+                                                                options={SCOPE_OPTIONS}
                                                                 value={field.value}
                                                                 onValueChange={field.onChange}
-                                                                placeholder="Select a submission"
+                                                                description="Edition-wide and division scopes only cover submitted or accepted work."
                                                                 {...(fieldState.error?.message ===
                                                                 undefined
                                                                     ? {}
@@ -780,6 +810,60 @@ export function JudgingPage(): ReactNode {
                                                             />
                                                         )}
                                                     />
+                                                    {assignmentScope === "submission" ? (
+                                                        <Controller
+                                                            control={assignmentForm.control}
+                                                            name="submissionId"
+                                                            render={({ field, fieldState }) => (
+                                                                <Select
+                                                                    label="Submission"
+                                                                    options={submissionItems.map(
+                                                                        (submission) => ({
+                                                                            value: submission.id,
+                                                                            label: `${submission.projectTitle} · ${submission.teamName ?? "No team"} (${humanizeToken(submission.status)})`,
+                                                                        }),
+                                                                    )}
+                                                                    value={field.value}
+                                                                    onValueChange={field.onChange}
+                                                                    placeholder="Select a submission"
+                                                                    {...(fieldState.error
+                                                                        ?.message === undefined
+                                                                        ? {}
+                                                                        : {
+                                                                              error: fieldState
+                                                                                  .error.message,
+                                                                          })}
+                                                                />
+                                                            )}
+                                                        />
+                                                    ) : null}
+                                                    {assignmentScope === "division" ? (
+                                                        <Controller
+                                                            control={assignmentForm.control}
+                                                            name="divisionId"
+                                                            render={({ field, fieldState }) => (
+                                                                <Select
+                                                                    label="Division"
+                                                                    options={divisionItems.map(
+                                                                        (division) => ({
+                                                                            value: division.id,
+                                                                            label: division.name,
+                                                                        }),
+                                                                    )}
+                                                                    value={field.value}
+                                                                    onValueChange={field.onChange}
+                                                                    placeholder="Select a division"
+                                                                    {...(fieldState.error
+                                                                        ?.message === undefined
+                                                                        ? {}
+                                                                        : {
+                                                                              error: fieldState
+                                                                                  .error.message,
+                                                                          })}
+                                                                />
+                                                            )}
+                                                        />
+                                                    ) : null}
                                                     <Controller
                                                         control={assignmentForm.control}
                                                         name="rubricId"
@@ -850,10 +934,17 @@ export function JudgingPage(): ReactNode {
                                                         type="submit"
                                                         loading={createAssignment.isPending}
                                                     >
-                                                        Create assignment
+                                                        Assign judge
                                                     </Button>
                                                 </div>
                                             </Form>
+                                        )}
+                                        {bulkResult === null ? null : (
+                                            <Alert tone="success" title="Bulk assignment complete">
+                                                {String(bulkResult.assigned.length)} assigned ·{" "}
+                                                {String(bulkResult.skipped)} already assigned and
+                                                skipped.
+                                            </Alert>
                                         )}
                                     </CardContent>
                                 </Card>

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, ArrowUpRight, CalendarClock, GitBranch, Users } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CalendarClock, GitBranch, Mail, Users } from "lucide-react";
 import {
     Badge,
     Button,
@@ -24,6 +24,14 @@ function formatDate(value: string | null): string {
         dateStyle: "medium",
         timeStyle: "short",
     }).format(new Date(value));
+}
+
+function linkHost(value: string): string {
+    try {
+        return new URL(value).hostname;
+    } catch {
+        return value;
+    }
 }
 
 export async function generateMetadata({
@@ -297,6 +305,38 @@ export default async function CompetitionDetailPage({
                             </CardContent>
                         </Card>
                     </Reveal>
+
+                    {competition.contactEmail === null && competition.contactUrl === null ? null : (
+                        <Reveal delay={0.1}>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Contact the organizer</CardTitle>
+                                </CardHeader>
+                                <CardContent className="flex flex-col gap-2 text-sm leading-7">
+                                    {competition.contactEmail === null ? null : (
+                                        <a
+                                            href={`mailto:${competition.contactEmail}`}
+                                            className="inline-flex items-center gap-1.5 text-primary underline underline-offset-2 hover:text-primary-hover"
+                                        >
+                                            <Mail className="size-3.5" aria-hidden="true" />
+                                            {competition.contactEmail}
+                                        </a>
+                                    )}
+                                    {competition.contactUrl === null ? null : (
+                                        <a
+                                            href={competition.contactUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1.5 text-primary underline underline-offset-2 hover:text-primary-hover"
+                                        >
+                                            <ArrowUpRight className="size-3.5" aria-hidden="true" />
+                                            {linkHost(competition.contactUrl)}
+                                        </a>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </Reveal>
+                    )}
                 </div>
             </div>
 

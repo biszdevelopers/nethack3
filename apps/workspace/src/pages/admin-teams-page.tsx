@@ -4,6 +4,7 @@ import {
     teamStatusSchema,
     type AdministrationTeam,
     type AdministrationTeamSubmission,
+    type TeamStatus,
 } from "@nethack/contracts";
 import {
     Alert,
@@ -11,7 +12,14 @@ import {
     Badge,
     Button,
     Card,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
     EmptyState,
+    Field,
     LoadingBlock,
     PageHeader,
     Table,
@@ -20,9 +28,11 @@ import {
     TableHead,
     TableHeader,
     TableRow,
+    Textarea,
     useToast,
 } from "@nethack/ui";
 import { useActiveMembership } from "../application/session.js";
+import { formatDateTime } from "../lib/format.js";
 import { useOrganizerEditions } from "../capabilities/competitions/hooks.js";
 import {
     useAdministrationTeams,
@@ -34,11 +44,20 @@ import { EditionSelect } from "../capabilities/shared/edition-select.js";
 import { describeError } from "../capabilities/shared/errors.js";
 import { RequestError } from "../capabilities/shared/states.jsx";
 import { humanizeToken } from "../capabilities/shared/format.js";
-import { TEAM_STATUS_OPTIONS, teamStatusLabel } from "../capabilities/teams/status.js";
+import {
+    TEAM_STATUS_OPTIONS,
+    isInactiveTeamStatus,
+    teamStatusLabel,
+} from "../capabilities/teams/status.js";
 
 interface PendingReopen {
     readonly team: AdministrationTeam;
     readonly submission: AdministrationTeamSubmission;
+}
+
+interface PendingStatus {
+    readonly team: AdministrationTeam;
+    readonly status: TeamStatus;
 }
 
 export function AdminTeamsPage(): ReactNode {
@@ -59,6 +78,9 @@ export function AdminTeamsPage(): ReactNode {
 
     const [pendingDelete, setPendingDelete] = useState<AdministrationTeam | null>(null);
     const [pendingReopen, setPendingReopen] = useState<PendingReopen | null>(null);
+    const [pendingStatus, setPendingStatus] = useState<PendingStatus | null>(null);
+    const [reasonDraft, setReasonDraft] = useState("");
+    const [reasonError, setReasonError] = useState<string | null>(null);
 
     if (session.isPending) {
         return <LoadingBlock rows={4} label="Loading teams" />;
@@ -102,8 +124,14 @@ export function AdminTeamsPage(): ReactNode {
         if (!parsed.success) {
             return;
         }
+        if (isInactiveTeamStatus(parsed.data)) {
+            setReasonDraft("");
+            setReasonError(null);
+            setPendingStatus({ team, status: parsed.data });
+            return;
+        }
         updateStatus.mutate(
-            { teamId: team.id, status: parsed.data },
+            { teamId: team.id, status: parsed.data, reason: "" },
             {
                 onSuccess: () =>
                     toast({
@@ -119,6 +147,38 @@ export function AdminTeamsPage(): ReactNode {
                     }),
             },
         );
+    };
+
+    const applyPendingStatus = async (): Promise<void> => {
+        if (pendingStatus === null) {
+            return;
+        }
+        const reason = reasonDraft.trim();
+        if (reason.length < 5) {
+            setReasonError("Enter a reason of at least 5 characters.");
+            return;
+        }
+        if (reason.length > 500) {
+            setReasonError("Keep the reason under 500 characters.");
+            return;
+        }
+        try {
+            await updateStatus.mutateAsync({
+                teamId: pendingStatus.team.id,
+                status: pendingStatus.status,
+                reason,
+            });
+            toast({
+                title: "Team status updated",
+                description: `${pendingStatus.team.name} is now ${teamStatusLabel(pendingStatus.status)}.`,
+                tone: "success",
+            });
+            setPendingStatus(null);
+            setReasonDraft("");
+            setReasonError(null);
+        } catch (error) {
+            setReasonError(describeError(error));
+        }
     };
 
     const onDelete = async (): Promise<void> => {
@@ -166,7 +226,7 @@ export function AdminTeamsPage(): ReactNode {
         <div className="flex flex-col gap-6">
             <PageHeader
                 title="Teams"
-                description={`Teams in ${membership.organizationName}, with members, status, and submissions.`}
+                description={`Teams in ${membership.organizationName}, with track, status, score, project, and submissions.`}
                 actions={
                     <Button asChild variant="outline" size="sm">
                         <Link to="/admin">Back to administration</Link>
@@ -198,8 +258,8 @@ export function AdminTeamsPage(): ReactNode {
                         </div>
                     </Card>
                     <p className="text-xs text-ink-muted">
-                        Withdrawn, disqualified, no show, and disbanded are final statuses and
-                        cannot be reopened.
+                        Withdrawn, disqualified, no show, and disbanded are final statuses, need a
+                        reason, and cannot be reopened.
                     </p>
 
                     {editionId === "" ? (
@@ -222,9 +282,12 @@ export function AdminTeamsPage(): ReactNode {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Team</TableHead>
+                                        <TableHead>Track</TableHead>
                                         <TableHead>Status</TableHead>
-                                        <TableHead>Members</TableHead>
-                                        <TableHead>Submissions</TableHead>
+                                        <TableHead>Score</TableHead>
+                                        <TableHead>Rank</TableHead>
+                                        <TableHead>Project</TableHead>
+                                        <TableHead>Submitted</TableHead>
                                         <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -232,6 +295,7 @@ export function AdminTeamsPage(): ReactNode {
                                     {items.map((team) => {
                                         const deletable =
                                             team.memberCount === 0 && team.submissions.length === 0;
+                                        const latestSubmission = team.submissions[0];
                                         return (
                                             <TableRow key={team.id}>
                                                 <TableCell>
@@ -240,6 +304,33 @@ export function AdminTeamsPage(): ReactNode {
                                                         {team.memberCount} of {team.maxMembers}{" "}
                                                         members
                                                     </span>
+                                                    {team.members.length === 0 ? (
+                                                        <span className="mt-1 block text-xs text-ink-subtle">
+                                                            No members
+                                                        </span>
+                                                    ) : (
+                                                        <span className="mt-1 flex flex-col gap-0.5 text-xs text-ink-muted">
+                                                            {team.members.map((member) => (
+                                                                <span key={member.userId}>
+                                                                    {member.displayName}
+                                                                    {member.role === "captain"
+                                                                        ? " (captain)"
+                                                                        : ""}
+                                                                </span>
+                                                            ))}
+                                                        </span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {team.divisionName === null ? (
+                                                        <span className="text-ink-subtle">
+                                                            No track
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-xs text-ink-muted">
+                                                            {team.divisionName}
+                                                        </span>
+                                                    )}
                                                 </TableCell>
                                                 <TableCell>
                                                     <label
@@ -253,6 +344,11 @@ export function AdminTeamsPage(): ReactNode {
                                                         className="h-9 w-36 rounded-md border border-line bg-app px-2 text-xs text-ink focus-visible:border-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/25"
                                                         value={team.status}
                                                         disabled={updateStatus.isPending}
+                                                        aria-describedby={
+                                                            team.statusReason === ""
+                                                                ? undefined
+                                                                : `status-reason-${team.id}`
+                                                        }
                                                         onChange={(event) =>
                                                             changeStatus(team, event.target.value)
                                                         }
@@ -266,92 +362,109 @@ export function AdminTeamsPage(): ReactNode {
                                                             </option>
                                                         ))}
                                                     </select>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {team.members.length === 0 ? (
-                                                        <span className="text-ink-subtle">
-                                                            No members
-                                                        </span>
-                                                    ) : (
-                                                        <span className="flex flex-col gap-0.5 text-xs text-ink-muted">
-                                                            {team.members.map((member) => (
-                                                                <span key={member.userId}>
-                                                                    {member.displayName}
-                                                                    {member.role === "captain"
-                                                                        ? " (captain)"
-                                                                        : ""}
-                                                                </span>
-                                                            ))}
+                                                    {team.statusReason === "" ? null : (
+                                                        <span
+                                                            id={`status-reason-${team.id}`}
+                                                            className="mt-1 block max-w-48 text-xs text-ink-subtle"
+                                                        >
+                                                            {team.statusReason}
                                                         </span>
                                                     )}
                                                 </TableCell>
                                                 <TableCell>
-                                                    {team.submissions.length === 0 ? (
-                                                        <span className="text-ink-subtle">
-                                                            No submission
+                                                    <span className="text-xs tabular-nums text-ink-muted">
+                                                        {team.score === null
+                                                            ? "—"
+                                                            : team.score.toFixed(1)}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-xs tabular-nums text-ink-muted">
+                                                        {team.rank ?? "—"}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {team.projectTitle === null ? (
+                                                        <span className="text-xs text-ink-subtle">
+                                                            No project
                                                         </span>
                                                     ) : (
-                                                        <span className="flex flex-col gap-2">
-                                                            {team.submissions.map((submission) => (
-                                                                <span
-                                                                    key={submission.id}
-                                                                    className="flex flex-wrap items-center gap-2"
+                                                        <span className="flex flex-col gap-1">
+                                                            <span className="text-xs text-ink-muted">
+                                                                {team.projectTitle}
+                                                            </span>
+                                                            {latestSubmission ===
+                                                            undefined ? null : (
+                                                                <Badge
+                                                                    tone={
+                                                                        latestSubmission.status ===
+                                                                        "submitted"
+                                                                            ? "primary"
+                                                                            : "neutral"
+                                                                    }
                                                                 >
-                                                                    <span className="text-xs text-ink-muted">
-                                                                        {submission.projectTitle}
-                                                                    </span>
-                                                                    <Badge
-                                                                        tone={
-                                                                            submission.status ===
-                                                                            "submitted"
-                                                                                ? "primary"
-                                                                                : "neutral"
-                                                                        }
-                                                                    >
-                                                                        {humanizeToken(
-                                                                            submission.status,
-                                                                        )}
-                                                                    </Badge>
-                                                                    {submission.status ===
-                                                                    "submitted" ? (
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="ghost"
-                                                                            size="sm"
-                                                                            aria-label={`Reopen submission for ${team.name}`}
-                                                                            onClick={() =>
-                                                                                setPendingReopen({
-                                                                                    team,
-                                                                                    submission,
-                                                                                })
-                                                                            }
-                                                                        >
-                                                                            Reopen
-                                                                        </Button>
-                                                                    ) : null}
-                                                                </span>
-                                                            ))}
+                                                                    {humanizeToken(
+                                                                        latestSubmission.status,
+                                                                    )}
+                                                                </Badge>
+                                                            )}
+                                                        </span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {team.submittedAt === null ? (
+                                                        <span className="text-xs text-ink-subtle">
+                                                            Not submitted
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-xs text-ink-muted">
+                                                            {formatDateTime(team.submittedAt)}
                                                         </span>
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        aria-label={`Delete team ${team.name}`}
-                                                        disabled={
-                                                            !deletable || deleteTeam.isPending
-                                                        }
-                                                        title={
-                                                            deletable
-                                                                ? "Delete this empty team"
-                                                                : "Remove all members and submissions before deleting the team"
-                                                        }
-                                                        onClick={() => setPendingDelete(team)}
-                                                    >
-                                                        Delete
-                                                    </Button>
+                                                    <div className="flex flex-wrap justify-end gap-1">
+                                                        {team.submissions
+                                                            .filter(
+                                                                (submission) =>
+                                                                    submission.status ===
+                                                                    "submitted",
+                                                            )
+                                                            .map((submission) => (
+                                                                <Button
+                                                                    key={submission.id}
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    aria-label={`Reopen submission for ${team.name}`}
+                                                                    onClick={() =>
+                                                                        setPendingReopen({
+                                                                            team,
+                                                                            submission,
+                                                                        })
+                                                                    }
+                                                                >
+                                                                    Reopen
+                                                                </Button>
+                                                            ))}
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            aria-label={`Delete team ${team.name}`}
+                                                            disabled={
+                                                                !deletable || deleteTeam.isPending
+                                                            }
+                                                            title={
+                                                                deletable
+                                                                    ? "Delete this empty team"
+                                                                    : "Remove all members and submissions before deleting the team"
+                                                            }
+                                                            onClick={() => setPendingDelete(team)}
+                                                        >
+                                                            Delete
+                                                        </Button>
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         );
@@ -362,6 +475,70 @@ export function AdminTeamsPage(): ReactNode {
                     )}
                 </>
             )}
+
+            <Dialog
+                open={pendingStatus !== null}
+                onOpenChange={(open) => {
+                    if (!open && !updateStatus.isPending) {
+                        setPendingStatus(null);
+                        setReasonError(null);
+                    }
+                }}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Change team status</DialogTitle>
+                        <DialogDescription>
+                            Set{" "}
+                            {pendingStatus === null
+                                ? "this team"
+                                : `${pendingStatus.team.name} to ${teamStatusLabel(pendingStatus.status)}`}
+                            . A reason is required for a final status and is shown next to the
+                            status.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <Field
+                        label="Reason"
+                        required
+                        description="Between 5 and 500 characters."
+                        {...(reasonError === null ? {} : { error: reasonError })}
+                    >
+                        {(props) => (
+                            <Textarea
+                                {...props}
+                                value={reasonDraft}
+                                maxLength={500}
+                                onChange={(event) => {
+                                    setReasonDraft(event.target.value);
+                                    if (reasonError !== null) {
+                                        setReasonError(null);
+                                    }
+                                }}
+                            />
+                        )}
+                    </Field>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            disabled={updateStatus.isPending}
+                            onClick={() => {
+                                setPendingStatus(null);
+                                setReasonError(null);
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            loading={updateStatus.isPending}
+                            onClick={() => void applyPendingStatus()}
+                        >
+                            Apply status
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <AlertDialog
                 open={pendingDelete !== null}

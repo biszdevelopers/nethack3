@@ -36,6 +36,7 @@ import {
     useToast,
 } from "@nethack/ui";
 import { useActiveMembership } from "../../../application/session.js";
+import { PreflightWarnings } from "../../administration/components/preflight-warnings.js";
 import { FormSwitch } from "../../../components/form-switch.js";
 import { EditionSelect } from "../../shared/edition-select.js";
 import {
@@ -135,6 +136,8 @@ function toEditionForm(edition: CompetitionEditionDetail): EditionForm {
         description: edition.description,
         themeName: edition.themeName ?? "",
         themeDescription: edition.themeDescription ?? "",
+        contactEmail: edition.contactEmail ?? "",
+        contactUrl: edition.contactUrl ?? "",
         showScores: edition.showScores,
         showRanking: edition.showRanking,
         timezone: edition.timezone,
@@ -193,6 +196,8 @@ export function CompetitionAdminPage(): ReactNode {
             description: "",
             themeName: "",
             themeDescription: "",
+            contactEmail: "",
+            contactUrl: "",
             showScores: false,
             showRanking: false,
             timezone: timezoneDefault(),
@@ -216,6 +221,8 @@ export function CompetitionAdminPage(): ReactNode {
             description: "",
             themeName: "",
             themeDescription: "",
+            contactEmail: "",
+            contactUrl: "",
             showScores: false,
             showRanking: false,
             timezone: timezoneDefault(),
@@ -336,6 +343,8 @@ export function CompetitionAdminPage(): ReactNode {
                     themeName: values.themeName.length === 0 ? null : values.themeName,
                     themeDescription:
                         values.themeDescription.length === 0 ? null : values.themeDescription,
+                    contactEmail: values.contactEmail.length === 0 ? null : values.contactEmail,
+                    contactUrl: values.contactUrl.length === 0 ? null : values.contactUrl,
                     showScores: values.showScores,
                     showRanking: values.showRanking,
                     timezone: values.timezone,
@@ -357,6 +366,8 @@ export function CompetitionAdminPage(): ReactNode {
                 description: "",
                 themeName: "",
                 themeDescription: "",
+                contactEmail: "",
+                contactUrl: "",
                 showScores: false,
                 showRanking: false,
                 timezone: timezoneDefault(),
@@ -461,6 +472,8 @@ export function CompetitionAdminPage(): ReactNode {
                     themeName: values.themeName.length === 0 ? null : values.themeName,
                     themeDescription:
                         values.themeDescription.length === 0 ? null : values.themeDescription,
+                    contactEmail: values.contactEmail.length === 0 ? null : values.contactEmail,
+                    contactUrl: values.contactUrl.length === 0 ? null : values.contactUrl,
                     showScores: values.showScores,
                     showRanking: values.showRanking,
                     timezone: values.timezone,
@@ -686,6 +699,38 @@ export function CompetitionAdminPage(): ReactNode {
                                         >
                                             {(field) => (
                                                 <Textarea {...field} value={field.value} rows={2} />
+                                            )}
+                                        </FormField>
+                                    </div>
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <FormField
+                                            name="contactEmail"
+                                            label="Contact email"
+                                            optionalLabel="optional"
+                                            description="Public address for questions about this edition."
+                                        >
+                                            {(field) => (
+                                                <Input
+                                                    {...field}
+                                                    value={field.value}
+                                                    type="email"
+                                                    placeholder="organizers@example.org"
+                                                />
+                                            )}
+                                        </FormField>
+                                        <FormField
+                                            name="contactUrl"
+                                            label="Contact URL"
+                                            optionalLabel="optional"
+                                            description="Public https link, such as a chat channel or contact page."
+                                        >
+                                            {(field) => (
+                                                <Input
+                                                    {...field}
+                                                    value={field.value}
+                                                    type="url"
+                                                    placeholder="https://teams.microsoft.com/..."
+                                                />
                                             )}
                                         </FormField>
                                     </div>
@@ -924,6 +969,12 @@ export function CompetitionAdminPage(): ReactNode {
                         ]}
                     />
 
+                    <PreflightWarnings
+                        organizationId={organizationId}
+                        editionId={editionData.id}
+                        enabled={isOrganizer}
+                    />
+
                     <Card>
                         <CardHeader>
                             <CardTitle>Edit edition</CardTitle>
@@ -980,6 +1031,38 @@ export function CompetitionAdminPage(): ReactNode {
                                         >
                                             {(field) => (
                                                 <Textarea {...field} value={field.value} rows={2} />
+                                            )}
+                                        </FormField>
+                                    </div>
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <FormField
+                                            name="contactEmail"
+                                            label="Contact email"
+                                            optionalLabel="optional"
+                                            description="Public address for questions about this edition."
+                                        >
+                                            {(field) => (
+                                                <Input
+                                                    {...field}
+                                                    value={field.value}
+                                                    type="email"
+                                                    placeholder="organizers@example.org"
+                                                />
+                                            )}
+                                        </FormField>
+                                        <FormField
+                                            name="contactUrl"
+                                            label="Contact URL"
+                                            optionalLabel="optional"
+                                            description="Public https link, such as a chat channel or contact page."
+                                        >
+                                            {(field) => (
+                                                <Input
+                                                    {...field}
+                                                    value={field.value}
+                                                    type="url"
+                                                    placeholder="https://teams.microsoft.com/..."
+                                                />
                                             )}
                                         </FormField>
                                     </div>

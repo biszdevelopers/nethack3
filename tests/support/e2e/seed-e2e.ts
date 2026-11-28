@@ -21,6 +21,13 @@ const ORGANIZER_RUBRIC_ID = "f4000000-0000-4000-8000-000000000001";
 const LAB_RUBRIC_ID = FIXTURE.labRubricId;
 const LAB_ASSIGNMENT_ID = FIXTURE.labAssignmentId;
 
+const TEAM_ADMIN_ID = "f2000000-0000-4000-8000-0000000000a1";
+const DISPOSABLE_TEAM_ID = "f2000000-0000-4000-8000-0000000000b1";
+const DISPOSABLE_TEAM_MEMBER_ID = "f2000000-0000-4000-8000-0000000000c1";
+const DISPOSABLE_REGISTRATION_ID = "f2000000-0000-4000-8000-0000000000d1";
+const DISPOSABLE_PARTICIPANT_ID = "f2000000-0000-4000-8000-0000000000e1";
+const DISPOSABLE_INVITATION_ID = "f2000000-0000-4000-8000-0000000000f1";
+
 const OTHER_USER_ID = "f3000000-0000-4000-8000-000000000010";
 const OTHER_SERIES_ID = "f3000000-0000-4000-8000-000000000002";
 const OTHER_EDITION_ID = "f3000000-0000-4000-8000-000000000003";
@@ -48,6 +55,12 @@ async function seedUsers(): Promise<void> {
             subject: "fixture-author",
         },
         {
+            id: TEAM_ADMIN_ID,
+            name: USERS.teamAdmin.name,
+            email: USERS.teamAdmin.email,
+            subject: USERS.teamAdmin.subject,
+        },
+        {
             id: OTHER_USER_ID,
             name: USERS.outsider.name,
             email: USERS.outsider.email,
@@ -67,8 +80,8 @@ async function seedUsers(): Promise<void> {
     }
     await ownerQuery(
         `insert into organization_memberships (organization_id, user_id, role)
-         values ($1, $2, 'participant'), ($1, $3, 'participant')`,
-        [ORG, FIXTURE.applicantId, AUTHOR_ID],
+         values ($1, $2, 'participant'), ($1, $3, 'participant'), ($1, $4, 'participant')`,
+        [ORG, FIXTURE.applicantId, AUTHOR_ID, TEAM_ADMIN_ID],
     );
 }
 
@@ -121,6 +134,60 @@ async function seedOpenEdition(): Promise<void> {
                    (organization_id, edition_id, user_id, division_id, status)
                    values ($1, $2, $3, $4, 'pending')`,
             values: [ORG, OPEN_EDITION, FIXTURE.applicantId, OPEN_DIVISION],
+        },
+        {
+            text: `insert into registrations
+                   (id, organization_id, edition_id, user_id, division_id, status,
+                    decided_by_user_id, decided_at)
+                   values ($1, $2, $3, $4, $5, 'approved', $6, now())`,
+            values: [
+                DISPOSABLE_REGISTRATION_ID,
+                ORG,
+                OPEN_EDITION,
+                TEAM_ADMIN_ID,
+                OPEN_DIVISION,
+                FIXTURE.organizerId,
+            ],
+        },
+        {
+            text: `insert into teams
+                   (id, organization_id, edition_id, division_id, name, description, status,
+                    captain_user_id, max_members)
+                   values ($1, $2, $3, $4, 'E2E Disposable Team',
+                           'Team used by the team invitation and disband journey.', 'forming', $5, 4)`,
+            values: [DISPOSABLE_TEAM_ID, ORG, OPEN_EDITION, OPEN_DIVISION, TEAM_ADMIN_ID],
+        },
+        {
+            text: `insert into team_members (id, organization_id, team_id, user_id, role)
+                   values ($1, $2, $3, $4, 'captain')`,
+            values: [DISPOSABLE_TEAM_MEMBER_ID, ORG, DISPOSABLE_TEAM_ID, TEAM_ADMIN_ID],
+        },
+        {
+            text: `insert into participants
+                   (id, organization_id, edition_id, user_id, division_id, team_id)
+                   values ($1, $2, $3, $4, $5, $6)`,
+            values: [
+                DISPOSABLE_PARTICIPANT_ID,
+                ORG,
+                OPEN_EDITION,
+                TEAM_ADMIN_ID,
+                OPEN_DIVISION,
+                DISPOSABLE_TEAM_ID,
+            ],
+        },
+        {
+            text: `insert into team_invitations
+                   (id, organization_id, team_id, email, token_hash, status, invited_by_user_id,
+                    expires_at)
+                   values ($1, $2, $3, $4, $5, 'pending', $6, now() + interval '7 days')`,
+            values: [
+                DISPOSABLE_INVITATION_ID,
+                ORG,
+                DISPOSABLE_TEAM_ID,
+                USERS.applicant.email,
+                "a".repeat(64),
+                TEAM_ADMIN_ID,
+            ],
         },
         {
             text: `insert into competition_editions

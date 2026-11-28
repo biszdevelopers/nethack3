@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { BookOpen, Database, Download, FileSearch, MessagesSquare } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -49,12 +49,13 @@ import {
 } from "../capabilities/administration/hooks.js";
 import {
     auditSchema,
+    describeAuditMetadata,
     grantSchema,
     revokeSchema,
     type AuditForm,
     type GrantForm,
     type RevokeForm,
-} from "../capabilities/administration/forms.js";
+} from "../capabilities/administration/index.js";
 
 export function AdminPage(): ReactNode {
     const session = useSession();
@@ -416,24 +417,33 @@ function AdminContent({
                             </TableHeader>
                             <TableBody>
                                 {auditItems.map((entry: AuditLog) => (
-                                    <TableRow key={entry.id}>
-                                        <TableCell className="whitespace-nowrap text-ink-muted">
-                                            {formatDateTime(entry.createdAt)}
-                                        </TableCell>
-                                        <TableCell className="text-ink-muted">
-                                            {entry.organizationId ?? "Global"}
-                                        </TableCell>
-                                        <TableCell>{entry.actorDisplayName ?? "System"}</TableCell>
-                                        <TableCell>{entry.action}</TableCell>
-                                        <TableCell className="text-ink-muted">
-                                            {entry.entityType}
-                                            {entry.entityId === null ? null : (
-                                                <span className="block text-xs text-ink-subtle">
-                                                    {entry.entityId}
-                                                </span>
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
+                                    <Fragment key={entry.id}>
+                                        <TableRow>
+                                            <TableCell className="whitespace-nowrap text-ink-muted">
+                                                {formatDateTime(entry.createdAt)}
+                                            </TableCell>
+                                            <TableCell className="text-ink-muted">
+                                                {entry.organizationId ?? "Global"}
+                                            </TableCell>
+                                            <TableCell>
+                                                {entry.actorDisplayName ?? "System"}
+                                            </TableCell>
+                                            <TableCell>{entry.action}</TableCell>
+                                            <TableCell className="text-ink-muted">
+                                                {entry.entityType}
+                                                {entry.entityId === null ? null : (
+                                                    <span className="block text-xs text-ink-subtle">
+                                                        {entry.entityId}
+                                                    </span>
+                                                )}
+                                            </TableCell>
+                                        </TableRow>
+                                        <TableRow className="hover:bg-transparent">
+                                            <TableCell colSpan={5} className="bg-raised/40">
+                                                <AuditMetadataDetail metadata={entry.metadata} />
+                                            </TableCell>
+                                        </TableRow>
+                                    </Fragment>
                                 ))}
                             </TableBody>
                         </Table>
@@ -561,18 +571,78 @@ const EXPORT_OMISSIONS = [
     "Notification recipients, bodies, and deduplication keys.",
 ] as const;
 
+function AuditMetadataDetail({
+    metadata,
+}: {
+    readonly metadata: Record<string, unknown>;
+}): ReactNode {
+    const detail = describeAuditMetadata(metadata);
+    const empty =
+        detail.reason === null && detail.changes.length === 0 && detail.fields.length === 0;
+    return (
+        <div className="flex flex-col gap-2 text-xs">
+            {detail.reason === null ? null : (
+                <p className="text-ink">
+                    <span className="font-medium">Reason:</span> {detail.reason}
+                </p>
+            )}
+            {detail.changes.length === 0 ? null : (
+                <ul className="flex flex-col gap-1">
+                    {detail.changes.map((change) => (
+                        <li
+                            key={change.field}
+                            className="grid gap-1 sm:grid-cols-[minmax(6rem,10rem)_minmax(0,1fr)]"
+                        >
+                            <span className="font-medium text-ink-muted">{change.field}</span>
+                            <span className="break-words text-ink">
+                                <span className="text-ink-subtle line-through">
+                                    {change.before}
+                                </span>
+                                <span className="mx-2 text-ink-subtle" aria-hidden="true">
+                                    to
+                                </span>
+                                <span>{change.after}</span>
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {detail.fields.length === 0 ? null : (
+                <dl className="grid gap-1 sm:grid-cols-[minmax(6rem,10rem)_minmax(0,1fr)]">
+                    {detail.fields.map((field) => (
+                        <Fragment key={field.label}>
+                            <dt className="font-medium text-ink-muted">{field.label}</dt>
+                            <dd className="break-words text-ink">{field.value}</dd>
+                        </Fragment>
+                    ))}
+                </dl>
+            )}
+            {empty ? <p className="text-ink-subtle">No metadata recorded.</p> : null}
+            <details className="text-ink-muted">
+                <summary className="cursor-pointer select-none">Raw metadata</summary>
+                <pre className="mt-2 overflow-x-auto rounded-md border border-line bg-app p-2 text-[11px] leading-relaxed">
+                    {detail.raw}
+                </pre>
+            </details>
+        </div>
+    );
+}
+
 function OperatorTools(): ReactNode {
     const { toast } = useToast();
-    const [exporting, setExporting] = useState(false);
+    const [exporting, setExporting] = useState<"json" | "csv" | null>(null);
 
-    const onExport = async (): Promise<void> => {
-        if (exporting) {
+    const onExport = async (format: "json" | "csv"): Promise<void> => {
+        if (exporting !== null) {
             return;
         }
-        setExporting(true);
+        setExporting(format);
         try {
-            await downloadDatabaseExport();
-            toast({ title: "Database export downloaded", tone: "success" });
+            await downloadDatabaseExport(format);
+            toast({
+                title: format === "csv" ? "CSV export downloaded" : "Database export downloaded",
+                tone: "success",
+            });
         } catch (error) {
             toast({
                 title: "Could not download the database export",
@@ -580,7 +650,7 @@ function OperatorTools(): ReactNode {
                 tone: "critical",
             });
         } finally {
-            setExporting(false);
+            setExporting(null);
         }
     };
 
@@ -606,8 +676,8 @@ function OperatorTools(): ReactNode {
                             Database export
                         </CardTitle>
                         <CardDescription>
-                            A repeatable-read JSON archive of platform records. The response is
-                            streamed as an attachment.
+                            A repeatable-read archive of platform records, streamed as a JSON or CSV
+                            attachment.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="flex flex-col gap-4">
@@ -624,12 +694,24 @@ function OperatorTools(): ReactNode {
                         <Button
                             type="button"
                             variant="outline"
-                            loading={exporting}
-                            onClick={() => void onExport()}
+                            loading={exporting === "json"}
+                            disabled={exporting !== null && exporting !== "json"}
+                            onClick={() => void onExport("json")}
                             className="self-start"
                         >
                             <Download className="size-4" aria-hidden="true" />
                             Download database export
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            loading={exporting === "csv"}
+                            disabled={exporting !== null && exporting !== "csv"}
+                            onClick={() => void onExport("csv")}
+                            className="self-start"
+                        >
+                            <Download className="size-4" aria-hidden="true" />
+                            Download CSV export
                         </Button>
                     </CardContent>
                 </Card>

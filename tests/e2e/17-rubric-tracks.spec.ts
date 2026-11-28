@@ -123,8 +123,8 @@ test.describe("rubric tracks, templates, versions, and the score curve", () => {
                 `${APPLIED_NAME} (1 criteria)`,
             );
             await page.getByLabel("Judge email").fill(USERS.judge.email);
-            await page.getByRole("button", { name: "Create assignment" }).click();
-            await expectToast(page, "Assignment created");
+            await page.getByRole("button", { name: "Assign judge" }).click();
+            await expectToast(page, "Assignments updated");
         });
 
         const judgeContext = await newAppContext(browser);
@@ -170,7 +170,7 @@ test.describe("rubric tracks, templates, versions, and the score curve", () => {
             });
 
             await test.step("the curve adjusts the displayed score but not the raw score", async () => {
-                await judgePage.getByRole("spinbutton", { name: "Score for Impact" }).fill("5");
+                await judgePage.getByRole("radio", { name: "5 of 10 for Impact" }).check();
                 await judgePage.getByLabel("Comment on Impact").fill("Solid evidence.");
                 await judgePage.getByRole("button", { name: "Save draft" }).click();
                 await expectToast(judgePage, "Draft saved");

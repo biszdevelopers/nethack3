@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
     CreateDebugAiSessionRequest,
+    DatabaseExportFormat,
     GrantGlobalAdministratorRequest,
     OrganizationRole,
     ReopenAdministrationSubmissionRequest,
@@ -110,6 +111,20 @@ export function useAdministrationUsers(organizationId: string | null, enabled: b
     });
 }
 
+export function useDeleteAdministrationUser() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (userId: string) => api.administration.deleteUser(userId),
+        onSuccess: async () => {
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: ["administration", "users"] }),
+                queryClient.invalidateQueries({ queryKey: queryKeys.globalAdministrators() }),
+                queryClient.invalidateQueries({ queryKey: ["administration", "audit"] }),
+            ]);
+        },
+    });
+}
+
 export function useUpdateAdministrationUserRole(organizationId: string | null) {
     const queryClient = useQueryClient();
     return useMutation({
@@ -153,7 +168,7 @@ export function useUpdateAdministrationTeamStatus(
 ) {
     const queryClient = useQueryClient();
     return useMutation({
-        mutationFn: async (input: { teamId: string; status: TeamStatus }) => {
+        mutationFn: async (input: { teamId: string; status: TeamStatus; reason?: string }) => {
             if (organizationId === null || editionId === null) {
                 throw new Error("Select an edition first.");
             }
@@ -162,6 +177,7 @@ export function useUpdateAdministrationTeamStatus(
                 editionId,
                 input.teamId,
                 input.status,
+                input.reason,
             );
         },
         onSuccess: async () => {
@@ -357,8 +373,8 @@ export function useSendDebugAiMessage(sessionId: string | null) {
     });
 }
 
-export async function downloadDatabaseExport(): Promise<void> {
-    const { blob, fileName } = await api.administration.databaseExport();
+export async function downloadDatabaseExport(format: DatabaseExportFormat = "json"): Promise<void> {
+    const { blob, fileName } = await api.administration.databaseExport(format);
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;

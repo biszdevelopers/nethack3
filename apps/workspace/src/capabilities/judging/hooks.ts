@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
     ApplyRubricTemplateRequest,
     ConflictDeclarationRequest,
+    CreateBulkAssignmentRequest,
     CreateRubricRequest,
     CreateAssignmentRequest,
     CreateJudgeFlagRequest,
@@ -167,6 +168,35 @@ export function useCreateAssignment(organizationId: string | null, editionId: st
             await queryClient.invalidateQueries({
                 queryKey: queryKeys.editionAssignments(editionId),
             });
+        },
+    });
+}
+
+export function useCreateBulkAssignment(organizationId: string | null, editionId: string | null) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (input: CreateBulkAssignmentRequest) => {
+            if (organizationId === null || editionId === null) {
+                throw new Error("Select an edition first.");
+            }
+            return api.judging.createBulkAssignments(organizationId, editionId, input);
+        },
+        onSuccess: async () => {
+            if (editionId === null) {
+                return;
+            }
+            await Promise.all([
+                queryClient.invalidateQueries({
+                    queryKey: queryKeys.editionAssignments(editionId),
+                }),
+                ...(organizationId === null
+                    ? []
+                    : [
+                          queryClient.invalidateQueries({
+                              queryKey: queryKeys.judgingAssignments(organizationId),
+                          }),
+                      ]),
+            ]);
         },
     });
 }

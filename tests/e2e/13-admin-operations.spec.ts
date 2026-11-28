@@ -1,8 +1,17 @@
 import { expect, test } from "@playwright/test";
 import { FIXTURE, USERS } from "../support/e2e/config.js";
 import { chooseOption, expectToast, signIn } from "../support/e2e/app.js";
+import { ownerTenantQuery } from "../support/e2e/db.js";
 
 test.describe("administration operations", () => {
+    test.afterAll(async () => {
+        await ownerTenantQuery(
+            FIXTURE.organizationId,
+            "update organization_memberships set role = 'participant' where organization_id = $1 and user_id = $2",
+            [FIXTURE.organizationId, FIXTURE.participantId],
+        );
+    });
+
     test("organizer manages users, teams, standings, and preflight", async ({ page }) => {
         test.setTimeout(180_000);
         await signIn(page, USERS.organizer);
@@ -15,6 +24,7 @@ test.describe("administration operations", () => {
             await expect(page.getByRole("heading", { name: "Users", level: 1 })).toBeVisible();
             const row = page.getByRole("row", { name: /Fixture Participant/ });
             await expect(row).toBeVisible();
+            await expect(page.getByRole("button", { name: /Delete account for/ })).toHaveCount(0);
 
             await row.getByLabel("Role for Fixture Participant").selectOption("judge");
             await expectToast(page, "Member role updated");
@@ -32,6 +42,17 @@ test.describe("administration operations", () => {
             await expect(row).toBeVisible();
             await expect(row.getByLabel("Status for Fixture Team")).toHaveValue("ready");
             await expect(row.getByText("Fixture Participant (captain)")).toBeVisible();
+
+            await Promise.all(
+                ["Team", "Track", "Status", "Score", "Rank", "Project", "Submitted"].map((column) =>
+                    expect(
+                        page.getByRole("columnheader", { name: column, exact: true }),
+                    ).toBeVisible(),
+                ),
+            );
+            await expect(row.getByText("Open", { exact: true })).toBeVisible();
+            await expect(row.getByText(FIXTURE.projectTitle)).toBeVisible();
+            await expect(row.getByText("Not submitted")).toHaveCount(0);
         });
 
         await test.step("read preflight counts and download the standings CSV", async () => {
@@ -61,6 +82,20 @@ test.describe("administration operations", () => {
             expect(content.split("\n")[0]).toBe(
                 "rank,project,team,average_score,submitted,assignments,awards",
             );
+        });
+        await test.step("review preflight warnings on the competition admin page", async () => {
+            await page.goto(`/competitions/manage?edition=${FIXTURE.editionId}`);
+            await expect(
+                page.getByRole("heading", { name: "Competition management", level: 1 }),
+            ).toBeVisible({ timeout: 30_000 });
+            await expect(
+                page.getByRole("heading", { name: "Preflight warnings", level: 3 }),
+            ).toBeVisible({ timeout: 30_000 });
+            await expect(
+                page.getByText("Milestone “Registration closes” occurs before the edition starts."),
+            ).toBeVisible();
+            await expect(page.getByText(/teams below the 3-evaluation minimum/)).toBeVisible();
+            await expect(page.getByText(/Fixture Project/).first()).toBeVisible();
         });
     });
 

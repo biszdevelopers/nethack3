@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { FIXTURE, USERS } from "../support/e2e/config.js";
-import { expectToast, newAppContext, signIn } from "../support/e2e/app.js";
+import { chooseOption, expectToast, newAppContext, signIn } from "../support/e2e/app.js";
 
 test.describe("judge workflow", () => {
     test("opens an assignment from the judging list", async ({ page }) => {
@@ -51,10 +51,19 @@ test.describe("judge workflow", () => {
         });
 
         await test.step("score each criterion and save a draft", async () => {
-            await page.getByRole("spinbutton", { name: "Score for Impact" }).fill("8");
+            const impact = page.getByRole("group", { name: "Impact", exact: true });
+            await impact.getByRole("radio", { name: "8 of 10 for Impact" }).focus();
+            await page.keyboard.press("Space");
+            await expect(impact.getByRole("radio", { name: "8 of 10 for Impact" })).toBeChecked();
+            await expect(impact.getByText("8 / 10")).toBeVisible();
             await page.getByLabel("Comment on Impact").fill("Strong reach.");
-            await page.getByRole("spinbutton", { name: "Score for Craft" }).fill("9");
+
+            const craft = page.getByRole("group", { name: "Craft", exact: true });
+            await craft.getByRole("radio", { name: "9 of 10 for Craft" }).click();
+            await expect(craft.getByRole("radio", { name: "9 of 10 for Craft" })).toBeChecked();
+            await expect(craft.getByText("9 / 10")).toBeVisible();
             await page.getByLabel("Comment on Craft").fill("Careful execution.");
+
             await page.getByLabel("Overall comment").fill("An 85 percent evaluation.");
             await page.getByRole("button", { name: "Save draft" }).click();
             await expectToast(page, "Draft saved");
@@ -77,6 +86,25 @@ test.describe("judge workflow", () => {
             await expect(page.getByText("Submitted", { exact: true }).first()).toBeVisible();
         });
 
+        await test.step("resizes the judging split with the keyboard", async () => {
+            const separator = page.getByRole("separator", {
+                name: "Resize project context and scoring panes",
+            });
+            await expect(separator).toBeVisible();
+            await expect(separator).toHaveAttribute("aria-valuemin", "30");
+            await expect(separator).toHaveAttribute("aria-valuemax", "70");
+            await expect(separator).toHaveAttribute("aria-valuenow", "50");
+            await separator.focus();
+            await page.keyboard.press("ArrowRight");
+            await expect(separator).toHaveAttribute("aria-valuenow", "52");
+            await page.keyboard.press("Home");
+            await expect(separator).toHaveAttribute("aria-valuenow", "30");
+            await page.keyboard.press("ArrowLeft");
+            await expect(separator).toHaveAttribute("aria-valuenow", "30");
+            await page.keyboard.press("End");
+            await expect(separator).toHaveAttribute("aria-valuenow", "70");
+        });
+
         await test.step("organizer sees the evaluated submission in the edition results", async () => {
             const organizerContext = await newAppContext(browser);
             try {
@@ -91,6 +119,38 @@ test.describe("judge workflow", () => {
                 await expect(row).toBeVisible();
                 await expect(row.getByText("85.00 / 100").first()).toBeVisible();
                 await expect(row.getByText("1 of 1 submitted")).toBeVisible();
+            } finally {
+                await organizerContext.close();
+            }
+        });
+
+        await test.step("organizer bulk assignment reports already assigned work as skipped", async () => {
+            const organizerContext = await newAppContext(browser);
+            try {
+                const organizerPage = await organizerContext.newPage();
+                await signIn(organizerPage, USERS.organizer);
+                await organizerPage.goto(`/judging?edition=${FIXTURE.editionId}`);
+                await expect(
+                    organizerPage.getByRole("heading", {
+                        name: "Assignment management",
+                        level: 2,
+                    }),
+                ).toBeVisible();
+                await chooseOption(organizerPage.getByLabel("Assignment scope"), "One submission");
+                await chooseOption(
+                    organizerPage.getByLabel("Submission"),
+                    new RegExp(FIXTURE.labProjectTitle),
+                );
+                await chooseOption(
+                    organizerPage.getByRole("combobox", { name: "Rubric" }),
+                    /Judging Lab Rubric/,
+                );
+                await organizerPage.getByLabel("Judge email").fill(USERS.judge.email);
+                await organizerPage.getByRole("button", { name: "Assign judge" }).click();
+                await expectToast(organizerPage, "Assignments updated");
+                await expect(
+                    organizerPage.getByText("0 assigned · 1 already assigned and skipped."),
+                ).toBeVisible();
             } finally {
                 await organizerContext.close();
             }

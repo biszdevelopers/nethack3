@@ -1,25 +1,39 @@
 import { useId, type ReactNode } from "react";
 import type { Criterion, RubricCommentGuidance } from "@nethack/contracts";
-import { Button, Input, Label, Textarea, type RubricScore } from "@nethack/ui";
+import { Button, Label, Textarea, cn, type RubricScore } from "@nethack/ui";
+
+export type RubricDraftScore = Partial<RubricScore>;
+
+export function isValidCriterionScore(
+    criterion: Pick<Criterion, "minScore" | "maxScore">,
+    score: number | undefined,
+): score is number {
+    return (
+        score !== undefined &&
+        Number.isInteger(score) &&
+        score >= criterion.minScore &&
+        score <= criterion.maxScore
+    );
+}
+
+function scoreChoices(minScore: number, maxScore: number): readonly number[] {
+    return Array.from(
+        { length: Math.max(0, maxScore - minScore + 1) },
+        (_, index) => minScore + index,
+    );
+}
 
 export interface RubricScoringFormProps {
     readonly criteria: readonly Criterion[];
     readonly guidance: RubricCommentGuidance;
-    readonly scores: Readonly<Record<string, RubricScore>>;
+    readonly scores: Readonly<Record<string, RubricDraftScore>>;
     readonly overallComment: string;
     readonly rawScore: number | null;
     readonly displayScore: number | null;
-    readonly onChange: (scores: Record<string, RubricScore>) => void;
+    readonly onChange: (scores: Record<string, RubricDraftScore>) => void;
     readonly onOverallCommentChange: (comment: string) => void;
     readonly commentError?: string | null;
     readonly disabled?: boolean;
-}
-
-function clamp(value: number, min: number, max: number): number {
-    if (!Number.isFinite(value)) {
-        return min;
-    }
-    return Math.min(Math.max(Math.round(value), min), max);
 }
 
 export function RubricScoringForm({
@@ -39,19 +53,14 @@ export function RubricScoringForm({
     const commentErrorId = useId();
 
     const setScore = (criterion: Criterion, score: number): void => {
-        const current = scores[criterion.id] ?? { score: criterion.minScore };
-        onChange({
-            ...scores,
-            [criterion.id]: {
-                ...current,
-                score: clamp(score, criterion.minScore, criterion.maxScore),
-            },
-        });
+        if (!isValidCriterionScore(criterion, score)) {
+            return;
+        }
+        onChange({ ...scores, [criterion.id]: { ...scores[criterion.id], score } });
     };
 
     const setComment = (criterionId: string, comment: string): void => {
-        const current = scores[criterionId] ?? { score: 0 };
-        onChange({ ...scores, [criterionId]: { ...current, comment } });
+        onChange({ ...scores, [criterionId]: { ...scores[criterionId], comment } });
     };
 
     const applyTemplate = (body: string): void => {
@@ -154,43 +163,68 @@ function CriterionRow({
     onCommentChange,
 }: {
     readonly criterion: Criterion;
-    readonly entry: RubricScore | undefined;
+    readonly entry: RubricDraftScore | undefined;
     readonly disabled: boolean;
     readonly onScoreChange: (score: number) => void;
     readonly onCommentChange: (comment: string) => void;
 }): ReactNode {
-    const scoreId = useId();
+    const groupName = useId();
     const commentId = useId();
+    const rawScore = entry?.score;
+    const selectedScore = isValidCriterionScore(criterion, rawScore) ? rawScore : null;
+
     return (
-        <li className="flex flex-col gap-3 rounded-md border border-line bg-panel p-4">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="flex min-w-0 flex-col gap-0.5">
-                    <Label htmlFor={scoreId}>{criterion.name}</Label>
-                    {criterion.description.length === 0 ? null : (
-                        <p className="text-xs text-ink-muted">{criterion.description}</p>
-                    )}
+        <li className="flex min-w-0 flex-col gap-3 rounded-md border border-line bg-panel p-4">
+            <fieldset className="flex min-w-0 flex-col gap-3" disabled={disabled}>
+                <legend className="w-full text-sm font-medium text-ink">{criterion.name}</legend>
+                {criterion.description.length === 0 ? null : (
+                    <p className="text-xs text-ink-muted">{criterion.description}</p>
+                )}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs text-ink-subtle">
+                        weight {criterion.weight} · range {criterion.minScore}–{criterion.maxScore}
+                    </span>
+                    <output
+                        className={cn(
+                            "rounded-sm border px-2 py-0.5 text-xs font-semibold tabular-nums",
+                            selectedScore === null
+                                ? "border-line-strong text-ink-muted"
+                                : "border-primary/40 bg-primary/10 text-primary",
+                        )}
+                    >
+                        {selectedScore === null
+                            ? "No score selected"
+                            : `${String(selectedScore)} / ${String(criterion.maxScore)}`}
+                    </output>
                 </div>
-                <span className="text-xs text-ink-subtle">
-                    weight {criterion.weight} · range {criterion.minScore}–{criterion.maxScore}
-                </span>
-            </div>
-            <div className="flex items-center gap-2">
-                <Input
-                    id={scoreId}
-                    type="number"
-                    min={criterion.minScore}
-                    max={criterion.maxScore}
-                    step={1}
-                    value={entry?.score ?? criterion.minScore}
-                    onChange={(event) => onScoreChange(Number(event.currentTarget.value))}
-                    className="w-20"
-                    aria-label={`Score for ${criterion.name}`}
-                    disabled={disabled}
-                />
-                <span className="text-xs text-ink-subtle">
-                    of {criterion.maxScore} (minimum {criterion.minScore})
-                </span>
-            </div>
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(2.5rem,1fr))] gap-1.5">
+                    {scoreChoices(criterion.minScore, criterion.maxScore).map((choice) => (
+                        <label
+                            key={choice}
+                            className={cn(
+                                "relative flex h-11 min-w-0 items-center justify-center rounded-sm border text-sm font-semibold tabular-nums transition-colors",
+                                "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-panel",
+                                selectedScore === choice
+                                    ? "border-primary bg-primary/10 text-primary"
+                                    : "border-line bg-app text-ink hover:border-line-strong",
+                                disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+                            )}
+                        >
+                            <input
+                                type="radio"
+                                name={`${groupName}-${criterion.id}`}
+                                value={choice}
+                                checked={selectedScore === choice}
+                                onChange={() => onScoreChange(choice)}
+                                disabled={disabled}
+                                aria-label={`${String(choice)} of ${String(criterion.maxScore)} for ${criterion.name}`}
+                                className="absolute inset-0 size-full cursor-pointer opacity-0 focus-visible:outline-none"
+                            />
+                            <span aria-hidden="true">{choice}</span>
+                        </label>
+                    ))}
+                </div>
+            </fieldset>
             <div className="flex flex-col gap-1">
                 <Label htmlFor={commentId} className="text-xs text-ink-muted">
                     Comment

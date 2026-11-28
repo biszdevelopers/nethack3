@@ -54,6 +54,7 @@ import type { OrganizationRole, Session } from "@nethack/contracts";
 import { api } from "./api.js";
 import { organizationSelectionStore } from "./organization-store.js";
 import { useActiveMembership, useSession } from "./session.js";
+import { NotificationBell } from "../capabilities/notifications/components/notification-bell.js";
 
 interface NavigationItem {
     readonly label: string;
@@ -275,6 +276,7 @@ export function AppShell(): ReactNode {
                             {roleLabel(membership.role)}
                         </Badge>
                     )}
+                    <NotificationBell />
                     <Button
                         variant="ghost"
                         size="icon"

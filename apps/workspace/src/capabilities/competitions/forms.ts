@@ -1,10 +1,35 @@
 import { z } from "zod";
 import {
     competitionEditionStatusSchema,
+    emailSchema,
     milestoneKindSchema,
     slugSchema,
 } from "@nethack/contracts";
 import { localInputToIso } from "../shared/datetime.js";
+
+function isHttpsUrl(value: string): boolean {
+    try {
+        return new URL(value).protocol === "https:";
+    } catch {
+        return false;
+    }
+}
+
+const contactEmailField = z
+    .string()
+    .trim()
+    .max(254)
+    .refine((value) => value === "" || emailSchema.safeParse(value).success, {
+        message: "Enter a valid email address.",
+    });
+
+const contactUrlField = z
+    .string()
+    .trim()
+    .max(2048)
+    .refine((value) => value === "" || isHttpsUrl(value), {
+        message: "Use an https URL.",
+    });
 
 const optionalDateTime = z
     .string()
@@ -26,6 +51,8 @@ export const editionSchema = z.object({
     description: z.string().max(5000),
     themeName: z.string().trim().max(160),
     themeDescription: z.string().max(2000),
+    contactEmail: contactEmailField,
+    contactUrl: contactUrlField,
     showScores: z.boolean(),
     showRanking: z.boolean(),
     timezone: z.string().min(1, "Enter an IANA time zone.").max(64),
