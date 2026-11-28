@@ -19,6 +19,8 @@ function source(
         summary: `Summary ${id}`,
         status,
         teamId: TEAM_ID,
+        videoUrl: null,
+        aiDisclosure: "",
         ...overrides,
     };
 }
@@ -53,8 +55,24 @@ describe("toVotableSubmissions", () => {
                 summary: "Summary a",
                 teamId: OTHER_TEAM_ID,
                 teamName: "Falcons",
+                videoUrl: null,
+                aiDisclosure: "",
             },
         ]);
+    });
+
+    it("passes the demonstration video and AI-use disclosure through", () => {
+        const result = toVotableSubmissions(
+            [
+                source("a", "submitted", {
+                    videoUrl: "https://videos.example.org/demo.mp4",
+                    aiDisclosure: "Used a code assistant for boilerplate.",
+                }),
+            ],
+            new Map(),
+        );
+        expect(result[0]?.videoUrl).toBe("https://videos.example.org/demo.mp4");
+        expect(result[0]?.aiDisclosure).toBe("Used a code assistant for boilerplate.");
     });
 
     it("keeps a null team and never resolves a name for it", () => {

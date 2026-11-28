@@ -46,6 +46,7 @@ import { describeError } from "../capabilities/shared/errors.js";
 import { humanizeToken } from "../capabilities/shared/format.js";
 import { RequestError } from "../capabilities/shared/states.jsx";
 import { roundSchema, type RoundForm } from "../capabilities/voting/forms.js";
+import { safeExternalUrl } from "../capabilities/voting/media.js";
 import {
     useOrganizerEditions,
     usePublicEditionOptions,
@@ -967,6 +968,7 @@ function StarEditor({
                 <ul className="flex flex-col gap-3">
                     {submissions.map((submission) => {
                         const stars = scores[submission.id] ?? 0;
+                        const videoUrl = safeExternalUrl(submission.videoUrl);
                         const canAdd =
                             !isSubmitting &&
                             !capBlocksFullBallot &&
@@ -978,13 +980,35 @@ function StarEditor({
                                 key={submission.id}
                                 className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3 first:border-t-0 first:pt-0"
                             >
-                                <div className="flex flex-col gap-0.5">
-                                    <span className="text-sm text-ink">
-                                        {submission.projectTitle}
-                                    </span>
-                                    <span className="text-xs text-ink-muted">
-                                        {submission.teamName ?? "No team"}
-                                    </span>
+                                <div className="flex min-w-0 flex-col gap-2">
+                                    <div className="flex flex-col gap-0.5">
+                                        <span className="text-sm text-ink">
+                                            {submission.projectTitle}
+                                        </span>
+                                        <span className="text-xs text-ink-muted">
+                                            {submission.teamName ?? "No team"}
+                                        </span>
+                                    </div>
+                                    {videoUrl === null ? null : (
+                                        <a
+                                            href={videoUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-xs text-primary underline-offset-4 hover:underline"
+                                        >
+                                            Watch demonstration video
+                                        </a>
+                                    )}
+                                    <div className="flex max-w-prose flex-col gap-0.5">
+                                        <span className="text-xs font-medium text-ink">
+                                            AI-use disclosure
+                                        </span>
+                                        <p className="whitespace-pre-wrap text-xs text-ink-muted">
+                                            {submission.aiDisclosure.trim().length === 0
+                                                ? "No AI-use disclosure was recorded."
+                                                : submission.aiDisclosure}
+                                        </p>
+                                    </div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Button

@@ -26,6 +26,7 @@ import type {
 import type { CompetitionsContract, EditionSummary } from "../../competitions/contracts.js";
 import type { OrganizationsContract } from "../../organizations/contracts.js";
 import type { ParticipantsContract } from "../../participants/contracts.js";
+import type { ProjectsContract } from "../../projects/contracts.js";
 import type { SubmissionsContract } from "../../submissions/contracts.js";
 import type { TeamsContract } from "../../teams/contracts.js";
 import { toVotableSubmissions } from "../domain/votable-submissions.js";
@@ -37,6 +38,11 @@ import type {
     VotingRepository,
     VotingRoundRow,
 } from "../infrastructure/voting-repository.js";
+import {
+    EMPTY_PROJECT_DISCLOSURE,
+    toProjectDisclosure,
+    type ProjectDisclosure,
+} from "./project-disclosure.js";
 
 const RESULT_LIMIT = 200;
 
@@ -48,6 +54,7 @@ export class VotingService {
     private readonly participants: ParticipantsContract;
     private readonly organizations: OrganizationsContract;
     private readonly teams: TeamsContract;
+    private readonly projects: ProjectsContract;
     private readonly events: OutboxPublisher;
     private readonly audit: AuditLogger;
     private readonly clock: Clock;
@@ -60,6 +67,7 @@ export class VotingService {
         participants: ParticipantsContract,
         organizations: OrganizationsContract,
         teams: TeamsContract,
+        projects: ProjectsContract,
         events: OutboxPublisher,
         audit: AuditLogger,
         clock: Clock,
@@ -71,6 +79,7 @@ export class VotingService {
         this.participants = participants;
         this.organizations = organizations;
         this.teams = teams;
+        this.projects = projects;
         this.events = events;
         this.audit = audit;
         this.clock = clock;
@@ -104,7 +113,17 @@ export class VotingService {
                 submission.teamId === null ? [] : [submission.teamId],
             ),
         );
-        return toVotableSubmissions(votable, teamNames);
+        const disclosures = await this.projectDisclosures(
+            organizationId,
+            votable.map((submission) => submission.projectId),
+        );
+        return toVotableSubmissions(
+            votable.map((submission) => ({
+                ...submission,
+                ...(disclosures.get(submission.projectId) ?? EMPTY_PROJECT_DISCLOSURE),
+            })),
+            teamNames,
+        );
     }
 
     async createRound(
@@ -678,6 +697,19 @@ export class VotingService {
             }),
         );
         return names;
+    }
+
+    private async projectDisclosures(
+        organizationId: string,
+        projectIds: readonly string[],
+    ): Promise<ReadonlyMap<string, ProjectDisclosure>> {
+        const entries = await Promise.all(
+            [...new Set(projectIds)].map(async (projectId) => {
+                const project = await this.projects.getProject(organizationId, projectId);
+                return [projectId, toProjectDisclosure(project)] as const;
+            }),
+        );
+        return new Map(entries);
     }
 
     private async assertSelectionsAreVotable(

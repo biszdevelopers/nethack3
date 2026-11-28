@@ -32,6 +32,7 @@ import { describeError } from "../../shared/errors.js";
 import { RequestError } from "../../shared/states.jsx";
 import { conflictSchema, flagSchema, type ConflictForm, type FlagForm } from "../forms.js";
 import { useDeclareConflict, useFlagAssignment } from "../hooks.js";
+import { safeExternalUrl } from "../media.js";
 
 function statusTone(status: JudgeAssignmentStatus): "neutral" | "primary" | "outline" | "critical" {
     switch (status) {
@@ -99,6 +100,7 @@ export function JudgingQueue({
     const current = items[activeIndex] ?? null;
     const currentFrozen = frozen || current?.frozen === true;
     const currentId = current?.id ?? null;
+    const currentVideoUrl = current === null ? null : safeExternalUrl(current.videoUrl);
     const declareConflict = useDeclareConflict(organizationId, currentId);
     const flagAssignment = useFlagAssignment(organizationId, currentId);
     const hasUnscored = items.some((item) => isPending(item.status));
@@ -260,6 +262,41 @@ export function JudgingQueue({
                                     Recusal note: {current.conflictNote}
                                 </p>
                             )}
+                            <div className="flex flex-col gap-3 border-t border-line pt-4">
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-sm font-medium text-ink">
+                                        Demonstration video
+                                    </span>
+                                    {currentVideoUrl === null ? (
+                                        <span className="text-sm text-ink-muted">
+                                            No demonstration video link was provided.
+                                        </span>
+                                    ) : (
+                                        <a
+                                            href={currentVideoUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-sm text-primary underline-offset-4 hover:underline"
+                                        >
+                                            Watch demonstration video
+                                        </a>
+                                    )}
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-sm font-medium text-ink">
+                                        AI-use disclosure
+                                    </span>
+                                    {current.aiDisclosure.trim().length === 0 ? (
+                                        <p className="text-sm text-ink-muted">
+                                            No AI-use disclosure was recorded.
+                                        </p>
+                                    ) : (
+                                        <p className="whitespace-pre-wrap text-sm text-ink">
+                                            {current.aiDisclosure}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
                             <div className="flex flex-wrap gap-2 border-t border-line pt-4">
                                 <Button asChild>
                                     <Link to={`/judging/assignments/${current.id}`}>

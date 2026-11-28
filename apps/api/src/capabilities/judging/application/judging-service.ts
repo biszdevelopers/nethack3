@@ -46,6 +46,7 @@ import {
     type EditionSummary,
 } from "../../competitions/contracts.js";
 import type { OrganizationSummary, OrganizationsContract } from "../../organizations/contracts.js";
+import type { ProjectsContract } from "../../projects/contracts.js";
 import type { SubmissionSummary, SubmissionsContract } from "../../submissions/contracts.js";
 import type { TeamsContract } from "../../teams/contracts.js";
 import { nextEvaluationRevision, toEvaluationVersion } from "../domain/evaluation-history.js";
@@ -68,6 +69,11 @@ import {
     DEFAULT_SCORE_CURVE_POINTS,
 } from "../domain/score-curve.js";
 import type { JudgingSummary } from "../contracts.js";
+import {
+    EMPTY_PROJECT_DISCLOSURE,
+    toProjectDisclosure,
+    type ProjectDisclosure,
+} from "./project-disclosure.js";
 import type {
     AssignmentView,
     CriterionRow,
@@ -83,6 +89,7 @@ export interface JudgingContracts {
     readonly competitions: CompetitionsContract;
     readonly organizations: OrganizationsContract;
     readonly teams: TeamsContract;
+    readonly projects: ProjectsContract;
 }
 
 export class JudgingService {
@@ -845,6 +852,9 @@ export class JudgingService {
             return toAssignment(
                 { assignment: row, judgeDisplayName: judge.displayName },
                 submission.title,
+                toProjectDisclosure(
+                    await this.contracts.projects.getProject(organizationId, submission.projectId),
+                ),
                 isEditionResultsFrozen(edition.status),
             );
         } catch (error) {
@@ -1160,12 +1170,16 @@ export class JudgingService {
             view.assignment.editionId,
             view.assignment.submissionId,
         );
+        const disclosure = toProjectDisclosure(
+            await this.contracts.projects.getProject(organizationId, submission.projectId),
+        );
         const evaluationView =
             evaluation === null ? null : toEvaluation(evaluation.evaluation, evaluation.scores);
         return {
             assignment: toAssignment(
                 view,
                 submission.title,
+                disclosure,
                 isEditionResultsFrozen(edition.status),
             ),
             rubric: toRubric(rubric),
@@ -1175,6 +1189,8 @@ export class JudgingService {
                 projectId: submission.projectId,
                 projectTitle: submission.title,
                 teamId: submission.teamId,
+                videoUrl: disclosure.videoUrl,
+                aiDisclosure: disclosure.aiDisclosure,
             },
             evaluation: evaluationView,
             scoreCurve: { points: [...curvePoints] },
@@ -1694,15 +1710,38 @@ export class JudgingService {
             return [];
         }
         const summaries = await this.submissionSummaries(organizationId, views);
-        return views.map((view) =>
-            toAssignment(
+        const disclosures = await this.projectDisclosures(
+            organizationId,
+            [...summaries.values()].map((summary) => summary.projectId),
+        );
+        return views.map((view) => {
+            const summary = summaries.get(view.assignment.submissionId);
+            if (summary === undefined) {
+                throw new InternalError("A judging assignment references a missing submission.");
+            }
+            return toAssignment(
                 view,
-                submissionTitle(summaries, view.assignment.submissionId),
+                summary.title,
+                disclosures.get(summary.projectId) ?? EMPTY_PROJECT_DISCLOSURE,
                 typeof frozen === "boolean"
                     ? frozen
                     : (frozen.get(view.assignment.editionId) ?? false),
-            ),
+            );
+        });
+    }
+
+    private async projectDisclosures(
+        organizationId: string,
+        projectIds: readonly string[],
+    ): Promise<ReadonlyMap<string, ProjectDisclosure>> {
+        const uniqueIds = [...new Set(projectIds)];
+        const entries = await Promise.all(
+            uniqueIds.map(async (projectId) => {
+                const project = await this.contracts.projects.getProject(organizationId, projectId);
+                return [projectId, toProjectDisclosure(project)] as const;
+            }),
         );
+        return new Map(entries);
     }
 
     private async submissionSummaries(
@@ -1942,6 +1981,7 @@ function toCriterion(row: CriterionRow): Criterion {
 function toAssignment(
     view: AssignmentView,
     projectTitle: string,
+    disclosure: ProjectDisclosure,
     frozen?: boolean,
 ): JudgeAssignment {
     return {
@@ -1953,6 +1993,8 @@ function toAssignment(
         judgeUserId: view.assignment.judgeUserId,
         judgeDisplayName: view.judgeDisplayName,
         projectTitle,
+        videoUrl: disclosure.videoUrl,
+        aiDisclosure: disclosure.aiDisclosure,
         status: view.assignment.status,
         conflictNote: view.assignment.conflictNote,
         assignmentNote: view.assignment.assignmentNote,
@@ -1969,14 +2011,6 @@ function scorableCriteria(rows: readonly CriterionRow[]): readonly ScorableCrite
         maxScore: row.maxScore,
         weight: Number(row.weight),
     }));
-}
-
-function submissionTitle(summaries: Map<string, SubmissionSummary>, submissionId: string): string {
-    const summary = summaries.get(submissionId);
-    if (summary === undefined) {
-        throw new InternalError("A judging assignment references a missing submission.");
-    }
-    return summary.title;
 }
 
 function nullableIso(value: Date | null): string | null {

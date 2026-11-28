@@ -42,6 +42,7 @@ import { humanizeToken } from "../../shared/format.js";
 import { RequestError } from "../../shared/states.jsx";
 import { RubricScoringForm } from "../components/rubric-scoring-form.js";
 import { conflictSchema, flagSchema, type ConflictForm, type FlagForm } from "../forms.js";
+import { safeExternalUrl } from "../media.js";
 import { curveScore, weightedRubricScore } from "../scoring.js";
 import {
     useAssignment,
@@ -162,6 +163,7 @@ export function AssignmentDetailPage(): ReactNode {
 
     const { assignment, rubric, criteria, submission, evaluation, scoreCurve, frozen } =
         detail.data;
+    const videoUrl = safeExternalUrl(submission.videoUrl);
     const evaluationKey = evaluation?.id ?? `${assignment.id}-new`;
     const serverScores: Record<string, RubricScore> = {};
     for (const score of evaluation?.scores ?? []) {
@@ -280,6 +282,48 @@ export function AssignmentDetailPage(): ReactNode {
 
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
                 <div className="flex min-w-0 flex-col gap-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Project context</CardTitle>
+                            <CardDescription>
+                                The demonstration video and AI-use disclosure the team provided.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex flex-col gap-4">
+                            <div className="flex flex-col gap-1">
+                                <h3 className="text-sm font-medium text-ink">
+                                    Demonstration video
+                                </h3>
+                                {videoUrl === null ? (
+                                    <p className="text-sm text-ink-muted">
+                                        No demonstration video link was provided.
+                                    </p>
+                                ) : (
+                                    <a
+                                        href={videoUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-sm text-primary underline-offset-4 hover:underline"
+                                    >
+                                        Watch demonstration video
+                                    </a>
+                                )}
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <h3 className="text-sm font-medium text-ink">AI-use disclosure</h3>
+                                {submission.aiDisclosure.trim().length === 0 ? (
+                                    <p className="text-sm text-ink-muted">
+                                        No AI-use disclosure was recorded.
+                                    </p>
+                                ) : (
+                                    <p className="whitespace-pre-wrap text-sm text-ink">
+                                        {submission.aiDisclosure}
+                                    </p>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+
                     <Card>
                         <CardHeader>
                             <CardTitle>Rubric scoring</CardTitle>

@@ -7,6 +7,8 @@ export interface VotableSubmissionSource {
     readonly summary: string;
     readonly status: SubmissionStatus;
     readonly teamId: string | null;
+    readonly videoUrl?: string | null;
+    readonly aiDisclosure?: string;
 }
 
 export function toVotableSubmissions(
@@ -22,5 +24,7 @@ export function toVotableSubmissions(
             teamId: submission.teamId,
             teamName:
                 submission.teamId === null ? null : (teamNames.get(submission.teamId) ?? null),
+            videoUrl: submission.videoUrl ?? null,
+            aiDisclosure: submission.aiDisclosure ?? "",
         }));
 }

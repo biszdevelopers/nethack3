@@ -92,6 +92,8 @@ export const votableSubmissionSchema = z.object({
     summary: z.string(),
     teamId: idSchema.nullable(),
     teamName: z.string().nullable(),
+    videoUrl: z.string().nullable(),
+    aiDisclosure: z.string(),
 });
 export type VotableSubmission = z.infer<typeof votableSubmissionSchema>;
 

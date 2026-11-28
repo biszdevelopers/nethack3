@@ -215,6 +215,8 @@ export const judgeAssignmentSchema = z.object({
     judgeUserId: idSchema,
     judgeDisplayName: z.string(),
     projectTitle: z.string(),
+    videoUrl: z.string().nullable(),
+    aiDisclosure: z.string(),
     status: judgeAssignmentStatusSchema,
     conflictNote: z.string().nullable(),
     assignmentNote: z.string(),
@@ -290,6 +292,8 @@ export const assignmentSubmissionSummarySchema = z.object({
     projectId: idSchema,
     projectTitle: z.string(),
     teamId: idSchema.nullable(),
+    videoUrl: z.string().nullable(),
+    aiDisclosure: z.string(),
 });
 export type AssignmentSubmissionSummary = z.infer<typeof assignmentSubmissionSummarySchema>;
 

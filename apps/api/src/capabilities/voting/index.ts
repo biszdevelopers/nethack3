@@ -2,6 +2,7 @@ import type { CapabilityDefinition } from "../../core/capability.js";
 import { COMPETITIONS_CONTRACT, type CompetitionsContract } from "../competitions/contracts.js";
 import { ORGANIZATIONS_CONTRACT, type OrganizationsContract } from "../organizations/contracts.js";
 import { PARTICIPANTS_CONTRACT, type ParticipantsContract } from "../participants/contracts.js";
+import { PROJECTS_CONTRACT, type ProjectsContract } from "../projects/contracts.js";
 import { SUBMISSIONS_CONTRACT, type SubmissionsContract } from "../submissions/contracts.js";
 import { TEAMS_CONTRACT, type TeamsContract } from "../teams/contracts.js";
 import { VotingService } from "./application/voting-service.js";
@@ -12,7 +13,14 @@ import { VotingRepository } from "./infrastructure/voting-repository.js";
 export const votingCapability: CapabilityDefinition = {
     id: "voting",
     version: "1.0.0",
-    dependencies: ["organizations", "competitions", "participants", "submissions", "teams"],
+    dependencies: [
+        "organizations",
+        "competitions",
+        "participants",
+        "submissions",
+        "teams",
+        "projects",
+    ],
     async register(context) {
         const repository = new VotingRepository();
         const competitions = context.contracts.get<CompetitionsContract>(COMPETITIONS_CONTRACT);
@@ -20,6 +28,7 @@ export const votingCapability: CapabilityDefinition = {
         const participants = context.contracts.get<ParticipantsContract>(PARTICIPANTS_CONTRACT);
         const organizations = context.contracts.get<OrganizationsContract>(ORGANIZATIONS_CONTRACT);
         const teams = context.contracts.get<TeamsContract>(TEAMS_CONTRACT);
+        const projects = context.contracts.get<ProjectsContract>(PROJECTS_CONTRACT);
         const service = new VotingService(
             context.database,
             repository,
@@ -28,6 +37,7 @@ export const votingCapability: CapabilityDefinition = {
             participants,
             organizations,
             teams,
+            projects,
             context.events,
             context.audit,
             context.clock,
