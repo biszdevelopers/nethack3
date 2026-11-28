@@ -1,10 +1,12 @@
 import {
+    applyRubricTemplateRequestSchema,
     assignmentDetailSchema,
     assignmentHistorySchema,
     conflictDeclarationRequestSchema,
     createAssignmentRequestSchema,
     createJudgeFlagRequestSchema,
     createRubricRequestSchema,
+    createRubricTemplateRequestSchema,
     evaluationSchema,
     judgeAssignmentSchema,
     judgeFlagSchema,
@@ -13,13 +15,20 @@ import {
     judgingResultSchema,
     judgingRubricSchema,
     listResponseSchema,
+    rubricTemplateSchema,
     saveEvaluationRequestSchema,
+    scoreCurveResponseSchema,
+    scoreCurveSchema,
+    updateRubricRequestSchema,
+    updateRubricTemplateRequestSchema,
+    type ApplyRubricTemplateRequest,
     type AssignmentDetail,
     type AssignmentHistory,
     type ConflictDeclarationRequest,
     type CreateAssignmentRequest,
     type CreateJudgeFlagRequest,
     type CreateRubricRequest,
+    type CreateRubricTemplateRequest,
     type Evaluation,
     type JudgeAssignment,
     type JudgeAssignmentStatus,
@@ -29,7 +38,12 @@ import {
     type JudgingResult,
     type JudgingRubric,
     type ListResponse,
+    type RubricTemplate,
     type SaveEvaluationRequest,
+    type ScoreCurve,
+    type ScoreCurveResponse,
+    type UpdateRubricRequest,
+    type UpdateRubricTemplateRequest,
 } from "@nethack/contracts";
 import type { ApiClient } from "./client.js";
 
@@ -38,6 +52,7 @@ const assignmentListSchema = listResponseSchema(judgeAssignmentSchema);
 const resultListSchema = listResponseSchema(judgingResultSchema);
 const flagListSchema = listResponseSchema(judgeFlagSchema);
 const historyListSchema = listResponseSchema(judgingHistoryItemSchema);
+const templateListSchema = listResponseSchema(rubricTemplateSchema);
 
 function organizationHeader(organizationId: string): Record<string, string> {
     return { "X-Nethack-Organization-Id": organizationId };
@@ -50,9 +65,29 @@ export class JudgingApi {
         this.client = client;
     }
 
-    async rubrics(organizationId: string, editionId: string): Promise<ListResponse<JudgingRubric>> {
-        return this.client.request("GET", `/api/v1/competitions/${editionId}/rubrics`, {
-            schema: rubricListSchema,
+    async rubrics(
+        organizationId: string,
+        editionId: string,
+        includeInactive = false,
+    ): Promise<ListResponse<JudgingRubric>> {
+        const path = `/api/v1/competitions/${editionId}/rubrics`;
+        const headers = organizationHeader(organizationId);
+        return includeInactive
+            ? this.client.request("GET", path, {
+                  query: { includeInactive: "true" },
+                  schema: rubricListSchema,
+                  headers,
+              })
+            : this.client.request("GET", path, { schema: rubricListSchema, headers });
+    }
+
+    async rubric(
+        organizationId: string,
+        editionId: string,
+        rubricId: string,
+    ): Promise<JudgingRubric> {
+        return this.client.request("GET", `/api/v1/competitions/${editionId}/rubrics/${rubricId}`, {
+            schema: judgingRubricSchema,
             headers: organizationHeader(organizationId),
         });
     }
@@ -65,6 +100,133 @@ export class JudgingApi {
         return this.client.request("POST", `/api/v1/competitions/${editionId}/rubrics`, {
             body: createRubricRequestSchema.parse(input),
             schema: judgingRubricSchema,
+            headers: organizationHeader(organizationId),
+        });
+    }
+
+    async updateRubric(
+        organizationId: string,
+        editionId: string,
+        rubricId: string,
+        input: UpdateRubricRequest,
+    ): Promise<JudgingRubric> {
+        return this.client.request(
+            "PATCH",
+            `/api/v1/competitions/${editionId}/rubrics/${rubricId}`,
+            {
+                body: updateRubricRequestSchema.parse(input),
+                schema: judgingRubricSchema,
+                headers: organizationHeader(organizationId),
+            },
+        );
+    }
+
+    async publishRubric(
+        organizationId: string,
+        editionId: string,
+        rubricId: string,
+    ): Promise<JudgingRubric> {
+        return this.client.request(
+            "POST",
+            `/api/v1/competitions/${editionId}/rubrics/${rubricId}/publish`,
+            { schema: judgingRubricSchema, headers: organizationHeader(organizationId) },
+        );
+    }
+
+    async archiveRubric(
+        organizationId: string,
+        editionId: string,
+        rubricId: string,
+    ): Promise<JudgingRubric> {
+        return this.client.request(
+            "POST",
+            `/api/v1/competitions/${editionId}/rubrics/${rubricId}/archive`,
+            { schema: judgingRubricSchema, headers: organizationHeader(organizationId) },
+        );
+    }
+
+    async rubricTemplates(organizationId: string): Promise<ListResponse<RubricTemplate>> {
+        return this.client.request(
+            "GET",
+            `/api/v1/organizations/${organizationId}/rubric-templates`,
+            {
+                schema: templateListSchema,
+                headers: organizationHeader(organizationId),
+            },
+        );
+    }
+
+    async createRubricTemplate(
+        organizationId: string,
+        input: CreateRubricTemplateRequest,
+    ): Promise<RubricTemplate> {
+        return this.client.request(
+            "POST",
+            `/api/v1/organizations/${organizationId}/rubric-templates`,
+            {
+                body: createRubricTemplateRequestSchema.parse(input),
+                schema: rubricTemplateSchema,
+                headers: organizationHeader(organizationId),
+            },
+        );
+    }
+
+    async updateRubricTemplate(
+        organizationId: string,
+        templateId: string,
+        input: UpdateRubricTemplateRequest,
+    ): Promise<RubricTemplate> {
+        return this.client.request(
+            "PUT",
+            `/api/v1/organizations/${organizationId}/rubric-templates/${templateId}`,
+            {
+                body: updateRubricTemplateRequestSchema.parse(input),
+                schema: rubricTemplateSchema,
+                headers: organizationHeader(organizationId),
+            },
+        );
+    }
+
+    async deleteRubricTemplate(organizationId: string, templateId: string): Promise<void> {
+        await this.client.request(
+            "DELETE",
+            `/api/v1/organizations/${organizationId}/rubric-templates/${templateId}`,
+            { headers: organizationHeader(organizationId) },
+        );
+    }
+
+    async applyRubricTemplate(
+        organizationId: string,
+        editionId: string,
+        templateId: string,
+        input: ApplyRubricTemplateRequest,
+    ): Promise<JudgingRubric> {
+        return this.client.request(
+            "POST",
+            `/api/v1/competitions/${editionId}/rubrics/templates/${templateId}/apply`,
+            {
+                body: applyRubricTemplateRequestSchema.parse(input),
+                schema: judgingRubricSchema,
+                headers: organizationHeader(organizationId),
+            },
+        );
+    }
+
+    async scoreCurve(organizationId: string, editionId: string): Promise<ScoreCurveResponse> {
+        return this.client.request("GET", `/api/v1/competitions/${editionId}/score-curve`, {
+            schema: scoreCurveResponseSchema,
+            headers: organizationHeader(organizationId),
+        });
+    }
+
+    async updateScoreCurve(
+        organizationId: string,
+        editionId: string,
+        curve: ScoreCurve,
+    ): Promise<ScoreCurveResponse> {
+        return this.client.request("PATCH", `/api/v1/competitions/${editionId}/score-curve`, {
+            body: scoreCurveSchema.parse(curve),
+            schema: scoreCurveResponseSchema,
             headers: organizationHeader(organizationId),
         });
     }

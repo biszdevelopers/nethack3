@@ -20,7 +20,6 @@ import {
     DialogHeader,
     DialogTitle,
     EmptyState,
-    EvaluationRubric,
     Form,
     FormField,
     KeyValue,
@@ -41,7 +40,9 @@ import { formatDateTime } from "../../shared/datetime.js";
 import { describeError } from "../../shared/errors.js";
 import { humanizeToken } from "../../shared/format.js";
 import { RequestError } from "../../shared/states.jsx";
+import { RubricScoringForm } from "../components/rubric-scoring-form.js";
 import { conflictSchema, flagSchema, type ConflictForm, type FlagForm } from "../forms.js";
+import { curveScore, weightedRubricScore } from "../scoring.js";
 import {
     useAssignment,
     useAssignmentHistory,
@@ -159,7 +160,8 @@ export function AssignmentDetailPage(): ReactNode {
         );
     }
 
-    const { assignment, criteria, submission, evaluation } = detail.data;
+    const { assignment, rubric, criteria, submission, evaluation, scoreCurve, frozen } =
+        detail.data;
     const evaluationKey = evaluation?.id ?? `${assignment.id}-new`;
     const serverScores: Record<string, RubricScore> = {};
     for (const score of evaluation?.scores ?? []) {
@@ -176,9 +178,12 @@ export function AssignmentDetailPage(): ReactNode {
     const setOverallComment = (next: string): void => {
         setEdit({ key: evaluationKey, scores, comment: next });
     };
-    const canEvaluate = assignment.status === "assigned" || assignment.status === "in_progress";
+    const canEvaluate =
+        (assignment.status === "assigned" || assignment.status === "in_progress") && !frozen;
     const submitted = evaluation?.status === "submitted";
     const hasScores = criteria.some((criterion) => scores[criterion.id] !== undefined);
+    const rawPreview = weightedRubricScore(criteria, scores);
+    const displayPreview = rawPreview === null ? null : curveScore(rawPreview, scoreCurve.points);
 
     const onSave = async (): Promise<void> => {
         if (criteria.length === 0) {
@@ -266,15 +271,23 @@ export function AssignmentDetailPage(): ReactNode {
                 }
             />
 
+            {frozen ? (
+                <Alert tone="warning" title="Results are published">
+                    This edition is completed, so judging is read-only. Saved scores and history
+                    remain available.
+                </Alert>
+            ) : null}
+
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
                 <div className="flex min-w-0 flex-col gap-6">
                     <Card>
                         <CardHeader>
                             <CardTitle>Rubric scoring</CardTitle>
                             <CardDescription>
+                                {rubric.name} · version {rubric.version} ·{" "}
                                 {criteria.length === 0
-                                    ? "This rubric has no criteria."
-                                    : "Scores are saved as a draft until you submit the evaluation."}
+                                    ? "no criteria"
+                                    : "scores are saved as a draft until you submit the evaluation"}
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -286,20 +299,15 @@ export function AssignmentDetailPage(): ReactNode {
                                 />
                             ) : (
                                 <div className="flex flex-col gap-4">
-                                    <EvaluationRubric
-                                        criteria={criteria.map((criterion) => ({
-                                            id: criterion.id,
-                                            label: criterion.name,
-                                            description: criterion.description,
-                                            maxScore: criterion.maxScore,
-                                            weight: criterion.weight,
-                                        }))}
+                                    <RubricScoringForm
+                                        criteria={criteria}
+                                        guidance={rubric.commentGuidance}
                                         scores={scores}
+                                        overallComment={overallComment}
+                                        rawScore={rawPreview}
+                                        displayScore={displayPreview}
                                         onChange={setScores}
-                                    />
-                                    <FormFieldForComment
-                                        value={overallComment}
-                                        onChange={setOverallComment}
+                                        onOverallCommentChange={setOverallComment}
                                     />
                                     <div className="flex flex-wrap gap-2 border-t border-line pt-4">
                                         <Button
@@ -371,6 +379,13 @@ export function AssignmentDetailPage(): ReactNode {
                                                     history.data.evaluation.weightedScore === null
                                                         ? "Not calculated"
                                                         : `${String(history.data.evaluation.weightedScore)}%`,
+                                            },
+                                            {
+                                                label: "Display score",
+                                                value:
+                                                    history.data.displayWeightedScore === null
+                                                        ? "Not calculated"
+                                                        : `${String(history.data.displayWeightedScore)} / 100`,
                                             },
                                             {
                                                 label: "Last updated",
@@ -588,29 +603,6 @@ export function AssignmentDetailPage(): ReactNode {
                     </Form>
                 </DialogContent>
             </Dialog>
-        </div>
-    );
-}
-
-function FormFieldForComment({
-    value,
-    onChange,
-}: {
-    readonly value: string;
-    readonly onChange: (value: string) => void;
-}): ReactNode {
-    const [id] = useState(() => `overall-comment-${Math.random().toString(36).slice(2)}`);
-    return (
-        <div className="flex flex-col gap-1.5">
-            <label htmlFor={id} className="text-sm font-medium text-ink">
-                Overall comment
-            </label>
-            <Textarea
-                id={id}
-                value={value}
-                onChange={(event) => onChange(event.currentTarget.value)}
-                placeholder="Summarize the evaluation for the organizer."
-            />
         </div>
     );
 }

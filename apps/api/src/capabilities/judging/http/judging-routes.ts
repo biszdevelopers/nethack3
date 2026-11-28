@@ -1,11 +1,13 @@
 import { z } from "zod";
 import {
+    applyRubricTemplateRequestSchema,
     assignmentDetailSchema,
     assignmentHistorySchema,
     conflictDeclarationRequestSchema,
     createAssignmentRequestSchema,
     createJudgeFlagRequestSchema,
     createRubricRequestSchema,
+    createRubricTemplateRequestSchema,
     evaluationSchema,
     judgeAssignmentSchema,
     judgeAssignmentStatusSchema,
@@ -15,7 +17,12 @@ import {
     judgingResultSchema,
     judgingRubricSchema,
     listResponseSchema,
+    rubricTemplateSchema,
     saveEvaluationRequestSchema,
+    scoreCurveResponseSchema,
+    scoreCurveSchema,
+    updateRubricRequestSchema,
+    updateRubricTemplateRequestSchema,
 } from "@nethack/contracts";
 import type { CapabilityContext } from "../../../core/capability.js";
 import { AuthGuard } from "../../../http/guards.js";
@@ -27,6 +34,11 @@ const assignmentParams = z.object({ assignmentId: z.uuid() });
 const flagParams = z.object({ flagId: z.uuid() });
 const assignmentQuerySchema = z.object({ status: judgeAssignmentStatusSchema.optional() });
 const historyQuerySchema = z.object({ editionId: z.uuid() });
+const rubricListQuerySchema = z.object({ includeInactive: z.enum(["true", "false"]).optional() });
+const rubricParams = z.object({ editionId: z.uuid(), rubricId: z.uuid() });
+const rubricTemplateParams = z.object({ organizationId: z.uuid(), templateId: z.uuid() });
+const organizationParams = z.object({ organizationId: z.uuid() });
+const applyTemplateParams = z.object({ editionId: z.uuid(), templateId: z.uuid() });
 
 export async function registerJudgingRoutes(
     app: NethackServer,
@@ -40,6 +52,7 @@ export async function registerJudgingRoutes(
         {
             schema: {
                 params: editionParams,
+                querystring: rubricListQuerySchema,
                 response: { 200: listResponseSchema(judgingRubricSchema) },
             },
         },
@@ -50,6 +63,7 @@ export async function registerJudgingRoutes(
                 auth,
                 access.organizationId,
                 request.params.editionId,
+                request.query.includeInactive === "true",
             );
             return { items: [...items], nextCursor: null };
         },
@@ -76,6 +90,257 @@ export async function registerJudgingRoutes(
                 request.ip,
             );
             return reply.status(201).send(rubric);
+        },
+    );
+
+    app.get(
+        "/api/v1/competitions/:editionId/rubrics/:rubricId",
+        {
+            schema: {
+                params: rubricParams,
+                response: { 200: judgingRubricSchema },
+            },
+        },
+        async (request) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            return service.getRubric(
+                auth,
+                access.organizationId,
+                request.params.editionId,
+                request.params.rubricId,
+            );
+        },
+    );
+
+    app.patch(
+        "/api/v1/competitions/:editionId/rubrics/:rubricId",
+        {
+            schema: {
+                params: rubricParams,
+                body: updateRubricRequestSchema,
+                response: { 200: judgingRubricSchema },
+            },
+        },
+        async (request) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            guard.requireOrganizer(access);
+            return service.updateRubric(
+                auth,
+                access.organizationId,
+                request.params.editionId,
+                request.params.rubricId,
+                request.body,
+                request.ip,
+            );
+        },
+    );
+
+    app.post(
+        "/api/v1/competitions/:editionId/rubrics/:rubricId/publish",
+        {
+            schema: {
+                params: rubricParams,
+                response: { 200: judgingRubricSchema },
+            },
+        },
+        async (request) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            guard.requireOrganizer(access);
+            return service.publishRubric(
+                auth,
+                access.organizationId,
+                request.params.editionId,
+                request.params.rubricId,
+                request.ip,
+            );
+        },
+    );
+
+    app.post(
+        "/api/v1/competitions/:editionId/rubrics/:rubricId/archive",
+        {
+            schema: {
+                params: rubricParams,
+                response: { 200: judgingRubricSchema },
+            },
+        },
+        async (request) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            guard.requireOrganizer(access);
+            return service.archiveRubric(
+                auth,
+                access.organizationId,
+                request.params.editionId,
+                request.params.rubricId,
+                request.ip,
+            );
+        },
+    );
+
+    app.post(
+        "/api/v1/competitions/:editionId/rubrics/templates/:templateId/apply",
+        {
+            schema: {
+                params: applyTemplateParams,
+                body: applyRubricTemplateRequestSchema,
+                response: { 201: judgingRubricSchema },
+            },
+        },
+        async (request, reply) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            guard.requireOrganizer(access);
+            const rubric = await service.applyRubricTemplate(
+                auth,
+                access.organizationId,
+                request.params.editionId,
+                request.params.templateId,
+                request.body,
+                request.ip,
+            );
+            return reply.status(201).send(rubric);
+        },
+    );
+
+    app.get(
+        "/api/v1/competitions/:editionId/score-curve",
+        {
+            schema: {
+                params: editionParams,
+                response: { 200: scoreCurveResponseSchema },
+            },
+        },
+        async (request) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            return service.getScoreCurve(auth, access.organizationId, request.params.editionId);
+        },
+    );
+
+    app.patch(
+        "/api/v1/competitions/:editionId/score-curve",
+        {
+            schema: {
+                params: editionParams,
+                body: scoreCurveSchema,
+                response: { 200: scoreCurveResponseSchema },
+            },
+        },
+        async (request) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(request, auth);
+            guard.requireOrganizer(access);
+            return service.updateScoreCurve(
+                auth,
+                access.organizationId,
+                request.params.editionId,
+                request.body,
+                request.ip,
+            );
+        },
+    );
+
+    app.get(
+        "/api/v1/organizations/:organizationId/rubric-templates",
+        {
+            schema: {
+                params: organizationParams,
+                response: { 200: listResponseSchema(rubricTemplateSchema) },
+            },
+        },
+        async (request) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(
+                request,
+                auth,
+                request.params.organizationId,
+            );
+            guard.requireOrganizer(access);
+            const items = await service.listRubricTemplates(auth, access.organizationId);
+            return { items: [...items], nextCursor: null };
+        },
+    );
+
+    app.post(
+        "/api/v1/organizations/:organizationId/rubric-templates",
+        {
+            schema: {
+                params: organizationParams,
+                body: createRubricTemplateRequestSchema,
+                response: { 201: rubricTemplateSchema },
+            },
+        },
+        async (request, reply) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(
+                request,
+                auth,
+                request.params.organizationId,
+            );
+            guard.requireOrganizer(access);
+            const template = await service.createRubricTemplate(
+                auth,
+                access.organizationId,
+                request.body,
+                request.ip,
+            );
+            return reply.status(201).send(template);
+        },
+    );
+
+    app.put(
+        "/api/v1/organizations/:organizationId/rubric-templates/:templateId",
+        {
+            schema: {
+                params: rubricTemplateParams,
+                body: updateRubricTemplateRequestSchema,
+                response: { 200: rubricTemplateSchema },
+            },
+        },
+        async (request) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(
+                request,
+                auth,
+                request.params.organizationId,
+            );
+            guard.requireOrganizer(access);
+            return service.updateRubricTemplate(
+                auth,
+                access.organizationId,
+                request.params.templateId,
+                request.body,
+                request.ip,
+            );
+        },
+    );
+
+    app.delete(
+        "/api/v1/organizations/:organizationId/rubric-templates/:templateId",
+        {
+            schema: {
+                params: rubricTemplateParams,
+            },
+        },
+        async (request, reply) => {
+            const auth = await guard.require(request);
+            const access = await guard.requireOrganization(
+                request,
+                auth,
+                request.params.organizationId,
+            );
+            guard.requireOrganizer(access);
+            await service.deleteRubricTemplate(
+                auth,
+                access.organizationId,
+                request.params.templateId,
+                request.ip,
+            );
+            return reply.status(204).send();
         },
     );
 

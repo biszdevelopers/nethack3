@@ -1,4 +1,5 @@
 import {
+    boolean,
     foreignKey,
     index,
     integer,
@@ -12,10 +13,71 @@ import {
     unique,
     uuid,
 } from "drizzle-orm/pg-core";
-import { competitionEditions } from "./competitions.js";
+import { competitionEditions, divisions } from "./competitions.js";
 import { organizations } from "./organizations.js";
 import { submissions } from "./submissions.js";
 import { users } from "./identity.js";
+
+export interface RubricCommentTemplate {
+    readonly label: string;
+    readonly body: string;
+}
+
+export interface RubricCommentGuidance {
+    readonly introduction: string;
+    readonly guidelines: readonly string[];
+    readonly templates: readonly RubricCommentTemplate[];
+}
+
+export interface RubricCriterionSnapshot {
+    readonly id: string;
+    readonly name: string;
+    readonly description: string;
+    readonly minScore: number;
+    readonly maxScore: number;
+    readonly weight: number;
+    readonly position: number;
+}
+
+export interface RubricSnapshot {
+    readonly rubricId: string;
+    readonly name: string;
+    readonly version: number;
+    readonly divisionId: string | null;
+    readonly commentGuidance: RubricCommentGuidance;
+    readonly criteria: readonly RubricCriterionSnapshot[];
+}
+
+export interface ScoreCurvePoint {
+    readonly rawScore: number;
+    readonly displayScore: number;
+}
+
+export interface RubricTemplateCriterion {
+    readonly name: string;
+    readonly description: string;
+    readonly minScore: number;
+    readonly maxScore: number;
+    readonly weight: number;
+    readonly position: number;
+}
+
+export interface RubricTemplateTrack {
+    readonly key: string;
+    readonly name: string;
+    readonly criteria: readonly RubricTemplateCriterion[];
+}
+
+export interface RubricTemplateDefinition {
+    readonly tracks: readonly RubricTemplateTrack[];
+    readonly commentGuidance: RubricCommentGuidance;
+}
+
+const EMPTY_COMMENT_GUIDANCE: RubricCommentGuidance = {
+    introduction: "",
+    guidelines: [],
+    templates: [],
+};
 
 export const assignmentStatusEnum = pgEnum("assignment_status", [
     "assigned",
@@ -35,16 +97,81 @@ export const judgingRubrics = pgTable(
             .notNull()
             .references(() => organizations.id, { onDelete: "cascade" }),
         editionId: uuid("edition_id").notNull(),
+        divisionId: uuid("division_id"),
+        familyId: uuid("family_id").notNull().defaultRandom(),
+        version: integer("version").notNull().default(1),
+        active: boolean("active").notNull().default(true),
         name: text("name").notNull(),
         description: text("description").notNull().default(""),
+        commentGuidance: jsonb("comment_guidance")
+            .$type<RubricCommentGuidance>()
+            .notNull()
+            .default(EMPTY_COMMENT_GUIDANCE),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     },
     (table) => [
         unique("judging_rubrics_id_org_unique").on(table.id, table.organizationId),
+        uniqueIndex("judging_rubrics_family_version_unique").on(table.familyId, table.version),
         index("judging_rubrics_org_edition_idx").on(table.organizationId, table.editionId),
+        index("judging_rubrics_family_idx").on(table.organizationId, table.familyId, table.version),
+        index("judging_rubrics_division_idx").on(table.organizationId, table.divisionId),
         foreignKey({
             name: "judging_rubrics_edition_fk",
+            columns: [table.editionId, table.organizationId],
+            foreignColumns: [competitionEditions.id, competitionEditions.organizationId],
+        }).onDelete("cascade"),
+        foreignKey({
+            name: "judging_rubrics_division_fk",
+            columns: [table.divisionId, table.organizationId],
+            foreignColumns: [divisions.id, divisions.organizationId],
+        }).onDelete("restrict"),
+    ],
+);
+
+export const judgingRubricTemplates = pgTable(
+    "judging_rubric_templates",
+    {
+        id: uuid("id").primaryKey().defaultRandom(),
+        organizationId: uuid("organization_id")
+            .notNull()
+            .references(() => organizations.id, { onDelete: "cascade" }),
+        name: text("name").notNull(),
+        description: text("description").notNull().default(""),
+        definition: jsonb("definition").$type<RubricTemplateDefinition>().notNull(),
+        createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+        updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    },
+    (table) => [
+        unique("judging_rubric_templates_id_org_unique").on(table.id, table.organizationId),
+        uniqueIndex("judging_rubric_templates_org_name_unique").on(
+            table.organizationId,
+            table.name,
+        ),
+        index("judging_rubric_templates_org_idx").on(table.organizationId),
+    ],
+);
+
+export const judgingScoreCurves = pgTable(
+    "judging_score_curves",
+    {
+        id: uuid("id").primaryKey().defaultRandom(),
+        organizationId: uuid("organization_id")
+            .notNull()
+            .references(() => organizations.id, { onDelete: "cascade" }),
+        editionId: uuid("edition_id").notNull(),
+        points: jsonb("points").$type<readonly ScoreCurvePoint[]>().notNull(),
+        createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+        updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    },
+    (table) => [
+        unique("judging_score_curves_id_org_unique").on(table.id, table.organizationId),
+        uniqueIndex("judging_score_curves_org_edition_unique").on(
+            table.organizationId,
+            table.editionId,
+        ),
+        foreignKey({
+            name: "judging_score_curves_edition_fk",
             columns: [table.editionId, table.organizationId],
             foreignColumns: [competitionEditions.id, competitionEditions.organizationId],
         }).onDelete("cascade"),
@@ -61,6 +188,7 @@ export const judgingCriteria = pgTable(
         rubricId: uuid("rubric_id").notNull(),
         name: text("name").notNull(),
         description: text("description").notNull().default(""),
+        minScore: integer("min_score").notNull().default(0),
         maxScore: integer("max_score").notNull(),
         weight: numeric("weight", { precision: 5, scale: 2 }).notNull().default("1"),
         position: integer("position").notNull().default(0),
@@ -215,6 +343,9 @@ export const evaluationVersions = pgTable(
         status: text("status").$type<EvaluationVersionStatus>().notNull(),
         overallComment: text("overall_comment").notNull().default(""),
         weightedScore: numeric("weighted_score", { precision: 7, scale: 2 }),
+        rubricId: uuid("rubric_id"),
+        rubricVersion: integer("rubric_version"),
+        rubricSnapshot: jsonb("rubric_snapshot").$type<RubricSnapshot>(),
         scores: jsonb("scores").$type<readonly EvaluationVersionScore[]>().notNull(),
         submittedAt: timestamp("submitted_at", { withTimezone: true }),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

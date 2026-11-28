@@ -1,4 +1,5 @@
-import type { JudgingResult } from "@nethack/contracts";
+import type { JudgingResult, ScoreCurvePoint } from "@nethack/contracts";
+import { applyScoreCurve } from "./score-curve.js";
 
 export interface JudgingResultRow {
     readonly assignmentId: string;
@@ -20,6 +21,7 @@ export interface JudgingResultRow {
  */
 export function aggregateJudgingResults(
     rows: readonly JudgingResultRow[],
+    scoreCurve?: readonly ScoreCurvePoint[],
 ): readonly JudgingResult[] {
     const grouped = new Map<string, JudgingResultRow[]>();
     for (const row of rows) {
@@ -54,6 +56,7 @@ export function aggregateJudgingResults(
             assignmentCount: group.length,
             submittedCount: submitted.length,
             averageScore,
+            displayScore: averageScore === null ? null : applyScoreCurve(averageScore, scoreCurve),
             rank: null,
             evaluations: group.map((row) => ({
                 assignmentId: row.assignmentId,

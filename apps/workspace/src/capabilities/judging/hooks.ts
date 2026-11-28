@@ -1,11 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+    ApplyRubricTemplateRequest,
     ConflictDeclarationRequest,
     CreateRubricRequest,
     CreateAssignmentRequest,
     CreateJudgeFlagRequest,
+    CreateRubricTemplateRequest,
     JudgeAssignmentStatus,
     SaveEvaluationRequest,
+    ScoreCurve,
+    UpdateRubricRequest,
+    UpdateRubricTemplateRequest,
 } from "@nethack/contracts";
 import { api } from "../../application/api.js";
 import { queryKeys } from "../shared/query-keys.js";
@@ -30,14 +35,44 @@ export function useMyAssignments(organizationId: string | null, status?: JudgeAs
     });
 }
 
-export function useEditionRubrics(organizationId: string | null, editionId: string | null) {
+export function useEditionRubrics(
+    organizationId: string | null,
+    editionId: string | null,
+    includeInactive = false,
+) {
     return useQuery({
-        queryKey: queryKeys.editionRubrics(editionId ?? "none"),
+        queryKey: [...queryKeys.editionRubrics(editionId ?? "none"), includeInactive],
         queryFn: async () => {
             if (organizationId === null || editionId === null) {
                 return { items: [], nextCursor: null };
             }
-            return api.judging.rubrics(organizationId, editionId);
+            return api.judging.rubrics(organizationId, editionId, includeInactive);
+        },
+        enabled: organizationId !== null && editionId !== null,
+    });
+}
+
+export function useRubricTemplateLibrary(organizationId: string | null, enabled = true) {
+    return useQuery({
+        queryKey: ["judging", organizationId ?? "none", "rubric-templates"],
+        queryFn: async () => {
+            if (organizationId === null) {
+                return { items: [], nextCursor: null };
+            }
+            return api.judging.rubricTemplates(organizationId);
+        },
+        enabled: organizationId !== null && enabled,
+    });
+}
+
+export function useEditionScoreCurve(organizationId: string | null, editionId: string | null) {
+    return useQuery({
+        queryKey: ["judging", editionId ?? "none", "score-curve"],
+        queryFn: async () => {
+            if (organizationId === null || editionId === null) {
+                return null;
+            }
+            return api.judging.scoreCurve(organizationId, editionId);
         },
         enabled: organizationId !== null && editionId !== null,
     });
@@ -353,6 +388,179 @@ export function useCreateRubric(organizationId: string | null, editionId: string
             }
             await queryClient.invalidateQueries({
                 queryKey: queryKeys.editionRubrics(editionId),
+            });
+        },
+    });
+}
+
+export function useUpdateRubric(organizationId: string | null, editionId: string | null) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (input: {
+            readonly rubricId: string;
+            readonly values: UpdateRubricRequest;
+        }) => {
+            if (organizationId === null || editionId === null) {
+                throw new Error("Select an edition first.");
+            }
+            return api.judging.updateRubric(
+                organizationId,
+                editionId,
+                input.rubricId,
+                input.values,
+            );
+        },
+        onSuccess: async () => {
+            if (editionId === null) {
+                return;
+            }
+            await queryClient.invalidateQueries({
+                queryKey: queryKeys.editionRubrics(editionId),
+            });
+        },
+    });
+}
+
+export function usePublishRubric(organizationId: string | null, editionId: string | null) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (rubricId: string) => {
+            if (organizationId === null || editionId === null) {
+                throw new Error("Select an edition first.");
+            }
+            return api.judging.publishRubric(organizationId, editionId, rubricId);
+        },
+        onSuccess: async () => {
+            if (editionId === null) {
+                return;
+            }
+            await queryClient.invalidateQueries({
+                queryKey: queryKeys.editionRubrics(editionId),
+            });
+        },
+    });
+}
+
+export function useArchiveRubric(organizationId: string | null, editionId: string | null) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (rubricId: string) => {
+            if (organizationId === null || editionId === null) {
+                throw new Error("Select an edition first.");
+            }
+            return api.judging.archiveRubric(organizationId, editionId, rubricId);
+        },
+        onSuccess: async () => {
+            if (editionId === null) {
+                return;
+            }
+            await queryClient.invalidateQueries({
+                queryKey: queryKeys.editionRubrics(editionId),
+            });
+        },
+    });
+}
+
+export function useCreateRubricTemplate(organizationId: string | null) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (input: CreateRubricTemplateRequest) => {
+            if (organizationId === null) {
+                throw new Error("Select an organization first.");
+            }
+            return api.judging.createRubricTemplate(organizationId, input);
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({
+                queryKey: ["judging", organizationId ?? "none", "rubric-templates"],
+            });
+        },
+    });
+}
+
+export function useUpdateRubricTemplate(organizationId: string | null) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (input: {
+            readonly templateId: string;
+            readonly values: UpdateRubricTemplateRequest;
+        }) => {
+            if (organizationId === null) {
+                throw new Error("Select an organization first.");
+            }
+            return api.judging.updateRubricTemplate(organizationId, input.templateId, input.values);
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({
+                queryKey: ["judging", organizationId ?? "none", "rubric-templates"],
+            });
+        },
+    });
+}
+
+export function useDeleteRubricTemplate(organizationId: string | null) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (templateId: string) => {
+            if (organizationId === null) {
+                throw new Error("Select an organization first.");
+            }
+            return api.judging.deleteRubricTemplate(organizationId, templateId);
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({
+                queryKey: ["judging", organizationId ?? "none", "rubric-templates"],
+            });
+        },
+    });
+}
+
+export function useApplyRubricTemplate(organizationId: string | null, editionId: string | null) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (input: {
+            readonly templateId: string;
+            readonly values: ApplyRubricTemplateRequest;
+        }) => {
+            if (organizationId === null || editionId === null) {
+                throw new Error("Select an edition first.");
+            }
+            return api.judging.applyRubricTemplate(
+                organizationId,
+                editionId,
+                input.templateId,
+                input.values,
+            );
+        },
+        onSuccess: async () => {
+            if (editionId === null) {
+                return;
+            }
+            await queryClient.invalidateQueries({
+                queryKey: queryKeys.editionRubrics(editionId),
+            });
+        },
+    });
+}
+
+export function useUpdateScoreCurve(organizationId: string | null, editionId: string | null) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (curve: ScoreCurve) => {
+            if (organizationId === null || editionId === null) {
+                throw new Error("Select an edition first.");
+            }
+            return api.judging.updateScoreCurve(organizationId, editionId, curve);
+        },
+        onSuccess: async () => {
+            if (editionId === null) {
+                return;
+            }
+            await queryClient.invalidateQueries({
+                queryKey: ["judging", editionId, "score-curve"],
+            });
+            await queryClient.invalidateQueries({
+                queryKey: queryKeys.editionJudgingResults(editionId),
             });
         },
     });

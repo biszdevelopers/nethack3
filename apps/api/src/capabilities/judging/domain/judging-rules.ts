@@ -1,8 +1,14 @@
-import type { JudgeAssignmentStatus, OrganizationRole } from "@nethack/contracts";
+import type {
+    CompetitionEditionStatus,
+    JudgeAssignmentStatus,
+    OrganizationRole,
+} from "@nethack/contracts";
+import { isEditionResultsFrozen } from "../../competitions/contracts.js";
 import { ConflictError, ValidationError } from "../../../core/errors.js";
 
 export interface ScorableCriterion {
     readonly id: string;
+    readonly minScore?: number;
     readonly maxScore: number;
     readonly weight: number;
 }
@@ -41,6 +47,14 @@ export class JudgingRules {
         }
     }
 
+    static assertEditionWritable(status: CompetitionEditionStatus): void {
+        if (isEditionResultsFrozen(status)) {
+            throw new ConflictError(
+                "Results are published for this edition, so judging is read-only.",
+            );
+        }
+    }
+
     static assertBeforeDeadline(dueAt: Date | null, now: Date): void {
         if (dueAt !== null && now.getTime() > dueAt.getTime()) {
             throw new ConflictError("The judging deadline for this assignment has passed.");
@@ -70,9 +84,10 @@ export class JudgingRules {
             if (!Number.isInteger(submitted.score)) {
                 throw new ValidationError("Scores must be whole numbers.");
             }
-            if (submitted.score < 0 || submitted.score > criterion.maxScore) {
+            const minScore = criterion.minScore ?? 0;
+            if (submitted.score < minScore || submitted.score > criterion.maxScore) {
                 throw new ValidationError(
-                    `Scores must be between 0 and ${criterion.maxScore} for this criterion.`,
+                    `Scores must be between ${String(minScore)} and ${String(criterion.maxScore)} for this criterion.`,
                 );
             }
         }
@@ -98,8 +113,10 @@ export class JudgingRules {
             if (score === undefined) {
                 throw new ValidationError("Every rubric criterion must be scored.");
             }
+            const minScore = criterion.minScore ?? 0;
+            const range = criterion.maxScore - minScore;
             totalWeight += criterion.weight;
-            weightedTotal += (score / criterion.maxScore) * criterion.weight;
+            weightedTotal += (range > 0 ? (score - minScore) / range : 0) * criterion.weight;
         }
         if (totalWeight <= 0) {
             throw new ValidationError("Judging criteria weights must be positive.");

@@ -29,6 +29,12 @@ export function JudgingResultsPanel({
 }): ReactNode {
     const results = useEditionJudgingResults(organizationId, editionId);
     const items = results.data?.items ?? [];
+    const hasCurve = items.some(
+        (result) =>
+            result.displayScore !== undefined &&
+            result.displayScore !== null &&
+            result.displayScore !== result.averageScore,
+    );
 
     return (
         <section
@@ -41,7 +47,8 @@ export function JudgingResultsPanel({
                 </h2>
                 <p className="text-sm text-ink-muted">
                     Mean weighted score of submitted evaluations. Draft evaluations are excluded
-                    from the ranking.
+                    from the ranking. The display score applies the edition curve and never changes
+                    the ranking.
                 </p>
             </div>
 
@@ -62,6 +69,7 @@ export function JudgingResultsPanel({
                                 <TableHead>Rank</TableHead>
                                 <TableHead>Project</TableHead>
                                 <TableHead>Score</TableHead>
+                                {hasCurve ? <TableHead>Display</TableHead> : null}
                                 <TableHead>Evaluations</TableHead>
                                 <TableHead className="text-right">Open</TableHead>
                             </TableRow>
@@ -97,6 +105,11 @@ export function JudgingResultsPanel({
                                     <TableCell className="font-medium tabular-nums">
                                         {scoreLabel(result.averageScore)}
                                     </TableCell>
+                                    {hasCurve ? (
+                                        <TableCell className="tabular-nums text-ink-muted">
+                                            {scoreLabel(result.displayScore ?? null)}
+                                        </TableCell>
+                                    ) : null}
                                     <TableCell className="tabular-nums text-ink-muted">
                                         {result.submittedCount} of {result.assignmentCount}{" "}
                                         submitted

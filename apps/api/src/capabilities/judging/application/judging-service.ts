@@ -1,8 +1,10 @@
 import type {
+    ApplyRubricTemplateRequest,
     AssignmentDetail,
     AssignmentHistory,
     CreateAssignmentRequest,
     CreateRubricRequest,
+    CreateRubricTemplateRequest,
     Criterion,
     Evaluation,
     JudgeAssignment,
@@ -13,8 +15,15 @@ import type {
     JudgingResult,
     JudgingRubric,
     OrganizationRole,
+    RubricTemplate,
+    RubricTemplateDefinition,
     SaveEvaluationRequest,
+    ScoreCurve,
+    ScoreCurveResponse,
+    UpdateRubricRequest,
+    UpdateRubricTemplateRequest,
 } from "@nethack/contracts";
+import { DEFAULT_RUBRIC_COMMENT_GUIDANCE } from "@nethack/contracts";
 import type { AuthContext } from "../../../authentication/types.js";
 import type { Clock } from "../../../core/clock.js";
 import { domainEvents } from "../../../core/domain-event.js";
@@ -31,7 +40,11 @@ import type {
     DatabaseConnection,
     DatabaseSession,
 } from "../../../infrastructure/database/client.js";
-import type { CompetitionsContract, EditionSummary } from "../../competitions/contracts.js";
+import {
+    isEditionResultsFrozen,
+    type CompetitionsContract,
+    type EditionSummary,
+} from "../../competitions/contracts.js";
 import type { OrganizationSummary, OrganizationsContract } from "../../organizations/contracts.js";
 import type { SubmissionSummary, SubmissionsContract } from "../../submissions/contracts.js";
 import type { TeamsContract } from "../../teams/contracts.js";
@@ -40,6 +53,20 @@ import { JudgeFlagRules } from "../domain/judge-flags.js";
 import { summarizeJudgeCoverage } from "../domain/judging-coverage.js";
 import { aggregateJudgingResults } from "../domain/judging-results.js";
 import { JudgingRules, type ScorableCriterion } from "../domain/judging-rules.js";
+import {
+    assertRubricCriteria,
+    assertTemplateTrack,
+    buildRubricSnapshot,
+    nextRubricVersion,
+    normalizeTemplateCriteria,
+    resolveRubricWeights,
+    type RubricCriterionInput,
+} from "../domain/rubric-definition.js";
+import {
+    applyScoreCurve,
+    assertValidScoreCurve,
+    DEFAULT_SCORE_CURVE_POINTS,
+} from "../domain/score-curve.js";
 import type { JudgingSummary } from "../contracts.js";
 import type {
     AssignmentView,
@@ -47,6 +74,7 @@ import type {
     EvaluationRow,
     JudgeFlagView,
     JudgingRepository,
+    RubricTemplateRow,
     RubricWithCriteria,
 } from "../infrastructure/judging-repository.js";
 
@@ -85,13 +113,36 @@ export class JudgingService {
         auth: AuthContext,
         organizationId: string,
         editionId: string,
+        includeInactive = false,
     ): Promise<readonly JudgingRubric[]> {
-        this.requireMembership(auth, organizationId);
+        const role = this.requireMembership(auth, organizationId);
+        if (includeInactive && !JudgingRules.isOrganizer(role)) {
+            throw new ForbiddenError("Only organizers can view inactive rubric versions.");
+        }
         await this.requireEdition(organizationId, editionId);
         const rows = await this.database.transaction({ organizationId }, async (session) =>
-            this.repository.listRubrics(session.db, organizationId, editionId),
+            this.repository.listRubrics(session.db, organizationId, editionId, includeInactive),
         );
         return rows.map(toRubric);
+    }
+
+    async getRubric(
+        auth: AuthContext,
+        organizationId: string,
+        editionId: string,
+        rubricId: string,
+    ): Promise<JudgingRubric> {
+        this.requireMembership(auth, organizationId);
+        await this.requireEdition(organizationId, editionId);
+        const rubric = await this.database.transaction({ organizationId }, async (session) =>
+            this.repository.findRubric(session.db, organizationId, rubricId),
+        );
+        if (rubric === null || rubric.rubric.editionId !== editionId) {
+            throw new NotFoundError(
+                "The judging rubric was not found for this competition edition.",
+            );
+        }
+        return toRubric(rubric);
     }
 
     async createRubric(
@@ -103,22 +154,30 @@ export class JudgingService {
     ): Promise<JudgingRubric> {
         this.assertOrganizer(auth, organizationId);
         await this.requireEdition(organizationId, editionId);
+        await this.requireDivision(organizationId, editionId, input.divisionId);
+        const criteria = this.resolveCriteria(input.criteria);
+        const guidance = input.commentGuidance ?? DEFAULT_RUBRIC_COMMENT_GUIDANCE;
         const created = await this.database.transaction(
             { organizationId, userId: auth.user.id },
             async (session) => {
                 const rubric = await this.repository.insertRubric(session, {
                     organizationId,
                     editionId,
+                    divisionId: input.divisionId,
+                    version: 1,
+                    active: true,
                     name: input.name,
                     description: input.description,
+                    commentGuidance: guidance,
                 });
-                const criteria = await this.repository.insertCriteria(
+                const inserted = await this.repository.insertCriteria(
                     session,
-                    input.criteria.map((criterion, position) => ({
+                    criteria.map((criterion, position) => ({
                         organizationId,
                         rubricId: rubric.id,
                         name: criterion.name,
                         description: criterion.description,
+                        minScore: criterion.minScore,
                         maxScore: criterion.maxScore,
                         weight: criterion.weight.toFixed(2),
                         position,
@@ -130,13 +189,476 @@ export class JudgingService {
                     action: "judging.rubric.created",
                     entityType: "judging_rubric",
                     entityId: rubric.id,
-                    metadata: { editionId, criteriaCount: criteria.length },
+                    metadata: {
+                        editionId,
+                        divisionId: rubric.divisionId,
+                        version: rubric.version,
+                        criteriaCount: inserted.length,
+                    },
                     ip,
                 });
-                return { rubric, criteria };
+                return { rubric, criteria: inserted };
             },
         );
         return toRubric(created);
+    }
+
+    async updateRubric(
+        auth: AuthContext,
+        organizationId: string,
+        editionId: string,
+        rubricId: string,
+        input: UpdateRubricRequest,
+        ip: string | null,
+    ): Promise<JudgingRubric> {
+        this.assertOrganizer(auth, organizationId);
+        await this.requireEdition(organizationId, editionId);
+        const now = this.clock.now();
+        const created = await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const existing = await this.repository.findRubricForUpdate(
+                    session,
+                    organizationId,
+                    rubricId,
+                );
+                if (existing === null || existing.rubric.editionId !== editionId) {
+                    throw new NotFoundError(
+                        "The judging rubric was not found for this competition edition.",
+                    );
+                }
+                const divisionId =
+                    input.divisionId === undefined ? existing.rubric.divisionId : input.divisionId;
+                await this.requireDivision(organizationId, editionId, divisionId);
+                const criteria =
+                    input.criteria === undefined
+                        ? existing.criteria.map((criterion) => ({
+                              name: criterion.name,
+                              description: criterion.description,
+                              minScore: criterion.minScore,
+                              maxScore: criterion.maxScore,
+                              weight: Number(criterion.weight),
+                          }))
+                        : this.resolveCriteria(input.criteria);
+                const latest = await this.repository.maxRubricVersion(
+                    session.db,
+                    organizationId,
+                    existing.rubric.familyId,
+                );
+                const rubric = await this.repository.insertRubric(session, {
+                    organizationId,
+                    editionId,
+                    divisionId,
+                    familyId: existing.rubric.familyId,
+                    version: nextRubricVersion(latest),
+                    active: true,
+                    name: input.name ?? existing.rubric.name,
+                    description: input.description ?? existing.rubric.description,
+                    commentGuidance: input.commentGuidance ?? existing.rubric.commentGuidance,
+                });
+                const inserted = await this.repository.insertCriteria(
+                    session,
+                    criteria.map((criterion, position) => ({
+                        organizationId,
+                        rubricId: rubric.id,
+                        name: criterion.name,
+                        description: criterion.description,
+                        minScore: criterion.minScore,
+                        maxScore: criterion.maxScore,
+                        weight: criterion.weight.toFixed(2),
+                        position,
+                    })),
+                );
+                await this.repository.deactivateRubricFamily(
+                    session,
+                    organizationId,
+                    existing.rubric.familyId,
+                    rubric.id,
+                    now,
+                );
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: "judging.rubric.version_created",
+                    entityType: "judging_rubric",
+                    entityId: rubric.id,
+                    metadata: {
+                        editionId,
+                        previousRubricId: existing.rubric.id,
+                        version: rubric.version,
+                    },
+                    ip,
+                });
+                return { rubric, criteria: inserted };
+            },
+        );
+        return toRubric(created);
+    }
+
+    async publishRubric(
+        auth: AuthContext,
+        organizationId: string,
+        editionId: string,
+        rubricId: string,
+        ip: string | null,
+    ): Promise<JudgingRubric> {
+        this.assertOrganizer(auth, organizationId);
+        await this.requireEdition(organizationId, editionId);
+        const now = this.clock.now();
+        const published = await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const existing = await this.repository.findRubricForUpdate(
+                    session,
+                    organizationId,
+                    rubricId,
+                );
+                if (existing === null || existing.rubric.editionId !== editionId) {
+                    throw new NotFoundError(
+                        "The judging rubric was not found for this competition edition.",
+                    );
+                }
+                const rubric = existing.rubric.active
+                    ? existing.rubric
+                    : await this.repository.setRubricActive(
+                          session,
+                          organizationId,
+                          rubricId,
+                          true,
+                          now,
+                      );
+                if (rubric === null) {
+                    throw new NotFoundError("The judging rubric was not found.");
+                }
+                await this.repository.deactivateRubricFamily(
+                    session,
+                    organizationId,
+                    existing.rubric.familyId,
+                    rubricId,
+                    now,
+                );
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: "judging.rubric.published",
+                    entityType: "judging_rubric",
+                    entityId: rubricId,
+                    metadata: { editionId, version: existing.rubric.version },
+                    ip,
+                });
+                return { rubric, criteria: existing.criteria };
+            },
+        );
+        return toRubric(published);
+    }
+
+    async archiveRubric(
+        auth: AuthContext,
+        organizationId: string,
+        editionId: string,
+        rubricId: string,
+        ip: string | null,
+    ): Promise<JudgingRubric> {
+        this.assertOrganizer(auth, organizationId);
+        await this.requireEdition(organizationId, editionId);
+        const now = this.clock.now();
+        const archived = await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const existing = await this.repository.findRubricForUpdate(
+                    session,
+                    organizationId,
+                    rubricId,
+                );
+                if (existing === null || existing.rubric.editionId !== editionId) {
+                    throw new NotFoundError(
+                        "The judging rubric was not found for this competition edition.",
+                    );
+                }
+                const rubric = existing.rubric.active
+                    ? await this.repository.setRubricActive(
+                          session,
+                          organizationId,
+                          rubricId,
+                          false,
+                          now,
+                      )
+                    : existing.rubric;
+                if (rubric === null) {
+                    throw new NotFoundError("The judging rubric was not found.");
+                }
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: "judging.rubric.archived",
+                    entityType: "judging_rubric",
+                    entityId: rubricId,
+                    metadata: { editionId, version: existing.rubric.version },
+                    ip,
+                });
+                return { rubric, criteria: existing.criteria };
+            },
+        );
+        return toRubric(archived);
+    }
+
+    async listRubricTemplates(
+        auth: AuthContext,
+        organizationId: string,
+    ): Promise<readonly RubricTemplate[]> {
+        this.assertOrganizer(auth, organizationId);
+        const rows = await this.database.transaction({ organizationId }, async (session) =>
+            this.repository.listRubricTemplates(session.db, organizationId),
+        );
+        return rows.map(toRubricTemplate);
+    }
+
+    async createRubricTemplate(
+        auth: AuthContext,
+        organizationId: string,
+        input: CreateRubricTemplateRequest,
+        ip: string | null,
+    ): Promise<RubricTemplate> {
+        this.assertOrganizer(auth, organizationId);
+        assertTemplateDefinition(input.definition);
+        try {
+            return await this.database.transaction(
+                { organizationId, userId: auth.user.id },
+                async (session) => {
+                    const template = await this.repository.insertRubricTemplate(session, {
+                        organizationId,
+                        name: input.name,
+                        description: input.description,
+                        definition: input.definition,
+                    });
+                    await this.audit.record(session, {
+                        organizationId,
+                        actorUserId: auth.user.id,
+                        action: "judging.rubric_template.created",
+                        entityType: "judging_rubric_template",
+                        entityId: template.id,
+                        metadata: { name: template.name },
+                        ip,
+                    });
+                    return toRubricTemplate(template);
+                },
+            );
+        } catch (error) {
+            if (isUniqueViolation(error)) {
+                throw new ConflictError("A rubric template already uses that name.");
+            }
+            throw error;
+        }
+    }
+
+    async updateRubricTemplate(
+        auth: AuthContext,
+        organizationId: string,
+        templateId: string,
+        input: UpdateRubricTemplateRequest,
+        ip: string | null,
+    ): Promise<RubricTemplate> {
+        this.assertOrganizer(auth, organizationId);
+        assertTemplateDefinition(input.definition);
+        try {
+            return await this.database.transaction(
+                { organizationId, userId: auth.user.id },
+                async (session) => {
+                    const template = await this.repository.updateRubricTemplate(
+                        session,
+                        organizationId,
+                        templateId,
+                        {
+                            name: input.name,
+                            description: input.description,
+                            definition: input.definition,
+                            updatedAt: this.clock.now(),
+                        },
+                    );
+                    if (template === null) {
+                        throw new NotFoundError("The rubric template was not found.");
+                    }
+                    await this.audit.record(session, {
+                        organizationId,
+                        actorUserId: auth.user.id,
+                        action: "judging.rubric_template.updated",
+                        entityType: "judging_rubric_template",
+                        entityId: template.id,
+                        metadata: { name: template.name },
+                        ip,
+                    });
+                    return toRubricTemplate(template);
+                },
+            );
+        } catch (error) {
+            if (isUniqueViolation(error)) {
+                throw new ConflictError("A rubric template already uses that name.");
+            }
+            throw error;
+        }
+    }
+
+    async deleteRubricTemplate(
+        auth: AuthContext,
+        organizationId: string,
+        templateId: string,
+        ip: string | null,
+    ): Promise<void> {
+        this.assertOrganizer(auth, organizationId);
+        await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const template = await this.repository.findRubricTemplate(
+                    session.db,
+                    organizationId,
+                    templateId,
+                );
+                if (template === null) {
+                    throw new NotFoundError("The rubric template was not found.");
+                }
+                await this.repository.deleteRubricTemplate(session, organizationId, templateId);
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: "judging.rubric_template.deleted",
+                    entityType: "judging_rubric_template",
+                    entityId: templateId,
+                    metadata: { name: template.name },
+                    ip,
+                });
+            },
+        );
+    }
+
+    async applyRubricTemplate(
+        auth: AuthContext,
+        organizationId: string,
+        editionId: string,
+        templateId: string,
+        input: ApplyRubricTemplateRequest,
+        ip: string | null,
+    ): Promise<JudgingRubric> {
+        this.assertOrganizer(auth, organizationId);
+        await this.requireEdition(organizationId, editionId);
+        await this.requireDivision(organizationId, editionId, input.divisionId);
+        const created = await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const template = await this.repository.findRubricTemplate(
+                    session.db,
+                    organizationId,
+                    templateId,
+                );
+                if (template === null) {
+                    throw new NotFoundError("The rubric template was not found.");
+                }
+                const track =
+                    input.trackKey === undefined
+                        ? template.definition.tracks[0]
+                        : template.definition.tracks.find(
+                              (candidate) => candidate.key === input.trackKey,
+                          );
+                if (track === undefined) {
+                    throw new NotFoundError("The rubric template track was not found.");
+                }
+                const criteria = normalizeTemplateCriteria(track.criteria);
+                const rubric = await this.repository.insertRubric(session, {
+                    organizationId,
+                    editionId,
+                    divisionId: input.divisionId,
+                    version: 1,
+                    active: true,
+                    name: input.name ?? `${template.name} — ${track.name}`,
+                    description: template.description,
+                    commentGuidance: template.definition.commentGuidance,
+                });
+                const inserted = await this.repository.insertCriteria(
+                    session,
+                    criteria.map((criterion, position) => ({
+                        organizationId,
+                        rubricId: rubric.id,
+                        name: criterion.name,
+                        description: criterion.description,
+                        minScore: criterion.minScore,
+                        maxScore: criterion.maxScore,
+                        weight: criterion.weight.toFixed(2),
+                        position,
+                    })),
+                );
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: "judging.rubric_template.applied",
+                    entityType: "judging_rubric",
+                    entityId: rubric.id,
+                    metadata: {
+                        editionId,
+                        templateId,
+                        trackKey: track.key,
+                        divisionId: rubric.divisionId,
+                    },
+                    ip,
+                });
+                return { rubric, criteria: inserted };
+            },
+        );
+        return toRubric(created);
+    }
+
+    async getScoreCurve(
+        auth: AuthContext,
+        organizationId: string,
+        editionId: string,
+    ): Promise<ScoreCurveResponse> {
+        this.requireMembership(auth, organizationId);
+        await this.requireEdition(organizationId, editionId);
+        const row = await this.database.transaction({ organizationId }, async (session) =>
+            this.repository.findScoreCurve(session.db, organizationId, editionId),
+        );
+        return {
+            editionId,
+            curve: { points: row === null ? [...DEFAULT_SCORE_CURVE_POINTS] : [...row.points] },
+            updatedAt: row === null ? null : row.updatedAt.toISOString(),
+        };
+    }
+
+    async updateScoreCurve(
+        auth: AuthContext,
+        organizationId: string,
+        editionId: string,
+        curve: ScoreCurve,
+        ip: string | null,
+    ): Promise<ScoreCurveResponse> {
+        this.assertOrganizer(auth, organizationId);
+        await this.requireEdition(organizationId, editionId);
+        assertValidScoreCurve(curve.points);
+        const now = this.clock.now();
+        const row = await this.database.transaction(
+            { organizationId, userId: auth.user.id },
+            async (session) => {
+                const saved = await this.repository.upsertScoreCurve(session, {
+                    organizationId,
+                    editionId,
+                    points: curve.points,
+                    updatedAt: now,
+                });
+                await this.audit.record(session, {
+                    organizationId,
+                    actorUserId: auth.user.id,
+                    action: "judging.score_curve.updated",
+                    entityType: "judging_score_curve",
+                    entityId: saved.id,
+                    metadata: { editionId, points: curve.points },
+                    ip,
+                });
+                return saved;
+            },
+        );
+        return {
+            editionId,
+            curve: { points: [...row.points] },
+            updatedAt: row.updatedAt.toISOString(),
+        };
     }
 
     async listEditionAssignments(
@@ -145,11 +667,11 @@ export class JudgingService {
         editionId: string,
     ): Promise<readonly JudgeAssignment[]> {
         this.assertOrganizer(auth, organizationId);
-        await this.requireEdition(organizationId, editionId);
+        const edition = await this.requireEdition(organizationId, editionId);
         const views = await this.database.transaction({ organizationId }, async (session) =>
             this.repository.listAssignmentsForEdition(session.db, organizationId, editionId),
         );
-        return this.toAssignments(organizationId, views);
+        return this.toAssignments(organizationId, views, isEditionResultsFrozen(edition.status));
     }
 
     async editionResults(
@@ -166,12 +688,15 @@ export class JudgingService {
         editionId: string,
     ): Promise<readonly JudgingResult[]> {
         await this.requireEdition(organizationId, editionId);
-        const [evaluationRows, submissionRows, teamRows] = await Promise.all([
+        const [evaluationRows, submissionRows, teamRows, curveRow] = await Promise.all([
             this.database.transaction({ organizationId }, async (session) =>
                 this.repository.listEditionEvaluationRows(session.db, organizationId, editionId),
             ),
             this.contracts.submissions.listEditionSubmissions(organizationId, editionId),
             this.contracts.teams.listEditionTeams(organizationId, editionId),
+            this.database.transaction({ organizationId }, async (session) =>
+                this.repository.findScoreCurve(session.db, organizationId, editionId),
+            ),
         ]);
         const submissionsById = new Map(
             submissionRows.map((submission) => [submission.id, submission] as const),
@@ -193,7 +718,10 @@ export class JudgingService {
                         : (teamsById.get(submission.teamId)?.name ?? null),
             };
         });
-        return aggregateJudgingResults(rows);
+        return aggregateJudgingResults(
+            rows,
+            curveRow === null ? DEFAULT_SCORE_CURVE_POINTS : curveRow.points,
+        );
     }
 
     async createAssignment(
@@ -204,7 +732,7 @@ export class JudgingService {
         ip: string | null,
     ): Promise<JudgeAssignment> {
         this.assertOrganizer(auth, organizationId);
-        await this.requireEdition(organizationId, editionId);
+        const edition = await this.requireEdition(organizationId, editionId);
         const submission = await this.requireSubmission(
             organizationId,
             editionId,
@@ -317,6 +845,7 @@ export class JudgingService {
             return toAssignment(
                 { assignment: row, judgeDisplayName: judge.displayName },
                 submission.title,
+                isEditionResultsFrozen(edition.status),
             );
         } catch (error) {
             if (isUniqueViolation(error)) {
@@ -340,7 +869,19 @@ export class JudgingService {
                 status,
             ),
         );
-        return this.toAssignments(organizationId, views);
+        if (views.length === 0) {
+            return [];
+        }
+        const editionIds = [...new Set(views.map((view) => view.assignment.editionId))];
+        const editions = await Promise.all(
+            editionIds.map((editionId) => this.requireEdition(organizationId, editionId)),
+        );
+        const frozenByEditionId = new Map(
+            editions.map(
+                (edition) => [edition.id, isEditionResultsFrozen(edition.status)] as const,
+            ),
+        );
+        return this.toAssignments(organizationId, views, frozenByEditionId);
     }
 
     async reportFlag(
@@ -526,7 +1067,7 @@ export class JudgingService {
     ): Promise<readonly JudgingHistoryItem[]> {
         this.requireMembership(auth, organizationId);
         await this.requireEdition(organizationId, editionId);
-        const [rows, submissionRows, teamRows] = await Promise.all([
+        const [rows, submissionRows, teamRows, curveRow] = await Promise.all([
             this.database.transaction({ organizationId }, async (session) =>
                 this.repository.listSubmittedEvaluationRows(
                     session.db,
@@ -537,7 +1078,11 @@ export class JudgingService {
             ),
             this.contracts.submissions.listEditionSubmissions(organizationId, editionId),
             this.contracts.teams.listEditionTeams(organizationId, editionId),
+            this.database.transaction({ organizationId }, async (session) =>
+                this.repository.findScoreCurve(session.db, organizationId, editionId),
+            ),
         ]);
+        const curvePoints = curveRow === null ? DEFAULT_SCORE_CURVE_POINTS : curveRow.points;
         const submissionsById = new Map(
             submissionRows.map((submission) => [submission.id, submission] as const),
         );
@@ -558,8 +1103,13 @@ export class JudgingService {
                         ? null
                         : (teamsById.get(submission.teamId)?.name ?? null),
                 rubricName: row.rubricName,
+                rubricVersion: row.rubricVersion,
                 evaluationId: row.evaluationId,
                 weightedScore: row.weightedScore,
+                displayWeightedScore:
+                    row.weightedScore === null
+                        ? null
+                        : applyScoreCurve(row.weightedScore, curvePoints),
                 overallComment: row.overallComment,
                 submittedAt: row.submittedAt.toISOString(),
                 scores: row.scores.map((score) => ({ ...score })),
@@ -591,19 +1141,34 @@ export class JudgingService {
                 organizationId,
                 assignmentId,
             ),
+            curve: await this.repository.findScoreCurve(
+                session.db,
+                organizationId,
+                view.assignment.editionId,
+            ),
         }));
         const rubric = loaded.rubric;
         if (rubric === null) {
             throw new NotFoundError("The judging rubric was not found.");
         }
         const evaluation = loaded.evaluation;
+        const curvePoints =
+            loaded.curve === null ? DEFAULT_SCORE_CURVE_POINTS : loaded.curve.points;
+        const edition = await this.requireEdition(organizationId, view.assignment.editionId);
         const submission = await this.requireSubmission(
             organizationId,
             view.assignment.editionId,
             view.assignment.submissionId,
         );
+        const evaluationView =
+            evaluation === null ? null : toEvaluation(evaluation.evaluation, evaluation.scores);
         return {
-            assignment: toAssignment(view, submission.title),
+            assignment: toAssignment(
+                view,
+                submission.title,
+                isEditionResultsFrozen(edition.status),
+            ),
+            rubric: toRubric(rubric),
             criteria: rubric.criteria.map(toCriterion),
             submission: {
                 id: submission.id,
@@ -611,8 +1176,13 @@ export class JudgingService {
                 projectTitle: submission.title,
                 teamId: submission.teamId,
             },
-            evaluation:
-                evaluation === null ? null : toEvaluation(evaluation.evaluation, evaluation.scores),
+            evaluation: evaluationView,
+            scoreCurve: { points: [...curvePoints] },
+            displayWeightedScore:
+                evaluationView === null || evaluationView.weightedScore === null
+                    ? null
+                    : applyScoreCurve(evaluationView.weightedScore, curvePoints),
+            frozen: isEditionResultsFrozen(edition.status),
         };
     }
 
@@ -669,6 +1239,18 @@ export class JudgingService {
         input: SaveEvaluationRequest,
     ): Promise<Evaluation> {
         this.requireMembership(auth, organizationId);
+        const existingAssignment = await this.database.transaction(
+            { organizationId },
+            async (session) =>
+                this.repository.findAssignment(session.db, organizationId, assignmentId),
+        );
+        if (existingAssignment === null) {
+            throw new NotFoundError("The judging assignment was not found.");
+        }
+        if (existingAssignment.judgeUserId !== auth.user.id) {
+            throw new ForbiddenError("Only the assigned judge may score this assignment.");
+        }
+        await this.requireWritableEdition(organizationId, existingAssignment.editionId);
         const now = this.clock.now();
         return this.database.transaction(
             { organizationId, userId: auth.user.id },
@@ -756,6 +1338,7 @@ export class JudgingService {
                     assignmentId,
                     judgeUserId: auth.user.id,
                     evaluation,
+                    rubric,
                     status: "draft",
                     scores: input.scores,
                     submittedAt: null,
@@ -781,6 +1364,7 @@ export class JudgingService {
         if (assignment.judgeUserId !== auth.user.id) {
             throw new ForbiddenError("Only the assigned judge may submit this evaluation.");
         }
+        await this.requireWritableEdition(organizationId, assignment.editionId);
         const submission = await this.requireSubmission(
             organizationId,
             assignment.editionId,
@@ -852,6 +1436,7 @@ export class JudgingService {
                     assignmentId,
                     judgeUserId: auth.user.id,
                     evaluation,
+                    rubric,
                     status: "submitted",
                     scores: loaded.scores,
                     submittedAt: now,
@@ -895,33 +1480,52 @@ export class JudgingService {
         assignmentId: string,
     ): Promise<AssignmentHistory> {
         const role = this.requireMembership(auth, organizationId);
-        const loaded = await this.database.transaction({ organizationId }, async (session) => ({
-            view: await this.repository.findAssignmentView(
+        const loaded = await this.database.transaction({ organizationId }, async (session) => {
+            const view = await this.repository.findAssignmentView(
                 session.db,
                 organizationId,
                 assignmentId,
-            ),
-            evaluation: await this.repository.findEvaluationWithScores(
-                session.db,
-                organizationId,
-                assignmentId,
-            ),
-            versions: await this.repository.listEvaluationVersions(
-                session.db,
-                organizationId,
-                assignmentId,
-            ),
-        }));
+            );
+            return {
+                view,
+                evaluation: await this.repository.findEvaluationWithScores(
+                    session.db,
+                    organizationId,
+                    assignmentId,
+                ),
+                versions: await this.repository.listEvaluationVersions(
+                    session.db,
+                    organizationId,
+                    assignmentId,
+                ),
+                curve:
+                    view === null
+                        ? null
+                        : await this.repository.findScoreCurve(
+                              session.db,
+                              organizationId,
+                              view.assignment.editionId,
+                          ),
+            };
+        });
         if (loaded.view === null) {
             throw new NotFoundError("The judging assignment was not found.");
         }
         this.assertCanView(loaded.view, auth.user.id, role);
+        const curvePoints =
+            loaded.curve === null ? DEFAULT_SCORE_CURVE_POINTS : loaded.curve.points;
+        const evaluation =
+            loaded.evaluation === null
+                ? null
+                : toEvaluation(loaded.evaluation.evaluation, loaded.evaluation.scores);
         return {
-            evaluation:
-                loaded.evaluation === null
-                    ? null
-                    : toEvaluation(loaded.evaluation.evaluation, loaded.evaluation.scores),
+            evaluation,
             versions: loaded.versions.map(toEvaluationVersion),
+            scoreCurve: { points: [...curvePoints] },
+            displayWeightedScore:
+                evaluation === null || evaluation.weightedScore === null
+                    ? null
+                    : applyScoreCurve(evaluation.weightedScore, curvePoints),
         };
     }
 
@@ -1030,6 +1634,7 @@ export class JudgingService {
             readonly assignmentId: string;
             readonly judgeUserId: string;
             readonly evaluation: EvaluationRow;
+            readonly rubric: RubricWithCriteria;
             readonly status: "draft" | "submitted";
             readonly scores: readonly {
                 readonly criterionId: string;
@@ -1044,6 +1649,7 @@ export class JudgingService {
             input.organizationId,
             input.evaluation.id,
         );
+        const criteria = input.rubric.criteria.map(toCriterion);
         await this.repository.insertEvaluationVersion(session, {
             organizationId: input.organizationId,
             evaluationId: input.evaluation.id,
@@ -1053,6 +1659,23 @@ export class JudgingService {
             status: input.status,
             overallComment: input.evaluation.overallComment,
             weightedScore: input.evaluation.weightedScore,
+            rubricId: input.rubric.rubric.id,
+            rubricVersion: input.rubric.rubric.version,
+            rubricSnapshot: buildRubricSnapshot({
+                id: input.rubric.rubric.id,
+                name: input.rubric.rubric.name,
+                version: input.rubric.rubric.version,
+                divisionId: input.rubric.rubric.divisionId,
+                commentGuidance: {
+                    introduction: input.rubric.rubric.commentGuidance.introduction,
+                    guidelines: [...input.rubric.rubric.commentGuidance.guidelines],
+                    templates: input.rubric.rubric.commentGuidance.templates.map((template) => ({
+                        label: template.label,
+                        body: template.body,
+                    })),
+                },
+                criteria,
+            }),
             scores: input.scores.map((score) => ({
                 criterionId: score.criterionId,
                 score: score.score,
@@ -1065,13 +1688,20 @@ export class JudgingService {
     private async toAssignments(
         organizationId: string,
         views: readonly AssignmentView[],
+        frozen: boolean | ReadonlyMap<string, boolean> = false,
     ): Promise<readonly JudgeAssignment[]> {
         if (views.length === 0) {
             return [];
         }
         const summaries = await this.submissionSummaries(organizationId, views);
         return views.map((view) =>
-            toAssignment(view, submissionTitle(summaries, view.assignment.submissionId)),
+            toAssignment(
+                view,
+                submissionTitle(summaries, view.assignment.submissionId),
+                typeof frozen === "boolean"
+                    ? frozen
+                    : (frozen.get(view.assignment.editionId) ?? false),
+            ),
         );
     }
 
@@ -1124,6 +1754,11 @@ export class JudgingService {
         return edition;
     }
 
+    private async requireWritableEdition(organizationId: string, editionId: string): Promise<void> {
+        const edition = await this.requireEdition(organizationId, editionId);
+        JudgingRules.assertEditionWritable(edition.status);
+    }
+
     private async requireOrganization(organizationId: string): Promise<OrganizationSummary> {
         const organization = await this.contracts.organizations.getSummary(organizationId);
         if (organization === null) {
@@ -1146,6 +1781,34 @@ export class JudgingService {
     private assertOrganizer(auth: AuthContext, organizationId: string): void {
         if (!JudgingRules.isOrganizer(this.requireMembership(auth, organizationId))) {
             throw new ForbiddenError("Your organization role does not permit this action.");
+        }
+    }
+
+    private resolveCriteria(
+        criteria: readonly RubricCriterionInput[],
+    ): readonly RubricCriterionInput[] {
+        assertRubricCriteria(criteria);
+        const weights = resolveRubricWeights(criteria.map((criterion) => criterion.weight));
+        return criteria.map((criterion, index) => ({
+            name: criterion.name,
+            description: criterion.description,
+            minScore: criterion.minScore,
+            maxScore: criterion.maxScore,
+            weight: weights[index] ?? criterion.weight,
+        }));
+    }
+
+    private async requireDivision(
+        organizationId: string,
+        editionId: string,
+        divisionId: string | null,
+    ): Promise<void> {
+        if (divisionId === null) {
+            return;
+        }
+        const division = await this.contracts.competitions.getDivision(organizationId, divisionId);
+        if (division === null || division.editionId !== editionId) {
+            throw new NotFoundError("The division was not found for this competition edition.");
         }
     }
 
@@ -1205,8 +1868,20 @@ function toRubric(row: RubricWithCriteria): JudgingRubric {
         id: row.rubric.id,
         organizationId: row.rubric.organizationId,
         editionId: row.rubric.editionId,
+        divisionId: row.rubric.divisionId,
+        familyId: row.rubric.familyId,
+        version: row.rubric.version,
+        active: row.rubric.active,
         name: row.rubric.name,
         description: row.rubric.description,
+        commentGuidance: {
+            introduction: row.rubric.commentGuidance.introduction,
+            guidelines: [...row.rubric.commentGuidance.guidelines],
+            templates: row.rubric.commentGuidance.templates.map((template) => ({
+                label: template.label,
+                body: template.body,
+            })),
+        },
         criteria: row.criteria
             .toSorted((left, right) => left.position - right.position)
             .map(toCriterion),
@@ -1215,18 +1890,60 @@ function toRubric(row: RubricWithCriteria): JudgingRubric {
     };
 }
 
+function toRubricTemplate(row: RubricTemplateRow): RubricTemplate {
+    return {
+        id: row.id,
+        organizationId: row.organizationId,
+        name: row.name,
+        description: row.description,
+        definition: {
+            tracks: row.definition.tracks.map((track) => ({
+                key: track.key,
+                name: track.name,
+                criteria: track.criteria.map((criterion) => ({ ...criterion })),
+            })),
+            commentGuidance: {
+                introduction: row.definition.commentGuidance.introduction,
+                guidelines: [...row.definition.commentGuidance.guidelines],
+                templates: row.definition.commentGuidance.templates.map((template) => ({
+                    label: template.label,
+                    body: template.body,
+                })),
+            },
+        },
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+    };
+}
+
+function assertTemplateDefinition(definition: RubricTemplateDefinition): void {
+    const keys = new Set<string>();
+    for (const track of definition.tracks) {
+        if (keys.has(track.key)) {
+            throw new ValidationError(`The template has more than one “${track.key}” track.`);
+        }
+        keys.add(track.key);
+        assertTemplateTrack(track);
+    }
+}
+
 function toCriterion(row: CriterionRow): Criterion {
     return {
         id: row.id,
         name: row.name,
         description: row.description,
+        minScore: row.minScore,
         maxScore: row.maxScore,
         weight: Number(row.weight),
         position: row.position,
     };
 }
 
-function toAssignment(view: AssignmentView, projectTitle: string): JudgeAssignment {
+function toAssignment(
+    view: AssignmentView,
+    projectTitle: string,
+    frozen?: boolean,
+): JudgeAssignment {
     return {
         id: view.assignment.id,
         organizationId: view.assignment.organizationId,
@@ -1241,12 +1958,14 @@ function toAssignment(view: AssignmentView, projectTitle: string): JudgeAssignme
         assignmentNote: view.assignment.assignmentNote,
         dueAt: nullableIso(view.assignment.dueAt),
         assignedAt: view.assignment.assignedAt.toISOString(),
+        ...(frozen === undefined ? {} : { frozen }),
     };
 }
 
 function scorableCriteria(rows: readonly CriterionRow[]): readonly ScorableCriterion[] {
     return rows.map((row) => ({
         id: row.id,
+        minScore: row.minScore,
         maxScore: row.maxScore,
         weight: Number(row.weight),
     }));

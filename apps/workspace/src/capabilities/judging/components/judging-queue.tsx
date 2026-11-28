@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { JudgeAssignment, JudgeAssignmentStatus } from "@nethack/contracts";
 import {
+    Alert,
     Badge,
     Button,
     Card,
@@ -68,12 +69,14 @@ export function JudgingQueue({
     isPending: loading,
     error,
     onRetry,
+    frozen = false,
 }: {
     readonly organizationId: string;
     readonly items: readonly JudgeAssignment[];
     readonly isPending: boolean;
     readonly error: unknown;
     readonly onRetry: () => void;
+    readonly frozen?: boolean;
 }): ReactNode {
     const { toast } = useToast();
     const [selected, setSelected] = useState<number | null>(null);
@@ -94,6 +97,7 @@ export function JudgingQueue({
     const preferred = selected ?? (firstPending === -1 ? 0 : firstPending);
     const activeIndex = items.length === 0 ? 0 : Math.min(Math.max(preferred, 0), items.length - 1);
     const current = items[activeIndex] ?? null;
+    const currentFrozen = frozen || current?.frozen === true;
     const currentId = current?.id ?? null;
     const declareConflict = useDeclareConflict(organizationId, currentId);
     const flagAssignment = useFlagAssignment(organizationId, currentId);
@@ -164,6 +168,12 @@ export function JudgingQueue({
 
     return (
         <div className="flex flex-col gap-4">
+            {currentFrozen ? (
+                <Alert tone="warning" title="Results are published">
+                    This edition is completed, so judging is read-only. You can review submitted
+                    work and history, but new scores cannot be saved or submitted.
+                </Alert>
+            ) : null}
             <Card>
                 <CardContent className="flex flex-col gap-4 pt-6">
                     <Progress
@@ -259,7 +269,7 @@ export function JudgingQueue({
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    disabled={!isPending(current.status)}
+                                    disabled={currentFrozen || !isPending(current.status)}
                                     onClick={() => setConflictOpen(true)}
                                 >
                                     Recuse from this project
@@ -268,6 +278,7 @@ export function JudgingQueue({
                                     type="button"
                                     variant="ghost"
                                     disabled={
+                                        currentFrozen ||
                                         current.status === "conflict_declared" ||
                                         current.status === "revoked"
                                     }

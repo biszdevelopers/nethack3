@@ -46,6 +46,7 @@ import { JudgingResultsPanel } from "../capabilities/judging/components/judging-
 import { RubricBuilder } from "../capabilities/judging/components/rubric-builder.js";
 import { buildJudgeEditionOptions } from "../capabilities/judging/edition-options.js";
 import {
+    useEdition,
     useOrganizerEditions,
     usePublicEditionOptions,
 } from "../capabilities/competitions/hooks.js";
@@ -120,6 +121,9 @@ export function JudgingPage(): ReactNode {
     const organizerEditions = useOrganizerEditions(organizationId, isOrganizer);
     const publicEditions = usePublicEditionOptions(membership?.organizationSlug ?? null);
     const editionId = searchParams.get("edition");
+    const editionDetail = useEdition(organizationId, editionId);
+    const editionFrozen =
+        editionDetail.data?.status === "completed" || editionDetail.data?.status === "archived";
     const rubrics = useEditionRubrics(organizationId, isOrganizer ? editionId : null);
     const assignments = useEditionAssignments(organizationId, isOrganizer ? editionId : null);
     const submissions = useEditionSubmissions(
@@ -199,6 +203,12 @@ export function JudgingPage(): ReactNode {
         ...judgeEditionOptions.map((edition) => ({ value: edition.id, label: edition.name })),
     ];
     const historyItems = myHistory.data?.items ?? [];
+    const historyHasCurve = historyItems.some(
+        (item) =>
+            item.displayWeightedScore !== undefined &&
+            item.displayWeightedScore !== null &&
+            item.displayWeightedScore !== item.weightedScore,
+    );
 
     const setEdition = (next: string): void => {
         const params = new URLSearchParams(searchParams);
@@ -347,6 +357,12 @@ export function JudgingPage(): ReactNode {
                             />
                         ) : (
                             <>
+                                {editionFrozen ? (
+                                    <Alert tone="warning" title="Results are published">
+                                        This edition is completed, so judging is read-only. Open an
+                                        assignment to review its saved feedback.
+                                    </Alert>
+                                ) : null}
                                 <Card>
                                     <CardContent className="flex flex-col gap-3 pt-6">
                                         <Progress
@@ -460,6 +476,7 @@ export function JudgingPage(): ReactNode {
                             isPending={myAssignments.isPending}
                             error={myAssignments.isError ? myAssignments.error : null}
                             onRetry={() => void myAssignments.refetch()}
+                            frozen={editionFrozen}
                         />
                     </section>
                 </TabsContent>
@@ -530,6 +547,9 @@ export function JudgingPage(): ReactNode {
                                             <TableHead>Project</TableHead>
                                             <TableHead>Team</TableHead>
                                             <TableHead>Score</TableHead>
+                                            {historyHasCurve ? (
+                                                <TableHead>Display</TableHead>
+                                            ) : null}
                                             <TableHead>Submitted</TableHead>
                                             <TableHead className="text-right">Open</TableHead>
                                         </TableRow>
@@ -546,6 +566,14 @@ export function JudgingPage(): ReactNode {
                                                         ? "Not scored"
                                                         : `${item.weightedScore.toFixed(2)} / 100`}
                                                 </TableCell>
+                                                {historyHasCurve ? (
+                                                    <TableCell className="tabular-nums text-ink-muted">
+                                                        {item.displayWeightedScore === undefined ||
+                                                        item.displayWeightedScore === null
+                                                            ? "—"
+                                                            : `${String(item.displayWeightedScore)} / 100`}
+                                                    </TableCell>
+                                                ) : null}
                                                 <TableCell className="text-ink-muted">
                                                     {formatDateTime(item.submittedAt)}
                                                 </TableCell>
@@ -624,16 +652,25 @@ export function JudgingPage(): ReactNode {
                     className="flex flex-col gap-4 border-t border-line pt-6"
                     aria-labelledby="assignment-management-heading"
                 >
-                    <div className="flex flex-col gap-1">
-                        <h2
-                            id="assignment-management-heading"
-                            className="text-lg font-bold tracking-tight"
-                        >
-                            Assignment management
-                        </h2>
-                        <p className="text-sm text-ink-muted">
-                            Assign judges to submissions in a competition edition.
-                        </p>
+                    <div className="flex flex-wrap items-end justify-between gap-3">
+                        <div className="flex flex-col gap-1">
+                            <h2
+                                id="assignment-management-heading"
+                                className="text-lg font-bold tracking-tight"
+                            >
+                                Assignment management
+                            </h2>
+                            <p className="text-sm text-ink-muted">
+                                Assign judges to submissions in a competition edition.
+                            </p>
+                        </div>
+                        {editionId === null ? null : (
+                            <Button variant="outline" asChild>
+                                <Link to={`/judging/rubrics?edition=${editionId}`}>
+                                    Open rubric manager
+                                </Link>
+                            </Button>
+                        )}
                     </div>
 
                     {organizerEditions.query.isPending ? (

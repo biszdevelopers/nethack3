@@ -1,12 +1,78 @@
 import { z } from "zod";
 import { idSchema, isoDateTimeSchema } from "../common/schemas.js";
 
+export const rubricCommentTemplateSchema = z
+    .object({
+        label: z.string().trim().min(1).max(120),
+        body: z.string().trim().min(1).max(2000),
+    })
+    .strict();
+export type RubricCommentTemplate = z.infer<typeof rubricCommentTemplateSchema>;
+
+export const rubricCommentGuidanceSchema = z
+    .object({
+        introduction: z.string().max(1000).default(""),
+        guidelines: z.array(z.string().trim().min(1).max(500)).max(20).default([]),
+        templates: z.array(rubricCommentTemplateSchema).max(20).default([]),
+    })
+    .strict();
+export type RubricCommentGuidance = z.infer<typeof rubricCommentGuidanceSchema>;
+
+export const DEFAULT_RUBRIC_COMMENT_GUIDANCE: RubricCommentGuidance = {
+    introduction: "Make feedback specific, respectful, and focused on the project.",
+    guidelines: [
+        "Describe a strength you observed and one actionable next step.",
+        "Comment on the work, not the people or their background.",
+        "Do not include your name or details that could identify you.",
+    ],
+    templates: [
+        {
+            label: "Strength + next step",
+            body: "Strength I observed: {{describe a specific feature or decision}}\nNext step: {{suggest one concrete action and why it matters}}",
+        },
+        {
+            label: "What stood out",
+            body: "What stood out: {{describe a specific moment, feature, or result}}\nTo make it stronger: {{suggest one practical improvement}}",
+        },
+    ],
+};
+
+export const scoreCurvePointSchema = z
+    .object({
+        rawScore: z.number().int().min(0).max(100),
+        displayScore: z.number().int().min(0).max(100),
+    })
+    .strict();
+export type ScoreCurvePoint = z.infer<typeof scoreCurvePointSchema>;
+
+export const scoreCurveSchema = z
+    .object({
+        points: z.array(scoreCurvePointSchema).min(2).max(21),
+    })
+    .strict();
+export type ScoreCurve = z.infer<typeof scoreCurveSchema>;
+
+export const DEFAULT_SCORE_CURVE: ScoreCurve = {
+    points: [
+        { rawScore: 0, displayScore: 0 },
+        { rawScore: 100, displayScore: 100 },
+    ],
+};
+
+export const scoreCurveResponseSchema = z.object({
+    editionId: idSchema,
+    curve: scoreCurveSchema,
+    updatedAt: isoDateTimeSchema.nullable(),
+});
+export type ScoreCurveResponse = z.infer<typeof scoreCurveResponseSchema>;
+
 export const criterionSchema = z.object({
     id: idSchema,
     name: z.string(),
     description: z.string(),
+    minScore: z.number().int().min(0).max(99),
     maxScore: z.number().int().min(1).max(100),
-    weight: z.number().min(0.1).max(10),
+    weight: z.number().min(0.01).max(100),
     position: z.number().int().nonnegative(),
 });
 export type Criterion = z.infer<typeof criterionSchema>;
@@ -15,34 +81,121 @@ export const judgingRubricSchema = z.object({
     id: idSchema,
     organizationId: idSchema,
     editionId: idSchema,
+    divisionId: idSchema.nullable(),
+    familyId: idSchema,
+    version: z.number().int().positive(),
+    active: z.boolean(),
     name: z.string(),
     description: z.string(),
+    commentGuidance: rubricCommentGuidanceSchema,
     criteria: z.array(criterionSchema),
     createdAt: isoDateTimeSchema,
     updatedAt: isoDateTimeSchema,
 });
 export type JudgingRubric = z.infer<typeof judgingRubricSchema>;
 
+const rubricCriterionInputSchema = z
+    .object({
+        name: z.string().trim().min(1).max(120),
+        description: z.string().max(1000).default(""),
+        minScore: z.number().int().min(0).max(99).default(0),
+        maxScore: z.number().int().min(1).max(100),
+        weight: z.number().min(0.01).max(100).default(1),
+    })
+    .strict();
+
 export const createRubricRequestSchema = z
     .object({
         name: z.string().trim().min(2).max(120),
         description: z.string().max(2000).default(""),
-        criteria: z
-            .array(
-                z
-                    .object({
-                        name: z.string().trim().min(1).max(120),
-                        description: z.string().max(1000).default(""),
-                        maxScore: z.number().int().min(1).max(100),
-                        weight: z.number().min(0.1).max(10).default(1),
-                    })
-                    .strict(),
-            )
-            .min(1)
-            .max(20),
+        divisionId: idSchema.nullable().default(null),
+        commentGuidance: rubricCommentGuidanceSchema
+            .default(DEFAULT_RUBRIC_COMMENT_GUIDANCE)
+            .optional(),
+        criteria: z.array(rubricCriterionInputSchema).min(1).max(20),
     })
     .strict();
 export type CreateRubricRequest = z.infer<typeof createRubricRequestSchema>;
+
+export const updateRubricRequestSchema = z
+    .object({
+        name: z.string().trim().min(2).max(120).optional(),
+        description: z.string().max(2000).optional(),
+        divisionId: idSchema.nullable().optional(),
+        commentGuidance: rubricCommentGuidanceSchema.optional(),
+        criteria: z.array(rubricCriterionInputSchema).min(1).max(20).optional(),
+    })
+    .strict();
+export type UpdateRubricRequest = z.infer<typeof updateRubricRequestSchema>;
+
+export const rubricTemplateCriterionSchema = z
+    .object({
+        name: z.string().trim().min(1).max(120),
+        description: z.string().max(1000).default(""),
+        minScore: z.number().int().min(0).max(99).default(0),
+        maxScore: z.number().int().min(1).max(100),
+        weight: z.number().min(0.01).max(100),
+        position: z.number().int().nonnegative().default(0),
+    })
+    .strict();
+export type RubricTemplateCriterion = z.infer<typeof rubricTemplateCriterionSchema>;
+
+export const rubricTemplateTrackSchema = z
+    .object({
+        key: z
+            .string()
+            .trim()
+            .min(1)
+            .max(64)
+            .regex(
+                /^[a-z0-9][a-z0-9_-]*$/,
+                "Use lowercase letters, numbers, underscores, or hyphens.",
+            ),
+        name: z.string().trim().min(1).max(80),
+        criteria: z.array(rubricTemplateCriterionSchema).min(1).max(20),
+    })
+    .strict();
+export type RubricTemplateTrack = z.infer<typeof rubricTemplateTrackSchema>;
+
+export const rubricTemplateDefinitionSchema = z
+    .object({
+        tracks: z.array(rubricTemplateTrackSchema).min(1).max(8),
+        commentGuidance: rubricCommentGuidanceSchema.default(DEFAULT_RUBRIC_COMMENT_GUIDANCE),
+    })
+    .strict();
+export type RubricTemplateDefinition = z.infer<typeof rubricTemplateDefinitionSchema>;
+
+export const rubricTemplateSchema = z.object({
+    id: idSchema,
+    organizationId: idSchema,
+    name: z.string(),
+    description: z.string(),
+    definition: rubricTemplateDefinitionSchema,
+    createdAt: isoDateTimeSchema,
+    updatedAt: isoDateTimeSchema,
+});
+export type RubricTemplate = z.infer<typeof rubricTemplateSchema>;
+
+export const createRubricTemplateRequestSchema = z
+    .object({
+        name: z.string().trim().min(2).max(120),
+        description: z.string().max(1000).default(""),
+        definition: rubricTemplateDefinitionSchema,
+    })
+    .strict();
+export type CreateRubricTemplateRequest = z.infer<typeof createRubricTemplateRequestSchema>;
+
+export const updateRubricTemplateRequestSchema = createRubricTemplateRequestSchema;
+export type UpdateRubricTemplateRequest = z.infer<typeof updateRubricTemplateRequestSchema>;
+
+export const applyRubricTemplateRequestSchema = z
+    .object({
+        divisionId: idSchema.nullable().default(null),
+        trackKey: z.string().trim().min(1).max(64).optional(),
+        name: z.string().trim().min(2).max(120).optional(),
+    })
+    .strict();
+export type ApplyRubricTemplateRequest = z.infer<typeof applyRubricTemplateRequestSchema>;
 
 export const judgeAssignmentStatusSchema = z.enum([
     "assigned",
@@ -67,6 +220,7 @@ export const judgeAssignmentSchema = z.object({
     assignmentNote: z.string(),
     dueAt: isoDateTimeSchema.nullable(),
     assignedAt: isoDateTimeSchema,
+    frozen: z.boolean().optional(),
 });
 export type JudgeAssignment = z.infer<typeof judgeAssignmentSchema>;
 
@@ -141,15 +295,21 @@ export type AssignmentSubmissionSummary = z.infer<typeof assignmentSubmissionSum
 
 export const assignmentDetailSchema = z.object({
     assignment: judgeAssignmentSchema,
+    rubric: judgingRubricSchema,
     criteria: z.array(criterionSchema),
     submission: assignmentSubmissionSummarySchema,
     evaluation: evaluationSchema.nullable(),
+    scoreCurve: scoreCurveSchema,
+    displayWeightedScore: z.number().nullable(),
+    frozen: z.boolean(),
 });
 export type AssignmentDetail = z.infer<typeof assignmentDetailSchema>;
 
 export const assignmentHistorySchema = z.object({
     evaluation: evaluationSchema.nullable(),
     versions: z.array(evaluationVersionSchema),
+    scoreCurve: scoreCurveSchema,
+    displayWeightedScore: z.number().nullable(),
 });
 export type AssignmentHistory = z.infer<typeof assignmentHistorySchema>;
 
@@ -172,6 +332,7 @@ export const judgingResultSchema = z.object({
     assignmentCount: z.number().int().nonnegative(),
     submittedCount: z.number().int().nonnegative(),
     averageScore: z.number().nullable(),
+    displayScore: z.number().nullable().optional(),
     rank: z.number().int().positive().nullable(),
     evaluations: z.array(judgingResultEvaluationSchema),
 });
@@ -251,8 +412,10 @@ export const judgingHistoryItemSchema = z.object({
     teamId: idSchema.nullable(),
     teamName: z.string().nullable(),
     rubricName: z.string(),
+    rubricVersion: z.number().int().positive().optional(),
     evaluationId: idSchema,
     weightedScore: z.number().nullable(),
+    displayWeightedScore: z.number().nullable().optional(),
     overallComment: z.string(),
     submittedAt: isoDateTimeSchema,
     scores: z.array(judgingHistoryCriterionScoreSchema),

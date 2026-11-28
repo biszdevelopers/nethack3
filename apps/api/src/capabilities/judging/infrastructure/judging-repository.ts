@@ -9,15 +9,25 @@ import {
     judgeAssignments,
     judgeFlags,
     judgingCriteria,
+    judgingRubricTemplates,
     judgingRubrics,
+    judgingScoreCurves,
     organizationMemberships,
     users,
 } from "../../../infrastructure/database/schema/index.js";
+import type {
+    RubricCommentGuidance,
+    RubricSnapshot,
+    RubricTemplateDefinition,
+    ScoreCurvePoint,
+} from "../../../infrastructure/database/schema/judging.js";
 
 const EVALUATION_HISTORY_LIMIT = 50;
 
 export type RubricRow = typeof judgingRubrics.$inferSelect;
 export type CriterionRow = typeof judgingCriteria.$inferSelect;
+export type RubricTemplateRow = typeof judgingRubricTemplates.$inferSelect;
+export type ScoreCurveRow = typeof judgingScoreCurves.$inferSelect;
 export type AssignmentRow = typeof judgeAssignments.$inferSelect;
 export type EvaluationRow = typeof evaluations.$inferSelect;
 export type EvaluationScoreRow = typeof evaluationScores.$inferSelect;
@@ -69,12 +79,14 @@ export interface SubmittedEvaluationRow {
     readonly assignmentId: string;
     readonly submissionId: string;
     readonly rubricName: string;
+    readonly rubricVersion: number;
     readonly weightedScore: number | null;
     readonly overallComment: string;
     readonly submittedAt: Date;
     readonly scores: readonly {
         readonly criterionId: string;
         readonly criterionName: string;
+        readonly minScore: number;
         readonly maxScore: number;
         readonly weight: number;
         readonly score: number;
@@ -97,9 +109,29 @@ export interface NewCriterionValues {
     readonly rubricId: string;
     readonly name: string;
     readonly description: string;
+    readonly minScore: number;
     readonly maxScore: number;
     readonly weight: string;
     readonly position: number;
+}
+
+export interface NewRubricValues {
+    readonly organizationId: string;
+    readonly editionId: string;
+    readonly divisionId: string | null;
+    readonly familyId?: string;
+    readonly version: number;
+    readonly active: boolean;
+    readonly name: string;
+    readonly description: string;
+    readonly commentGuidance: RubricCommentGuidance;
+}
+
+export interface NewRubricTemplateValues {
+    readonly organizationId: string;
+    readonly name: string;
+    readonly description: string;
+    readonly definition: RubricTemplateDefinition;
 }
 
 export interface NewAssignmentValues {
@@ -159,6 +191,9 @@ export interface NewEvaluationVersionValues {
     readonly status: EvaluationVersionRow["status"];
     readonly overallComment: string;
     readonly weightedScore: string | null;
+    readonly rubricId: string | null;
+    readonly rubricVersion: number | null;
+    readonly rubricSnapshot: RubricSnapshot | null;
     readonly scores: EvaluationVersionRow["scores"];
     readonly submittedAt: Date | null;
 }
@@ -168,17 +203,24 @@ export class JudgingRepository {
         db: DatabaseExecutor,
         organizationId: string,
         editionId: string,
+        includeInactive = false,
     ): Promise<readonly RubricWithCriteria[]> {
+        const conditions = [
+            eq(judgingRubrics.organizationId, organizationId),
+            eq(judgingRubrics.editionId, editionId),
+        ];
+        if (!includeInactive) {
+            conditions.push(eq(judgingRubrics.active, true));
+        }
         const rubrics = await db
             .select()
             .from(judgingRubrics)
-            .where(
-                and(
-                    eq(judgingRubrics.organizationId, organizationId),
-                    eq(judgingRubrics.editionId, editionId),
-                ),
-            )
-            .orderBy(desc(judgingRubrics.createdAt), asc(judgingRubrics.id));
+            .where(and(...conditions))
+            .orderBy(
+                asc(judgingRubrics.familyId),
+                desc(judgingRubrics.version),
+                asc(judgingRubrics.id),
+            );
         if (rubrics.length === 0) {
             return [];
         }
@@ -285,18 +327,240 @@ export class JudgingRepository {
         return { rubric, criteria };
     }
 
-    async insertRubric(
+    async findRubricForUpdate(
+        session: DatabaseSession,
+        organizationId: string,
+        rubricId: string,
+    ): Promise<RubricWithCriteria | null> {
+        const rows = await session.db
+            .select()
+            .from(judgingRubrics)
+            .where(
+                and(
+                    eq(judgingRubrics.organizationId, organizationId),
+                    eq(judgingRubrics.id, rubricId),
+                ),
+            )
+            .limit(1)
+            .for("update");
+        const rubric = rows[0];
+        if (rubric === undefined) {
+            return null;
+        }
+        const criteria = await session.db
+            .select()
+            .from(judgingCriteria)
+            .where(
+                and(
+                    eq(judgingCriteria.organizationId, organizationId),
+                    eq(judgingCriteria.rubricId, rubric.id),
+                ),
+            )
+            .orderBy(asc(judgingCriteria.position), asc(judgingCriteria.id));
+        return { rubric, criteria };
+    }
+
+    async insertRubric(session: DatabaseSession, values: NewRubricValues): Promise<RubricRow> {
+        const [row] = await session.db
+            .insert(judgingRubrics)
+            .values({
+                organizationId: values.organizationId,
+                editionId: values.editionId,
+                divisionId: values.divisionId,
+                version: values.version,
+                active: values.active,
+                name: values.name,
+                description: values.description,
+                commentGuidance: values.commentGuidance,
+                ...(values.familyId === undefined ? {} : { familyId: values.familyId }),
+            })
+            .returning();
+        if (row === undefined) {
+            throw new Error("The judging rubric could not be created.");
+        }
+        return row;
+    }
+
+    async maxRubricVersion(
+        db: DatabaseExecutor,
+        organizationId: string,
+        familyId: string,
+    ): Promise<number | null> {
+        const rows = await db
+            .select({ version: sql<number | null>`max(${judgingRubrics.version})` })
+            .from(judgingRubrics)
+            .where(
+                and(
+                    eq(judgingRubrics.organizationId, organizationId),
+                    eq(judgingRubrics.familyId, familyId),
+                ),
+            );
+        const version = rows[0]?.version;
+        return version === undefined || version === null ? null : Number(version);
+    }
+
+    async setRubricActive(
+        session: DatabaseSession,
+        organizationId: string,
+        rubricId: string,
+        active: boolean,
+        updatedAt: Date,
+    ): Promise<RubricRow | null> {
+        const rows = await session.db
+            .update(judgingRubrics)
+            .set({ active, updatedAt })
+            .where(
+                and(
+                    eq(judgingRubrics.organizationId, organizationId),
+                    eq(judgingRubrics.id, rubricId),
+                ),
+            )
+            .returning();
+        return rows[0] ?? null;
+    }
+
+    async deactivateRubricFamily(
+        session: DatabaseSession,
+        organizationId: string,
+        familyId: string,
+        exceptRubricId: string,
+        updatedAt: Date,
+    ): Promise<void> {
+        await session.db
+            .update(judgingRubrics)
+            .set({ active: false, updatedAt })
+            .where(
+                and(
+                    eq(judgingRubrics.organizationId, organizationId),
+                    eq(judgingRubrics.familyId, familyId),
+                    ne(judgingRubrics.id, exceptRubricId),
+                ),
+            );
+    }
+
+    async listRubricTemplates(
+        db: DatabaseExecutor,
+        organizationId: string,
+    ): Promise<readonly RubricTemplateRow[]> {
+        return db
+            .select()
+            .from(judgingRubricTemplates)
+            .where(eq(judgingRubricTemplates.organizationId, organizationId))
+            .orderBy(asc(judgingRubricTemplates.name), asc(judgingRubricTemplates.id));
+    }
+
+    async findRubricTemplate(
+        db: DatabaseExecutor,
+        organizationId: string,
+        templateId: string,
+    ): Promise<RubricTemplateRow | null> {
+        const rows = await db
+            .select()
+            .from(judgingRubricTemplates)
+            .where(
+                and(
+                    eq(judgingRubricTemplates.organizationId, organizationId),
+                    eq(judgingRubricTemplates.id, templateId),
+                ),
+            )
+            .limit(1);
+        return rows[0] ?? null;
+    }
+
+    async insertRubricTemplate(
+        session: DatabaseSession,
+        values: NewRubricTemplateValues,
+    ): Promise<RubricTemplateRow> {
+        const [row] = await session.db.insert(judgingRubricTemplates).values(values).returning();
+        if (row === undefined) {
+            throw new Error("The rubric template could not be created.");
+        }
+        return row;
+    }
+
+    async updateRubricTemplate(
+        session: DatabaseSession,
+        organizationId: string,
+        templateId: string,
+        values: {
+            readonly name: string;
+            readonly description: string;
+            readonly definition: RubricTemplateDefinition;
+            readonly updatedAt: Date;
+        },
+    ): Promise<RubricTemplateRow | null> {
+        const rows = await session.db
+            .update(judgingRubricTemplates)
+            .set(values)
+            .where(
+                and(
+                    eq(judgingRubricTemplates.organizationId, organizationId),
+                    eq(judgingRubricTemplates.id, templateId),
+                ),
+            )
+            .returning();
+        return rows[0] ?? null;
+    }
+
+    async deleteRubricTemplate(
+        session: DatabaseSession,
+        organizationId: string,
+        templateId: string,
+    ): Promise<RubricTemplateRow | null> {
+        const rows = await session.db
+            .delete(judgingRubricTemplates)
+            .where(
+                and(
+                    eq(judgingRubricTemplates.organizationId, organizationId),
+                    eq(judgingRubricTemplates.id, templateId),
+                ),
+            )
+            .returning();
+        return rows[0] ?? null;
+    }
+
+    async findScoreCurve(
+        db: DatabaseExecutor,
+        organizationId: string,
+        editionId: string,
+    ): Promise<ScoreCurveRow | null> {
+        const rows = await db
+            .select()
+            .from(judgingScoreCurves)
+            .where(
+                and(
+                    eq(judgingScoreCurves.organizationId, organizationId),
+                    eq(judgingScoreCurves.editionId, editionId),
+                ),
+            )
+            .limit(1);
+        return rows[0] ?? null;
+    }
+
+    async upsertScoreCurve(
         session: DatabaseSession,
         values: {
             readonly organizationId: string;
             readonly editionId: string;
-            readonly name: string;
-            readonly description: string;
+            readonly points: readonly ScoreCurvePoint[];
+            readonly updatedAt: Date;
         },
-    ): Promise<RubricRow> {
-        const [row] = await session.db.insert(judgingRubrics).values(values).returning();
+    ): Promise<ScoreCurveRow> {
+        const [row] = await session.db
+            .insert(judgingScoreCurves)
+            .values({
+                organizationId: values.organizationId,
+                editionId: values.editionId,
+                points: [...values.points],
+                updatedAt: values.updatedAt,
+            })
+            .onConflictDoUpdate({
+                target: [judgingScoreCurves.organizationId, judgingScoreCurves.editionId],
+                set: { points: [...values.points], updatedAt: values.updatedAt },
+            })
+            .returning();
         if (row === undefined) {
-            throw new Error("The judging rubric could not be created.");
+            throw new Error("The score curve could not be saved.");
         }
         return row;
     }
@@ -794,6 +1058,7 @@ export class JudgingRepository {
                 assignmentId: judgeAssignments.id,
                 submissionId: judgeAssignments.submissionId,
                 rubricName: judgingRubrics.name,
+                rubricVersion: judgingRubrics.version,
                 weightedScore: evaluations.weightedScore,
                 overallComment: evaluations.overallComment,
                 submittedAt: evaluations.submittedAt,
@@ -832,6 +1097,7 @@ export class JudgingRepository {
                 evaluationId: evaluationScores.evaluationId,
                 criterionId: evaluationScores.criterionId,
                 criterionName: judgingCriteria.name,
+                minScore: judgingCriteria.minScore,
                 maxScore: judgingCriteria.maxScore,
                 weight: judgingCriteria.weight,
                 score: evaluationScores.score,
@@ -857,6 +1123,7 @@ export class JudgingRepository {
             {
                 criterionId: string;
                 criterionName: string;
+                minScore: number;
                 maxScore: number;
                 weight: number;
                 score: number;
@@ -868,6 +1135,7 @@ export class JudgingRepository {
             list.push({
                 criterionId: score.criterionId,
                 criterionName: score.criterionName,
+                minScore: score.minScore,
                 maxScore: score.maxScore,
                 weight: Number(score.weight),
                 score: score.score,
@@ -885,6 +1153,7 @@ export class JudgingRepository {
                 assignmentId: row.assignmentId,
                 submissionId: row.submissionId,
                 rubricName: row.rubricName,
+                rubricVersion: row.rubricVersion,
                 weightedScore: row.weightedScore === null ? null : Number(row.weightedScore),
                 overallComment: row.overallComment,
                 submittedAt: row.submittedAt,

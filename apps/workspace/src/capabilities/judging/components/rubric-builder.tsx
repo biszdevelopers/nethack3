@@ -63,6 +63,7 @@ export function RubricBuilder({
         const parsed = criteria.map((criterion) => ({
             name: criterion.name.trim(),
             description: criterion.description.trim(),
+            minScore: 0,
             maxScore: Number.parseInt(criterion.maxScore, 10),
             weight: Number.parseFloat(criterion.weight),
         }));
@@ -77,18 +78,23 @@ export function RubricBuilder({
                     criterion.maxScore < 1 ||
                     criterion.maxScore > 100 ||
                     !Number.isFinite(criterion.weight) ||
-                    criterion.weight < 0.1 ||
-                    criterion.weight > 10,
+                    criterion.weight <= 0,
             )
         ) {
-            setError("Scores must be 1–100 and weights must be 0.1–10.");
+            setError("Scores must be 1–100 and weights must be positive.");
             return;
         }
+        const weightTotal = parsed.reduce((sum, criterion) => sum + criterion.weight, 0);
+        const weighted = parsed.map((criterion) => ({
+            ...criterion,
+            weight: Math.round((criterion.weight / weightTotal) * 100 * 100) / 100,
+        }));
         try {
             await createRubric.mutateAsync({
                 name: trimmedName,
                 description: description.trim(),
-                criteria: parsed,
+                divisionId: null,
+                criteria: weighted,
             });
             setName("");
             setDescription("");
