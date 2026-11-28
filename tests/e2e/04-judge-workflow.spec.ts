@@ -33,6 +33,14 @@ test.describe("judge workflow", () => {
         ).toBeVisible();
         await expect(page.getByText("Assigned", { exact: true }).first()).toBeVisible();
 
+        await test.step("shows team, track, submission state, and project context", async () => {
+            await expect(page.getByText("Fixture Author Team").first()).toBeVisible();
+            await expect(page.getByText("Open", { exact: true }).first()).toBeVisible();
+            await expect(page.getByText("Judging lab fixture.").first()).toBeVisible();
+            await expect(page.getByText("Submitted", { exact: true }).first()).toBeVisible();
+            await expect(page.getByRole("link", { name: "Open repository" })).toBeVisible();
+        });
+
         await test.step("open the recusal flow without recusing", async () => {
             await page.getByRole("button", { name: "Recuse from this project" }).click();
             const dialog = page.getByRole("dialog", { name: "Recuse from this project" });

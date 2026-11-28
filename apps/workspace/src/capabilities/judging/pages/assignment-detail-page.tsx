@@ -24,6 +24,7 @@ import {
     FormField,
     KeyValue,
     LoadingBlock,
+    Markdown,
     PageHeader,
     Table,
     TableBody,
@@ -42,6 +43,7 @@ import { humanizeToken } from "../../shared/format.js";
 import { RequestError } from "../../shared/states.jsx";
 import { RubricScoringForm } from "../components/rubric-scoring-form.js";
 import { conflictSchema, flagSchema, type ConflictForm, type FlagForm } from "../forms.js";
+import { judgeCommentIssue } from "../judge-comments.js";
 import { safeExternalUrl } from "../media.js";
 import { curveScore, weightedRubricScore } from "../scoring.js";
 import {
@@ -164,6 +166,8 @@ export function AssignmentDetailPage(): ReactNode {
     const { assignment, rubric, criteria, submission, evaluation, scoreCurve, frozen } =
         detail.data;
     const videoUrl = safeExternalUrl(submission.videoUrl);
+    const repositoryUrl = safeExternalUrl(submission.repositoryUrl);
+    const demoUrl = safeExternalUrl(submission.demoUrl);
     const evaluationKey = evaluation?.id ?? `${assignment.id}-new`;
     const serverScores: Record<string, RubricScore> = {};
     for (const score of evaluation?.scores ?? []) {
@@ -186,6 +190,13 @@ export function AssignmentDetailPage(): ReactNode {
     const hasScores = criteria.some((criterion) => scores[criterion.id] !== undefined);
     const rawPreview = weightedRubricScore(criteria, scores);
     const displayPreview = rawPreview === null ? null : curveScore(rawPreview, scoreCurve.points);
+    const commentIssue = judgeCommentIssue(overallComment, {
+        displayName: session.data?.user.displayName ?? "",
+        email: session.data?.user.email ?? null,
+    });
+    const commentError = overallComment.trim().length === 0 ? null : commentIssue;
+    const trackLabel = assignment.divisionName ?? "Edition-wide";
+    const submissionState = humanizeToken(submission.submissionStatus);
 
     const onSave = async (): Promise<void> => {
         if (criteria.length === 0) {
@@ -265,7 +276,7 @@ export function AssignmentDetailPage(): ReactNode {
 
             <PageHeader
                 title={submission.projectTitle}
-                description={`Assignment ${assignment.id}`}
+                description={`${submission.teamName ?? "No team"} · ${trackLabel} · Assignment ${assignment.id}`}
                 actions={
                     <Badge tone={statusTone(assignment.status)}>
                         {statusLabel(assignment.status)}
@@ -286,10 +297,65 @@ export function AssignmentDetailPage(): ReactNode {
                         <CardHeader>
                             <CardTitle>Project context</CardTitle>
                             <CardDescription>
-                                The demonstration video and AI-use disclosure the team provided.
+                                The submission details, links, and AI-use disclosure the team
+                                provided.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="flex flex-col gap-4">
+                            <KeyValue
+                                columns={2}
+                                items={[
+                                    { label: "Team", value: submission.teamName ?? "No team" },
+                                    { label: "Track", value: trackLabel },
+                                    { label: "Submission", value: submissionState },
+                                ]}
+                            />
+                            {submission.descriptionMarkdown.trim().length === 0 ? null : (
+                                <div className="flex flex-col gap-1">
+                                    <h3 className="text-sm font-medium text-ink">
+                                        Project description
+                                    </h3>
+                                    <div className="prose-nethack">
+                                        <Markdown source={submission.descriptionMarkdown} />
+                                    </div>
+                                </div>
+                            )}
+                            <div className="flex flex-wrap gap-4">
+                                <div className="flex flex-col gap-1">
+                                    <h3 className="text-sm font-medium text-ink">Repository</h3>
+                                    {repositoryUrl === null ? (
+                                        <p className="text-sm text-ink-muted">
+                                            No repository link was provided.
+                                        </p>
+                                    ) : (
+                                        <a
+                                            href={repositoryUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-sm text-primary underline-offset-4 hover:underline"
+                                        >
+                                            Open repository
+                                        </a>
+                                    )}
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <h3 className="text-sm font-medium text-ink">Demo</h3>
+                                    {demoUrl === null ? (
+                                        <p className="text-sm text-ink-muted">
+                                            No demo link was provided.
+                                        </p>
+                                    ) : (
+                                        <a
+                                            href={demoUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-sm text-primary underline-offset-4 hover:underline"
+                                        >
+                                            Open demo
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
                             <div className="flex flex-col gap-1">
                                 <h3 className="text-sm font-medium text-ink">
                                     Demonstration video
@@ -352,13 +418,14 @@ export function AssignmentDetailPage(): ReactNode {
                                         displayScore={displayPreview}
                                         onChange={setScores}
                                         onOverallCommentChange={setOverallComment}
+                                        commentError={commentError}
                                     />
                                     <div className="flex flex-wrap gap-2 border-t border-line pt-4">
                                         <Button
                                             type="button"
                                             variant="outline"
                                             loading={saveEvaluation.isPending}
-                                            disabled={!hasScores}
+                                            disabled={!hasScores || commentIssue !== null}
                                             onClick={() => void onSave()}
                                         >
                                             Save draft
@@ -368,7 +435,8 @@ export function AssignmentDetailPage(): ReactNode {
                                             loading={submitEvaluation.isPending}
                                             disabled={
                                                 evaluation?.status !== "draft" ||
-                                                submitEvaluation.isPending
+                                                submitEvaluation.isPending ||
+                                                commentIssue !== null
                                             }
                                             onClick={() => setConfirmSubmitOpen(true)}
                                         >
@@ -498,6 +566,9 @@ export function AssignmentDetailPage(): ReactNode {
                                 columns={1}
                                 items={[
                                     { label: "Judge", value: assignment.judgeDisplayName },
+                                    { label: "Team", value: assignment.teamName ?? "No team" },
+                                    { label: "Track", value: trackLabel },
+                                    { label: "Submission", value: submissionState },
                                     { label: "Due", value: formatDateTime(assignment.dueAt) },
                                     {
                                         label: "Assigned",

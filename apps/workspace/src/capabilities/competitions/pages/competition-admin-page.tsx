@@ -147,6 +147,7 @@ function toEditionForm(edition: CompetitionEditionDetail): EditionForm {
         teamMaxSize: edition.teamMaxSize,
         maxParticipants: edition.maxParticipants,
         rulesMarkdown: edition.rulesMarkdown,
+        resultsOpenAt: isoToLocalInput(edition.resultsOpenAt),
     };
 }
 
@@ -204,6 +205,7 @@ export function CompetitionAdminPage(): ReactNode {
             teamMaxSize: 4,
             maxParticipants: null,
             rulesMarkdown: "",
+            resultsOpenAt: "",
         },
     });
     const editEditionForm = useForm<EditionForm>({
@@ -226,6 +228,7 @@ export function CompetitionAdminPage(): ReactNode {
             teamMaxSize: 4,
             maxParticipants: null,
             rulesMarkdown: "",
+            resultsOpenAt: "",
         },
     });
     const divisionForm = useForm<DivisionForm>({
@@ -344,6 +347,7 @@ export function CompetitionAdminPage(): ReactNode {
                     teamMaxSize: values.teamMaxSize,
                     maxParticipants: values.maxParticipants,
                     rulesMarkdown: values.rulesMarkdown,
+                    resultsOpenAt: localInputToIso(values.resultsOpenAt),
                 },
             });
             setEdition(created.id);
@@ -365,6 +369,7 @@ export function CompetitionAdminPage(): ReactNode {
                 teamMaxSize: 4,
                 maxParticipants: null,
                 rulesMarkdown: "",
+                resultsOpenAt: "",
             });
             toast({ title: "Edition created", tone: "success" });
         } catch (error) {
@@ -470,6 +475,7 @@ export function CompetitionAdminPage(): ReactNode {
                     teamMaxSize: values.teamMaxSize,
                     maxParticipants: values.maxParticipants,
                     rulesMarkdown: values.rulesMarkdown,
+                    resultsOpenAt: localInputToIso(values.resultsOpenAt),
                 },
             });
             toast({ title: "Edition saved", tone: "success" });
@@ -695,6 +701,20 @@ export function CompetitionAdminPage(): ReactNode {
                                             description="Publish rank order on the public results page."
                                         />
                                     </div>
+                                    <FormField
+                                        name="resultsOpenAt"
+                                        label="Results release"
+                                        optionalLabel="optional"
+                                        description="Scheduled public release shown while results are unpublished."
+                                    >
+                                        {(field) => (
+                                            <Input
+                                                {...field}
+                                                type="datetime-local"
+                                                value={field.value}
+                                            />
+                                        )}
+                                    </FormField>
                                     <FormField name="timezone" label="Time zone" required>
                                         {(field) => <Input {...field} value={field.value} />}
                                     </FormField>
@@ -890,6 +910,10 @@ export function CompetitionAdminPage(): ReactNode {
                                 value: `${formatDate(editionData.startsAt)} to ${formatDate(editionData.endsAt)}`,
                             },
                             {
+                                label: "Results release",
+                                value: formatDateTime(editionData.resultsOpenAt),
+                            },
+                            {
                                 label: "Team size",
                                 value: `${String(editionData.teamMinSize)} to ${String(editionData.teamMaxSize)}`,
                             },
@@ -971,6 +995,20 @@ export function CompetitionAdminPage(): ReactNode {
                                             description="Publish rank order on the public results page."
                                         />
                                     </div>
+                                    <FormField
+                                        name="resultsOpenAt"
+                                        label="Results release"
+                                        optionalLabel="optional"
+                                        description="Scheduled public release shown while results are unpublished."
+                                    >
+                                        {(field) => (
+                                            <Input
+                                                {...field}
+                                                type="datetime-local"
+                                                value={field.value}
+                                            />
+                                        )}
+                                    </FormField>
                                     <div className="grid gap-4 sm:grid-cols-2">
                                         <FormField
                                             name="registrationOpensAt"

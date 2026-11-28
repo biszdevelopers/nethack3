@@ -24,6 +24,7 @@ import {
     CardHeader,
     CardTitle,
     EmptyState,
+    Markdown,
 } from "@nethack/ui/static";
 import {
     AnimatedDisclosure,
@@ -33,7 +34,8 @@ import {
     StaggerReveal,
     Tilt,
 } from "@nethack/ui/motion";
-import { getCompetition, getCompetitions, getProjects } from "../lib/public-api";
+import { getAnnouncements, getCompetition, getCompetitions, getProjects } from "../lib/public-api";
+import { Countdown } from "../components/countdown";
 
 const FEATURES = [
     {
@@ -126,12 +128,22 @@ export default async function HomePage(): Promise<ReactNode> {
         nextCursor: null,
     };
     let projects: Awaited<ReturnType<typeof getProjects>> = { items: [], nextCursor: null };
+    let announcements: Awaited<ReturnType<typeof getAnnouncements>> = {
+        items: [],
+        nextCursor: null,
+    };
     let unavailable = false;
     try {
-        [competitions, projects] = await Promise.all([getCompetitions(), getProjects()]);
+        [competitions, projects, announcements] = await Promise.all([
+            getCompetitions(),
+            getProjects(),
+            getAnnouncements(),
+        ]);
     } catch {
         unavailable = true;
     }
+
+    const latestAnnouncement = announcements.items[0] ?? null;
 
     const openCompetition = currentEvent(competitions.items);
     const themeCompetition =
@@ -232,7 +244,8 @@ export default async function HomePage(): Promise<ReactNode> {
                                 {nextMilestone === null ? null : (
                                     <span className="text-xs text-ink-subtle">
                                         Next: {nextMilestone.title} ·{" "}
-                                        {formatDate(nextMilestone.occursAt)}
+                                        {formatDate(nextMilestone.occursAt)} ·{" "}
+                                        <Countdown target={nextMilestone.occursAt} />
                                     </span>
                                 )}
                             </span>
@@ -252,6 +265,34 @@ export default async function HomePage(): Promise<ReactNode> {
                         When an organizer publishes an edition, it appears here with its schedule,
                         rules, and registration window.
                     </Alert>
+                )}
+                {latestAnnouncement === null ? null : (
+                    <Reveal delay={0.3}>
+                        <Card variant="soft">
+                            <CardHeader>
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <CardTitle className="text-lg">
+                                        {latestAnnouncement.title}
+                                    </CardTitle>
+                                    <Link
+                                        href="/announcements"
+                                        className="text-xs text-primary transition-colors hover:text-primary-hover"
+                                    >
+                                        All announcements
+                                    </Link>
+                                </div>
+                                <p className="text-xs text-ink-subtle">
+                                    {latestAnnouncement.organizationName} ·{" "}
+                                    {formatDate(latestAnnouncement.publishedAt)}
+                                </p>
+                            </CardHeader>
+                            {latestAnnouncement.bodyMarkdown.trim().length === 0 ? null : (
+                                <CardContent className="text-sm leading-6 text-ink-muted">
+                                    <Markdown source={latestAnnouncement.bodyMarkdown} />
+                                </CardContent>
+                            )}
+                        </Card>
+                    </Reveal>
                 )}
             </section>
 

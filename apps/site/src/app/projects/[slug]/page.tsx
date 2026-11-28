@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowUpRight, CalendarDays, Users } from "lucide-react";
+import { ArrowUpRight, Award, CalendarDays, Trophy, Users } from "lucide-react";
 import { Badge, Card, CardContent, CardHeader, CardTitle, Markdown } from "@nethack/ui/static";
 import { Reveal } from "@nethack/ui/motion";
 import { PublicApiError, getProject } from "../../../lib/public-api";
+import { getPublicResults } from "../../../lib/recognition-api";
 import { safeExternalUrl } from "../project-links";
 
 export async function generateMetadata({
@@ -52,6 +53,19 @@ export default async function ProjectDetailPage({
         { label: "Demonstration video", href: safeExternalUrl(project.videoUrl) },
     ].filter((entry): entry is { label: string; href: string } => entry.href !== null);
 
+    const results = await getPublicResults(project.competitionSlug).catch(() => null);
+    const resultEntry =
+        results === null
+            ? null
+            : (results.judgingEntries.find((entry) => entry.projectId === project.id) ?? null);
+    const certificate =
+        project.teamId !== null &&
+        resultEntry !== null &&
+        (resultEntry.awards.length > 0 ||
+            (results?.showRanking === true && resultEntry.rank !== null))
+            ? `/certificates/${project.teamId}`
+            : null;
+
     return (
         <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-10 px-4 py-10 sm:px-6 md:py-14 lg:px-8">
             <Reveal className="relative flex flex-col gap-4">
@@ -69,6 +83,17 @@ export default async function ProjectDetailPage({
                     <span>{project.organizationName}</span>
                     <span className="text-primary">/</span>
                     <span>{project.competitionName}</span>
+                    {project.divisionName === null ? null : (
+                        <>
+                            <span className="text-primary">/</span>
+                            <span>{project.divisionName}</span>
+                        </>
+                    )}
+                    {project.teamStatus === null || project.teamStatus === "ready" ? null : (
+                        <Badge variant="outline" color="neutral" size="sm">
+                            {project.teamStatus.replaceAll("_", " ")}
+                        </Badge>
+                    )}
                 </div>
                 <h1 className="text-balance text-3xl font-extrabold tracking-tight sm:text-4xl md:text-5xl">
                     {project.title}
@@ -123,6 +148,64 @@ export default async function ProjectDetailPage({
                 </div>
 
                 <div className="flex flex-col gap-4">
+                    {results === null ? null : (
+                        <Reveal>
+                            <Card variant="soft">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <Trophy
+                                            className="size-4 text-primary"
+                                            aria-hidden="true"
+                                        />
+                                        Results
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="flex flex-col gap-2">
+                                    {resultEntry === null ? (
+                                        <p className="text-sm text-ink-muted">
+                                            No published judging entry.
+                                        </p>
+                                    ) : (
+                                        <>
+                                            <p className="text-sm text-ink">
+                                                {results.showRanking
+                                                    ? resultEntry.rank === null
+                                                        ? "Unranked"
+                                                        : `Rank #${String(resultEntry.rank)}`
+                                                    : "Rankings are not public for this edition."}
+                                            </p>
+                                            {resultEntry.awards.length === 0 ? null : (
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {resultEntry.awards.map((award) => (
+                                                        <Badge
+                                                            key={award.id}
+                                                            variant="soft"
+                                                            color="primary"
+                                                            size="sm"
+                                                        >
+                                                            <Award
+                                                                className="size-3"
+                                                                aria-hidden="true"
+                                                            />
+                                                            {award.name}
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                    {certificate === null ? null : (
+                                        <Link
+                                            href={certificate}
+                                            className="text-sm text-primary transition-colors hover:text-primary-hover"
+                                        >
+                                            View certificate
+                                        </Link>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </Reveal>
+                    )}
                     <Reveal>
                         <Card variant="soft">
                             <CardHeader>

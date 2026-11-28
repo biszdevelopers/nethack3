@@ -193,18 +193,24 @@ export function CreateProjectDialog({
                             <FormField
                                 name="repositoryUrl"
                                 label="Repository URL"
+                                description="Required before submission. Use a public repository with a README."
                                 optionalLabel="optional"
                             >
                                 {(field) => <Input {...field} inputMode="url" />}
                             </FormField>
-                            <FormField name="demoUrl" label="Demo URL" optionalLabel="optional">
+                            <FormField
+                                name="demoUrl"
+                                label="Demo URL"
+                                description="Required before submission. Anyone should be able to try the project."
+                                optionalLabel="optional"
+                            >
                                 {(field) => <Input {...field} inputMode="url" />}
                             </FormField>
                         </div>
                         <FormField
                             name="videoUrl"
                             label="Demonstration video URL"
-                            description="Link a public recording that shows the project working."
+                            description="Required before submission. Link a public 2–3 minute recording that shows the project working."
                             optionalLabel="optional"
                         >
                             {(field) => (

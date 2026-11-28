@@ -84,6 +84,9 @@ test.describe("judging workflow", () => {
                 page.getByRole("heading", { name: PROJECT_TITLE, level: 3 }),
             ).toBeVisible();
             await expect(page.getByRole("group", { name: "Judging queue controls" })).toBeVisible();
+            await expect(page.getByText("Judging queue fixture.").first()).toBeVisible();
+            await expect(page.getByText("No team").first()).toBeVisible();
+            await expect(page.getByText("Submitted", { exact: true }).first()).toBeVisible();
             await page.getByRole("link", { name: "Open project" }).click();
             await expect(page).toHaveURL(new RegExp(`/judging/assignments/${ASSIGNMENT_ID}$`));
             await expect(
@@ -132,6 +135,9 @@ test.describe("judging workflow", () => {
             await expect(
                 page.getByRole("heading", { name: PROJECT_TITLE, level: 3 }),
             ).toBeVisible();
+            await expect(page.getByText("No team").first()).toBeVisible();
+            await expect(page.getByText("Judging queue fixture.").first()).toBeVisible();
+            await expect(page.getByText("Submitted", { exact: true }).first()).toBeVisible();
             await expect(page.getByText("Queue workflow evaluation.")).toBeVisible();
             await expect(page.getByText("7 / 10", { exact: false }).first()).toBeVisible();
             await expect(page.getByText("8 / 10", { exact: false }).first()).toBeVisible();

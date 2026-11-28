@@ -560,7 +560,12 @@ export function JudgingPage(): ReactNode {
                                                 <TableCell className="font-medium">
                                                     {item.projectTitle}
                                                 </TableCell>
-                                                <TableCell>{item.teamName ?? "No team"}</TableCell>
+                                                <TableCell>
+                                                    {item.teamName ?? "No team"}
+                                                    <span className="block text-xs text-ink-subtle">
+                                                        {item.divisionName ?? "Edition-wide"}
+                                                    </span>
+                                                </TableCell>
                                                 <TableCell className="tabular-nums">
                                                     {item.weightedScore === null
                                                         ? "Not scored"

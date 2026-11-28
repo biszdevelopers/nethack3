@@ -830,20 +830,27 @@ function BallotCard({
                     />
                 ) : submissionItems.length === 0 ? (
                     <EmptyState
-                        title="No submissions"
-                        description="A ballot can be cast after submissions exist in this edition."
+                        title="No eligible projects"
+                        description="Your ballot lists submitted projects from your division, excluding your own team. It stays empty while no other team has a votable submission."
                     />
                 ) : (
-                    <StarEditor
-                        key={submittedBallot?.submittedAt ?? "new"}
-                        round={round}
-                        submissions={submissionItems}
-                        initialScores={scoresFromBallot(ballot.data)}
-                        initialReasoning={ballot.data?.reasoning ?? ""}
-                        submittedAt={submittedBallot?.submittedAt ?? null}
-                        isSubmitting={castBallot.isPending}
-                        onCast={onCast}
-                    />
+                    <div className="flex flex-col gap-4">
+                        <p className="text-sm text-ink-muted">
+                            Your ballot lists submitted projects from your own division, excluding
+                            your own team. Distribute exactly 10 stars with at most 5 stars per
+                            project.
+                        </p>
+                        <StarEditor
+                            key={submittedBallot?.submittedAt ?? "new"}
+                            round={round}
+                            submissions={submissionItems}
+                            initialScores={scoresFromBallot(ballot.data)}
+                            initialReasoning={ballot.data?.reasoning ?? ""}
+                            submittedAt={submittedBallot?.submittedAt ?? null}
+                            isSubmitting={castBallot.isPending}
+                            onCast={onCast}
+                        />
+                    </div>
                 )}
             </CardContent>
         </Card>
@@ -969,6 +976,8 @@ function StarEditor({
                     {submissions.map((submission) => {
                         const stars = scores[submission.id] ?? 0;
                         const videoUrl = safeExternalUrl(submission.videoUrl);
+                        const repositoryUrl = safeExternalUrl(submission.repositoryUrl);
+                        const demoUrl = safeExternalUrl(submission.demoUrl);
                         const canAdd =
                             !isSubmitting &&
                             !capBlocksFullBallot &&
@@ -985,10 +994,44 @@ function StarEditor({
                                         <span className="text-sm text-ink">
                                             {submission.projectTitle}
                                         </span>
-                                        <span className="text-xs text-ink-muted">
-                                            {submission.teamName ?? "No team"}
-                                        </span>
+                                        <div className="flex flex-wrap items-center gap-2 text-xs text-ink-muted">
+                                            <span>{submission.teamName ?? "No team"}</span>
+                                            {submission.divisionName === null ? null : (
+                                                <Badge tone="outline">
+                                                    {submission.divisionName}
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        {submission.summary.length === 0 ? null : (
+                                            <p className="mt-1 max-w-prose text-xs text-ink-muted">
+                                                {submission.summary}
+                                            </p>
+                                        )}
                                     </div>
+                                    {repositoryUrl === null && demoUrl === null ? null : (
+                                        <div className="flex flex-wrap gap-3 text-xs">
+                                            {repositoryUrl === null ? null : (
+                                                <a
+                                                    href={repositoryUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-primary underline-offset-4 hover:underline"
+                                                >
+                                                    Repository
+                                                </a>
+                                            )}
+                                            {demoUrl === null ? null : (
+                                                <a
+                                                    href={demoUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-primary underline-offset-4 hover:underline"
+                                                >
+                                                    Live demo
+                                                </a>
+                                            )}
+                                        </div>
+                                    )}
                                     {videoUrl === null ? null : (
                                         <a
                                             href={videoUrl}

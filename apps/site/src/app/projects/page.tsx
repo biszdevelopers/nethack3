@@ -11,7 +11,7 @@ import {
     EmptyState,
 } from "@nethack/ui/static";
 import { Reveal, StaggerReveal, Tilt } from "@nethack/ui/motion";
-import { getCompetitions, getProjects } from "../../lib/public-api";
+import { getCompetitions, getAllProjects } from "../../lib/public-api";
 import { safeExternalUrl } from "./project-links";
 
 export const metadata = {
@@ -22,20 +22,51 @@ export const metadata = {
 export default async function ProjectsPage({
     searchParams,
 }: {
-    readonly searchParams: Promise<{ competition?: string }>;
+    readonly searchParams: Promise<{
+        competition?: string;
+        q?: string;
+        division?: string;
+    }>;
 }): Promise<ReactNode> {
-    const { competition } = await searchParams;
-    let projects: Awaited<ReturnType<typeof getProjects>> = { items: [], nextCursor: null };
+    const { competition, q = "", division = "" } = await searchParams;
+    let projects: Awaited<ReturnType<typeof getAllProjects>> = [];
     let competitions: Awaited<ReturnType<typeof getCompetitions>> = {
         items: [],
         nextCursor: null,
     };
     let unavailable = false;
     try {
-        [projects, competitions] = await Promise.all([getProjects(competition), getCompetitions()]);
+        [projects, competitions] = await Promise.all([
+            getAllProjects(competition),
+            getCompetitions(),
+        ]);
     } catch {
         unavailable = true;
     }
+
+    const query = q.trim().toLowerCase();
+    const divisions = [
+        ...new Set(
+            projects.flatMap((project) =>
+                project.divisionName === null ? [] : [project.divisionName],
+            ),
+        ),
+    ].sort((left, right) => left.localeCompare(right));
+    const visibleProjects = projects.filter((project) => {
+        if (division.length > 0 && project.divisionName !== division) {
+            return false;
+        }
+        if (query.length === 0) {
+            return true;
+        }
+        return [
+            project.title,
+            project.summary,
+            project.teamName ?? "",
+            project.descriptionMarkdown,
+            ...project.tags,
+        ].some((value) => value.toLowerCase().includes(query));
+    });
 
     return (
         <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-8 px-4 py-10 sm:px-6 md:py-14 lg:px-8">
@@ -58,6 +89,19 @@ export default async function ProjectsPage({
                     method="get"
                     className="flex flex-wrap items-end gap-3 rounded-lg border border-line bg-panel/60 p-4"
                 >
+                    <div className="flex min-w-56 flex-1 flex-col gap-1.5">
+                        <label htmlFor="project-search" className="text-xs text-ink-subtle">
+                            Search
+                        </label>
+                        <input
+                            id="project-search"
+                            name="q"
+                            type="search"
+                            defaultValue={q}
+                            placeholder="Project, team, description, or tag"
+                            className="h-10 rounded-md border border-line bg-app px-3 text-sm text-ink placeholder:text-ink-subtle transition-colors hover:border-line-strong focus-visible:border-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/25"
+                        />
+                    </div>
                     <div className="flex min-w-56 flex-col gap-1.5">
                         <label htmlFor="competition-filter" className="text-xs text-ink-subtle">
                             Competition
@@ -76,8 +120,28 @@ export default async function ProjectsPage({
                             ))}
                         </select>
                     </div>
+                    {divisions.length === 0 ? null : (
+                        <div className="flex min-w-44 flex-col gap-1.5">
+                            <label htmlFor="division-filter" className="text-xs text-ink-subtle">
+                                Track
+                            </label>
+                            <select
+                                id="division-filter"
+                                name="division"
+                                defaultValue={division}
+                                className="h-10 rounded-md border border-line bg-app px-3 text-sm text-ink transition-colors hover:border-line-strong focus-visible:border-primary focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/25"
+                            >
+                                <option value="">All tracks</option>
+                                {divisions.map((name) => (
+                                    <option key={name} value={name}>
+                                        {name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     <Button type="submit" variant="outline" color="neutral">
-                        Apply filter
+                        Apply filters
                     </Button>
                 </form>
             </Reveal>
@@ -87,10 +151,14 @@ export default async function ProjectsPage({
                     title="The project directory is unavailable"
                     description="The public API could not be reached. Try again shortly."
                 />
-            ) : projects.items.length === 0 ? (
+            ) : visibleProjects.length === 0 ? (
                 <EmptyState
                     title="No published projects"
-                    description="Projects appear here after organizers approve them for the public showcase."
+                    description={
+                        projects.length === 0
+                            ? "Projects appear here after organizers approve them for the public showcase."
+                            : "No project matches these filters. Clear the search or choose another track."
+                    }
                     action={
                         <Button asChild variant="outline" color="neutral">
                             <Link href="/competitions">Browse competitions</Link>
@@ -98,76 +166,87 @@ export default async function ProjectsPage({
                     }
                 />
             ) : (
-                <StaggerReveal className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {projects.items.map((project) => {
-                        const videoUrl = safeExternalUrl(project.videoUrl);
-                        return (
-                            <Tilt key={project.id}>
-                                <Card hoverable className="h-full bg-panel/80">
-                                    <CardHeader>
-                                        <div className="flex items-center gap-2 text-xs text-ink-subtle">
-                                            <FolderGit2
-                                                className="size-3.5 text-primary"
-                                                aria-hidden="true"
-                                            />
-                                            <span className="truncate">
-                                                {project.competitionName}
-                                            </span>
-                                        </div>
-                                        <CardTitle className="text-lg">{project.title}</CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="flex flex-col gap-3">
-                                        <p className="line-clamp-3 text-sm text-ink-muted">
-                                            {project.summary}
-                                        </p>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {project.tags.slice(0, 4).map((tag) => (
-                                                <Badge key={tag} variant="outline" size="sm">
-                                                    {tag}
-                                                </Badge>
-                                            ))}
-                                        </div>
-                                        {project.aiDisclosure.trim().length === 0 ? null : (
-                                            <p className="line-clamp-2 text-xs text-ink-subtle">
-                                                <span className="text-ink-muted">AI use:</span>{" "}
-                                                {project.aiDisclosure}
+                <>
+                    <p className="text-xs text-ink-subtle">
+                        {String(visibleProjects.length)}{" "}
+                        {visibleProjects.length === 1 ? "project" : "projects"}
+                    </p>
+                    <StaggerReveal className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        {visibleProjects.map((project) => {
+                            const videoUrl = safeExternalUrl(project.videoUrl);
+                            return (
+                                <Tilt key={project.id}>
+                                    <Card hoverable className="h-full bg-panel/80">
+                                        <CardHeader>
+                                            <div className="flex items-center gap-2 text-xs text-ink-subtle">
+                                                <FolderGit2
+                                                    className="size-3.5 text-primary"
+                                                    aria-hidden="true"
+                                                />
+                                                <span className="truncate">
+                                                    {project.competitionName}
+                                                </span>
+                                            </div>
+                                            <CardTitle className="text-lg">
+                                                {project.title}
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="flex flex-col gap-3">
+                                            <p className="line-clamp-3 text-sm text-ink-muted">
+                                                {project.summary}
                                             </p>
-                                        )}
-                                        <div className="flex items-center justify-between gap-2 pt-1">
-                                            <span className="inline-flex items-center gap-1 text-xs text-ink-subtle">
-                                                <GitBranch className="size-3" aria-hidden="true" />
-                                                {project.teamName ?? "Independent project"}
-                                            </span>
-                                            <span className="inline-flex items-center gap-3">
-                                                {videoUrl === null ? null : (
-                                                    <a
-                                                        href={videoUrl}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        aria-label={`Demonstration video for ${project.title}`}
-                                                        className="inline-flex items-center gap-1 text-sm text-primary transition-colors hover:text-primary-hover"
-                                                    >
-                                                        Video
-                                                    </a>
-                                                )}
-                                                <Link
-                                                    href={`/projects/${project.slug}`}
-                                                    className="inline-flex items-center gap-1 text-sm text-primary transition-colors hover:text-primary-hover"
-                                                >
-                                                    Open
-                                                    <ArrowRight
-                                                        className="size-3.5"
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {project.tags.slice(0, 4).map((tag) => (
+                                                    <Badge key={tag} variant="outline" size="sm">
+                                                        {tag}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                            {project.aiDisclosure.trim().length === 0 ? null : (
+                                                <p className="line-clamp-2 text-xs text-ink-subtle">
+                                                    <span className="text-ink-muted">AI use:</span>{" "}
+                                                    {project.aiDisclosure}
+                                                </p>
+                                            )}
+                                            <div className="flex items-center justify-between gap-2 pt-1">
+                                                <span className="inline-flex items-center gap-1 text-xs text-ink-subtle">
+                                                    <GitBranch
+                                                        className="size-3"
                                                         aria-hidden="true"
                                                     />
-                                                </Link>
-                                            </span>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </Tilt>
-                        );
-                    })}
-                </StaggerReveal>
+                                                    {project.teamName ?? "Independent project"}
+                                                </span>
+                                                <span className="inline-flex items-center gap-3">
+                                                    {videoUrl === null ? null : (
+                                                        <a
+                                                            href={videoUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            aria-label={`Demonstration video for ${project.title}`}
+                                                            className="inline-flex items-center gap-1 text-sm text-primary transition-colors hover:text-primary-hover"
+                                                        >
+                                                            Video
+                                                        </a>
+                                                    )}
+                                                    <Link
+                                                        href={`/projects/${project.slug}`}
+                                                        className="inline-flex items-center gap-1 text-sm text-primary transition-colors hover:text-primary-hover"
+                                                    >
+                                                        Open
+                                                        <ArrowRight
+                                                            className="size-3.5"
+                                                            aria-hidden="true"
+                                                        />
+                                                    </Link>
+                                                </span>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </Tilt>
+                            );
+                        })}
+                    </StaggerReveal>
+                </>
             )}
         </div>
     );

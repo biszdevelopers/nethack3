@@ -155,7 +155,7 @@ test.describe("results publication freeze", () => {
                     data: {
                         name: ROUND_NAME,
                         description: "Freeze journey round.",
-                        eligibleRoles: ["participant"],
+                        eligibleRoles: ["participant", "judge"],
                         maxSelections: 10,
                         maxVotesPerUser: 2,
                         opensAt: null,
@@ -177,7 +177,7 @@ test.describe("results publication freeze", () => {
         const participantContext = await newAppContext(browser);
         try {
             const participantPage = await participantContext.newPage();
-            await signIn(participantPage, USERS.participant);
+            await signIn(participantPage, USERS.judge);
             const participantToken = await csrfToken(participantPage);
 
             await test.step("participant casts a reasoned ballot", async () => {
@@ -231,7 +231,7 @@ test.describe("results publication freeze", () => {
                             data: {
                                 name: "E2E Frozen Round",
                                 description: "",
-                                eligibleRoles: ["participant"],
+                                eligibleRoles: ["participant", "judge"],
                                 maxSelections: 10,
                                 maxVotesPerUser: 0,
                                 opensAt: null,
@@ -282,6 +282,7 @@ test.describe("results publication freeze", () => {
                             { timeout: 60_000 },
                         )
                         .toBe(1);
+                    await signIn(participantPage, USERS.participant);
                     await participantPage.goto("/notifications");
                     await expect(
                         participantPage.getByText("Results published").first(),
@@ -310,7 +311,7 @@ test.describe("results publication freeze", () => {
                             data: {
                                 name: "E2E Reopened Round",
                                 description: "",
-                                eligibleRoles: ["participant"],
+                                eligibleRoles: ["participant", "judge"],
                                 maxSelections: 10,
                                 maxVotesPerUser: 0,
                                 opensAt: null,
@@ -324,7 +325,11 @@ test.describe("results publication freeze", () => {
                         `${API_ORIGIN}/api/v1/assignments/${ASSIGNMENT_ID}/evaluation`,
                         {
                             headers: requestHeaders(judgeToken),
-                            data: { scores: evaluationScores, overallComment: "Reopened probe." },
+                            data: {
+                                scores: evaluationScores,
+                                overallComment:
+                                    "Reopened probe after the results were unpublished.",
+                            },
                         },
                     );
                     expect(saved.status()).toBe(200);

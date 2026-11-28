@@ -35,6 +35,7 @@ async function createAndOpenRound(page: Page, name: string): Promise<string> {
     await form.getByLabel("Description").fill("Star voting rules created by the Playwright suite.");
     await form.getByRole("spinbutton", { name: "Per-voter cap" }).fill("2");
     await form.getByRole("checkbox", { name: "Organizers" }).check();
+    await form.getByRole("checkbox", { name: "Judges" }).check();
     await form.getByRole("button", { name: "Create round" }).click();
     await expectToast(page, "Voting round created");
 
@@ -215,17 +216,17 @@ test.describe("star voting", () => {
         ];
         expect(await castBallotWithCsrf(page, roundId, scores)).toBe(201);
 
-        const participantContext = await newAppContext(browser);
+        const judgeContext = await newAppContext(browser);
         try {
-            const participantPage = await participantContext.newPage();
-            await signIn(participantPage, USERS.participant);
+            const judgePage = await judgeContext.newPage();
+            await signIn(judgePage, USERS.judge);
 
-            await test.step("the participant casts a second star ballot", async () => {
-                expect(await castBallotWithCsrf(participantPage, roundId, scores)).toBe(201);
+            await test.step("a judge with no team casts a second star ballot", async () => {
+                expect(await castBallotWithCsrf(judgePage, roundId, scores)).toBe(201);
             });
 
             await test.step("results stay hidden before publication", async () => {
-                const hidden = await participantPage.request.get(
+                const hidden = await judgePage.request.get(
                     `${API_ORIGIN}/api/v1/voting-rounds/${roundId}/results`,
                     { headers: { "x-nethack-organization-id": FIXTURE.organizationId } },
                 );
@@ -238,7 +239,7 @@ test.describe("star voting", () => {
             });
 
             await test.step("results aggregate stars, averages, and ranks", async () => {
-                const response = await participantPage.request.get(
+                const response = await judgePage.request.get(
                     `${API_ORIGIN}/api/v1/voting-rounds/${roundId}/results`,
                     { headers: { "x-nethack-organization-id": FIXTURE.organizationId } },
                 );
@@ -257,7 +258,7 @@ test.describe("star voting", () => {
                 expect(result.entries[1]?.projectTitle).toBe(FIXTURE.labProjectTitle);
             });
         } finally {
-            await participantContext.close();
+            await judgeContext.close();
         }
     });
 });

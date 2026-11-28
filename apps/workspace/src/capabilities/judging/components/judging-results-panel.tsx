@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import {
     Badge,
@@ -15,6 +15,7 @@ import {
 } from "@nethack/ui";
 import { RequestError } from "../../shared/states.jsx";
 import { useEditionJudgingResults } from "../hooks.js";
+import { TeamFeedbackPanel } from "./team-feedback-panel.js";
 
 function scoreLabel(score: number | null): string {
     return score === null ? "Not scored" : `${score.toFixed(2)} / 100`;
@@ -28,6 +29,10 @@ export function JudgingResultsPanel({
     readonly editionId: string;
 }): ReactNode {
     const results = useEditionJudgingResults(organizationId, editionId);
+    const [selectedTeam, setSelectedTeam] = useState<{
+        readonly id: string;
+        readonly name: string | null;
+    } | null>(null);
     const items = results.data?.items ?? [];
     const hasCurve = items.some(
         (result) =>
@@ -71,6 +76,7 @@ export function JudgingResultsPanel({
                                 <TableHead>Score</TableHead>
                                 {hasCurve ? <TableHead>Display</TableHead> : null}
                                 <TableHead>Evaluations</TableHead>
+                                <TableHead>Feedback</TableHead>
                                 <TableHead className="text-right">Open</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -114,6 +120,26 @@ export function JudgingResultsPanel({
                                         {result.submittedCount} of {result.assignmentCount}{" "}
                                         submitted
                                     </TableCell>
+                                    <TableCell>
+                                        {result.teamId === null ? (
+                                            <span className="text-sm text-ink-muted">No team</span>
+                                        ) : (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    if (result.teamId !== null) {
+                                                        setSelectedTeam({
+                                                            id: result.teamId,
+                                                            name: result.teamName,
+                                                        });
+                                                    }
+                                                }}
+                                            >
+                                                View anonymous feedback
+                                            </Button>
+                                        )}
+                                    </TableCell>
                                     <TableCell className="text-right">
                                         <Button asChild variant="ghost" size="sm">
                                             <Link to={`/submissions/${result.submissionId}`}>
@@ -126,6 +152,14 @@ export function JudgingResultsPanel({
                         </TableBody>
                     </Table>
                 </Card>
+            )}
+            {selectedTeam === null ? null : (
+                <TeamFeedbackPanel
+                    organizationId={organizationId}
+                    editionId={editionId}
+                    teamId={selectedTeam.id}
+                    teamName={selectedTeam.name}
+                />
             )}
         </section>
     );

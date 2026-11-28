@@ -123,6 +123,16 @@ test.describe("participant workflow", () => {
             await expect(page.getByRole("heading", { name: projectTitle, level: 1 })).toBeVisible();
 
             await page.getByLabel("Title").fill(updatedTitle);
+            await page
+                .getByLabel("Repository URL")
+                .fill("https://github.com/example/e2e-participant-project");
+            await page.getByLabel("Demo URL").fill("https://example.com/e2e-participant-demo");
+            await page
+                .getByLabel("Demonstration video URL")
+                .fill("https://example.com/e2e-participant-video");
+            await page
+                .getByLabel("AI-use disclosure")
+                .fill("No AI tools or models were used in this project.");
             await page.getByRole("button", { name: "Save project" }).click();
             await expect(page.getByText("Project saved")).toBeVisible();
             await expect(page.getByRole("heading", { name: updatedTitle, level: 1 })).toBeVisible();
@@ -153,6 +163,9 @@ test.describe("participant workflow", () => {
             await page.getByLabel("Summary").fill("First submitted version.");
             await page.getByLabel("Description").fill("Initial end-to-end submission description.");
             await page.getByRole("checkbox", { name: "Submit this version for review" }).check();
+            await page
+                .getByRole("checkbox", { name: "I acknowledge the submission rules" })
+                .check();
             await page.getByRole("button", { name: "Save version" }).click();
             await expect(page.getByText("Version saved.")).toBeVisible();
             await expect(

@@ -568,6 +568,16 @@ export function JudgingRubricsPage(): ReactNode {
         setCurveDraft(next);
     };
 
+    const applyCurvePreset = (exponent: number): void => {
+        setCurveDraft(
+            [0, 25, 50, 75, 100].map((rawScore) => ({
+                key: nextKey++,
+                rawScore: String(rawScore),
+                displayScore: String(Math.round(100 * Math.pow(rawScore / 100, exponent))),
+            })),
+        );
+    };
+
     const patchCurvePoint = (key: number, patch: Partial<CurvePointDraft>): void => {
         setCurveDraft(
             curvePoints.map((point) => (point.key === key ? { ...point, ...patch } : point)),
@@ -1238,6 +1248,24 @@ export function JudgingRubricsPage(): ReactNode {
                                 />
                             ) : (
                                 <>
+                                    <div className="flex flex-wrap gap-2">
+                                        {[
+                                            { label: "Original score", exponent: 1 },
+                                            { label: "Gentle uplift", exponent: 0.9 },
+                                            { label: "Moderate uplift", exponent: 0.8 },
+                                            { label: "Strong uplift", exponent: 0.65 },
+                                        ].map((preset) => (
+                                            <Button
+                                                key={preset.label}
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => applyCurvePreset(preset.exponent)}
+                                            >
+                                                {preset.label}
+                                            </Button>
+                                        ))}
+                                    </div>
                                     <div className="flex flex-col gap-3">
                                         {curvePoints.map((point, index) => (
                                             <div

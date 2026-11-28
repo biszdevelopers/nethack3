@@ -11,6 +11,7 @@ export interface RubricScoringFormProps {
     readonly displayScore: number | null;
     readonly onChange: (scores: Record<string, RubricScore>) => void;
     readonly onOverallCommentChange: (comment: string) => void;
+    readonly commentError?: string | null;
     readonly disabled?: boolean;
 }
 
@@ -30,9 +31,12 @@ export function RubricScoringForm({
     displayScore,
     onChange,
     onOverallCommentChange,
+    commentError = null,
     disabled = false,
 }: RubricScoringFormProps): ReactNode {
     const commentId = useId();
+    const commentHintId = useId();
+    const commentErrorId = useId();
 
     const setScore = (criterion: Criterion, score: number): void => {
         const current = scores[criterion.id] ?? { score: criterion.minScore };
@@ -88,6 +92,9 @@ export function RubricScoringForm({
 
             <div className="flex flex-col gap-1.5">
                 <Label htmlFor={commentId}>Overall comment</Label>
+                <p id={commentHintId} className="text-xs text-ink-muted">
+                    Needs at least 20 characters. Do not include your name or email address.
+                </p>
                 <Textarea
                     id={commentId}
                     value={overallComment}
@@ -95,7 +102,16 @@ export function RubricScoringForm({
                     placeholder="Summarize the evaluation for the organizer."
                     disabled={disabled}
                     className="min-h-24"
+                    aria-invalid={commentError !== null}
+                    aria-describedby={
+                        commentError === null ? commentHintId : `${commentHintId} ${commentErrorId}`
+                    }
                 />
+                {commentError === null ? null : (
+                    <p id={commentErrorId} role="alert" className="text-xs text-ink">
+                        {commentError}
+                    </p>
+                )}
             </div>
 
             {guidance.templates.length === 0 ? null : (

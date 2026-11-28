@@ -142,16 +142,30 @@ test.describe("rubric tracks, templates, versions, and the score curve", () => {
                 ).toBeVisible();
                 await expect(judgePage.getByText(APPLIED_NAME)).toBeVisible();
                 await expect(judgePage.getByText(GUIDANCE)).toBeVisible();
+                await expect(judgePage.getByText("Rubric parity fixture.")).toBeVisible();
+                await expect(
+                    judgePage.getByText("Submitted", { exact: true }).first(),
+                ).toBeVisible();
                 await expect(
                     judgePage.getByRole("button", { name: "Strength + next step" }),
                 ).toBeVisible();
             });
 
-            await test.step("the template fills the overall comment", async () => {
+            await test.step("the template fills the overall comment and validation mirrors the API", async () => {
                 await judgePage.getByRole("button", { name: "Strength + next step" }).click();
                 await expect(judgePage.getByLabel("Overall comment")).toHaveValue(
                     new RegExp("Strength:"),
                 );
+                await expect(
+                    judgePage.getByText(
+                        "Replace every double-braced template placeholder with your own observation.",
+                    ),
+                ).toBeVisible();
+                await judgePage.getByLabel("Overall comment").fill("Too short.");
+                await expect(
+                    judgePage.getByText("Write at least 20 characters of feedback after trimming."),
+                ).toBeVisible();
+                await expect(judgePage.getByRole("button", { name: "Save draft" })).toBeDisabled();
                 await judgePage.getByLabel("Overall comment").fill("Clear and useful feedback.");
             });
 

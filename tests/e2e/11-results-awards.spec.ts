@@ -21,10 +21,21 @@ test.describe("results and awards", () => {
         await expect(page.getByRole("heading", { name: "Awards", level: 1 })).toBeVisible();
         await chooseOption(page.getByLabel("Competition edition"), FIXTURE.editionName);
 
-        await test.step("locked public results before publication", async () => {
+        await test.step("locked public results show the scheduled release", async () => {
+            await ownerTenantQuery(
+                FIXTURE.organizationId,
+                "update competition_editions set results_open_at = now() + interval '2 days' where id = $1",
+                [FIXTURE.editionId],
+            );
             await page.goto(`${SITE_ORIGIN}/results`);
             await expect(page.getByRole("heading", { name: "Results", level: 1 })).toBeVisible();
             await expect(page.getByText("Results not published yet")).toBeVisible();
+            await expect(page.getByText(/Scheduled release:/)).toBeVisible();
+            await ownerTenantQuery(
+                FIXTURE.organizationId,
+                "update competition_editions set results_open_at = null where id = $1",
+                [FIXTURE.editionId],
+            );
             await page.goto("/awards");
             await chooseOption(page.getByLabel("Competition edition"), FIXTURE.editionName);
         });
@@ -81,7 +92,9 @@ test.describe("results and awards", () => {
             await expect(page.getByRole("heading", { name: "Results", level: 1 })).toBeVisible();
             await expect(page.getByText(FIXTURE.labProjectTitle).first()).toBeVisible();
             await expect(page.getByText(awardName).first()).toBeVisible();
-            await expect(page.getByText(/Rank #\d+|Unranked/).first()).toBeVisible();
+            await expect(
+                page.getByText(/Rank #\d+|Unranked|Not enough reviews/).first(),
+            ).toBeVisible();
             await expect(page.getByRole("link", { name: "Certificate" }).first()).toBeVisible();
         });
 

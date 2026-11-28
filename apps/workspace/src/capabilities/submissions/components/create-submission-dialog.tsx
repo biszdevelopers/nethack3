@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
-import type { Project } from "@nethack/contracts";
+import { missingProjectEvidence, type Project } from "@nethack/contracts";
 import {
     Alert,
     Button,
@@ -16,6 +16,7 @@ import {
 } from "@nethack/ui";
 import { FormSelect } from "../../../components/form-select.js";
 import { errorMessage } from "../../../lib/errors.js";
+import { ProjectEvidenceChecklist } from "../../projects/components/project-evidence-checklist.js";
 import { useCreateSubmission } from "../hooks/use-submissions.js";
 
 const createSubmissionSchema = z.object({
@@ -40,6 +41,9 @@ export function CreateSubmissionDialog({
         resolver: zodResolver(createSubmissionSchema),
         defaultValues: { projectId: projects[0]?.id ?? "" },
     });
+    const selectedProjectId = useWatch({ control: form.control, name: "projectId" }) ?? "";
+    const selectedProject = projects.find((project) => project.id === selectedProjectId) ?? null;
+    const missingEvidence = selectedProject === null ? [] : missingProjectEvidence(selectedProject);
 
     const close = (next: boolean): void => {
         if (!next) {
@@ -50,6 +54,9 @@ export function CreateSubmissionDialog({
     };
 
     const submit = form.handleSubmit(async (values) => {
+        if (selectedProject === null || missingEvidence.length > 0) {
+            return;
+        }
         try {
             const submission = await createSubmission.mutateAsync({
                 projectId: values.projectId,
@@ -85,6 +92,17 @@ export function CreateSubmissionDialog({
                                 label: project.title,
                             }))}
                         />
+                        {selectedProject === null ? null : (
+                            <ProjectEvidenceChecklist
+                                project={selectedProject}
+                                projectId={selectedProject.id}
+                            />
+                        )}
+                        {missingEvidence.length === 0 ? null : (
+                            <Alert tone="warning" title="Project requirements incomplete">
+                                Add the missing project fields before starting a submission.
+                            </Alert>
+                        )}
                         {createSubmission.error === null ? null : (
                             <Alert tone="critical" title="Submission could not be created">
                                 {errorMessage(createSubmission.error)}
@@ -94,7 +112,11 @@ export function CreateSubmissionDialog({
                             <Button type="button" variant="outline" onClick={() => close(false)}>
                                 Cancel
                             </Button>
-                            <Button type="submit" loading={createSubmission.isPending}>
+                            <Button
+                                type="submit"
+                                loading={createSubmission.isPending}
+                                disabled={missingEvidence.length > 0}
+                            >
                                 Start submission
                             </Button>
                         </DialogFooter>

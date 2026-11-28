@@ -167,7 +167,10 @@ test.describe("voting", () => {
         }
     });
 
-    test("lets an eligible participant cast a star ballot", async ({ page, browser }) => {
+    test("shows an eligible participant only same-division projects from other teams", async ({
+        page,
+        browser,
+    }) => {
         test.setTimeout(240_000);
         const roundName = "E2E Participant Ballot";
         await signIn(page, USERS.organizer);
@@ -179,12 +182,23 @@ test.describe("voting", () => {
             await signIn(participantPage, USERS.participant);
             await participantPage.goto(`/voting?edition=${FIXTURE.editionId}`);
             await expect(participantPage.getByRole("heading", { name: roundName })).toBeVisible();
+            const labCard = participantPage
+                .getByRole("listitem")
+                .filter({ hasText: FIXTURE.labProjectTitle });
+            await expect(labCard).toBeVisible();
+            await expect(labCard.getByText("Open", { exact: true })).toBeVisible();
+            await expect(
+                participantPage.getByRole("button", {
+                    name: `Add a star to ${FIXTURE.labProjectTitle}`,
+                    exact: true,
+                }),
+            ).toBeVisible();
             await expect(
                 participantPage.getByRole("button", {
                     name: `Add a star to ${FIXTURE.projectTitle}`,
                     exact: true,
                 }),
-            ).toBeVisible();
+            ).toHaveCount(0);
             await expect(
                 participantPage.getByRole("button", { name: "Cast ballot" }).first(),
             ).toBeVisible();

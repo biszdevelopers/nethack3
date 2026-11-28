@@ -17,7 +17,7 @@ import { gsap, useIsoLayoutEffect } from "@nethack/ui/motion";
 import { AI_DISCLOSURE_EMPTY, safeExternalUrl, type ShowcaseProject } from "./showcase-data";
 import styles from "./signal.module.css";
 
-const DUPLICATE = 1;
+const DUPLICATE = 3;
 
 function disclosureText(project: ShowcaseProject): string {
     return project.aiDisclosure.trim().length === 0 ? AI_DISCLOSURE_EMPTY : project.aiDisclosure;

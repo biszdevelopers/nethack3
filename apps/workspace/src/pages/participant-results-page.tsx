@@ -33,6 +33,42 @@ function CertificateLink({ teamId }: { readonly teamId: string }): ReactNode {
     );
 }
 
+function ScoreLabel({ score }: { readonly score: number | null }): ReactNode {
+    return score === null ? null : (
+        <span className="text-sm tabular-nums text-ink">{score.toFixed(2)} / 100</span>
+    );
+}
+
+function FeedbackBlock({
+    feedback,
+}: {
+    readonly feedback: MyResults["past"][number]["feedback"];
+}): ReactNode {
+    if (feedback.length === 0) {
+        return null;
+    }
+    return (
+        <div className="border-t border-line pt-3">
+            <h3 className="text-sm font-medium text-ink">Anonymous judge feedback</h3>
+            <ul className="mt-2 flex flex-col gap-2">
+                {feedback.map((entry, index) => (
+                    <li
+                        key={`${entry.submittedAt ?? "feedback"}-${String(index)}`}
+                        className="text-sm leading-6 text-ink-muted"
+                    >
+                        <p className="whitespace-pre-wrap break-words">{entry.comment}</p>
+                        {entry.submittedAt === null ? null : (
+                            <p className="mt-1 text-xs text-ink-subtle">
+                                {formatDateTime(entry.submittedAt)}
+                            </p>
+                        )}
+                    </li>
+                ))}
+            </ul>
+        </div>
+    );
+}
+
 export function ParticipantResultsPage(): ReactNode {
     const { session, membership } = useActiveMembership();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -165,6 +201,9 @@ function ResultsBody({ results }: { readonly results: MyResults }): ReactNode {
                                                 : `Rank #${String(results.current.rank)}`
                                             : "Results are not published yet."}
                                     </span>
+                                    {results.published ? (
+                                        <ScoreLabel score={results.current.score} />
+                                    ) : null}
                                 </div>
                                 {results.published &&
                                 (results.current.rank !== null ||
@@ -181,6 +220,9 @@ function ResultsBody({ results }: { readonly results: MyResults }): ReactNode {
                                     ))}
                                 </div>
                             )}
+                            {results.published ? (
+                                <FeedbackBlock feedback={results.current.feedback} />
+                            ) : null}
                         </div>
                     )}
                 </CardContent>
@@ -211,22 +253,26 @@ function ResultsBody({ results }: { readonly results: MyResults }): ReactNode {
                                         {formatDateTime(entry.publishedAt)}
                                     </CardDescription>
                                 </CardHeader>
-                                <CardContent className="flex flex-wrap items-center justify-between gap-3">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <span className="text-sm">
-                                            {entry.rank === null
-                                                ? "Unranked"
-                                                : `Rank #${String(entry.rank)}`}
-                                        </span>
-                                        {entry.awards.map((award) => (
-                                            <Badge key={award.id} tone="primary" size="sm">
-                                                {award.name}
-                                            </Badge>
-                                        ))}
+                                <CardContent className="flex flex-col gap-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="text-sm">
+                                                {entry.rank === null
+                                                    ? "Unranked"
+                                                    : `Rank #${String(entry.rank)}`}
+                                            </span>
+                                            <ScoreLabel score={entry.score} />
+                                            {entry.awards.map((award) => (
+                                                <Badge key={award.id} tone="primary" size="sm">
+                                                    {award.name}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                        {entry.rank !== null || entry.awards.length > 0 ? (
+                                            <CertificateLink teamId={entry.teamId} />
+                                        ) : null}
                                     </div>
-                                    {entry.rank !== null || entry.awards.length > 0 ? (
-                                        <CertificateLink teamId={entry.teamId} />
-                                    ) : null}
+                                    <FeedbackBlock feedback={entry.feedback} />
                                 </CardContent>
                             </Card>
                         ))}

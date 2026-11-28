@@ -160,11 +160,15 @@ async function seedJudgingLab(): Promise<void> {
         {
             text: `insert into projects
                    (id, organization_id, edition_id, team_id, owner_user_id, title, slug, summary,
-                    description_markdown, repository_url, tags, status, published_at)
+                    description_markdown, repository_url, demo_url, video_url, ai_disclosure,
+                    tags, status, published_at, locked_at)
                    values ($1, $2, $3, $4, $5, $6, 'judging-lab-project',
                            'A fixture project used to exercise rubric scoring.',
                            'Judging lab fixture.', 'https://example.com/judging-lab',
-                           array['judging', 'lab'], 'published', now())`,
+                           'https://example.com/judging-lab-demo',
+                           'https://example.com/judging-lab-video',
+                           'No AI tools or models were used in this project.',
+                           array['judging', 'lab'], 'published', now(), now())`,
             values: [
                 LAB_PROJECT_ID,
                 ORG,
@@ -202,8 +206,8 @@ async function seedJudgingLab(): Promise<void> {
         {
             text: `insert into judging_criteria
                    (id, organization_id, rubric_id, name, description, max_score, weight, position)
-                   values ('f4000000-0000-4000-8000-000000000011', $1, $2, 'Impact', '', 10, 1.00, 0),
-                          ('f4000000-0000-4000-8000-000000000012', $1, $2, 'Craft', '', 10, 1.00, 1)`,
+                   values ('f4000000-0000-4000-8000-000000000011', $1, $2, 'Impact', '', 10, 50.00, 0),
+                          ('f4000000-0000-4000-8000-000000000012', $1, $2, 'Craft', '', 10, 50.00, 1)`,
             values: [ORG, ORGANIZER_RUBRIC_ID],
         },
         {
@@ -215,8 +219,8 @@ async function seedJudgingLab(): Promise<void> {
         {
             text: `insert into judging_criteria
                    (id, organization_id, rubric_id, name, description, max_score, weight, position)
-                   values ('f4000000-0000-4000-8000-000000000021', $1, $2, 'Impact', 'Reach of the work.', 10, 1.00, 0),
-                          ('f4000000-0000-4000-8000-000000000022', $1, $2, 'Craft', 'Quality of execution.', 10, 1.00, 1)`,
+                   values ('f4000000-0000-4000-8000-000000000021', $1, $2, 'Impact', 'Reach of the work.', 10, 50.00, 0),
+                          ('f4000000-0000-4000-8000-000000000022', $1, $2, 'Craft', 'Quality of execution.', 10, 50.00, 1)`,
             values: [ORG, LAB_RUBRIC_ID],
         },
         {

@@ -157,6 +157,7 @@ export function NewEditionDialog({
                     teamMaxSize: Number(values.teamMaxSize),
                     maxParticipants: null,
                     rulesMarkdown: values.rulesMarkdown,
+                    resultsOpenAt: null,
                 },
             });
             close(false);

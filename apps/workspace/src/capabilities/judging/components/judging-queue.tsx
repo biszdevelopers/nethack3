@@ -23,12 +23,14 @@ import {
     FormField,
     KeyValue,
     LoadingBlock,
+    Markdown,
     Progress,
     Textarea,
     useToast,
 } from "@nethack/ui";
 import { formatDateTime } from "../../shared/datetime.js";
 import { describeError } from "../../shared/errors.js";
+import { humanizeToken } from "../../shared/format.js";
 import { RequestError } from "../../shared/states.jsx";
 import { conflictSchema, flagSchema, type ConflictForm, type FlagForm } from "../forms.js";
 import { useDeclareConflict, useFlagAssignment } from "../hooks.js";
@@ -101,6 +103,8 @@ export function JudgingQueue({
     const currentFrozen = frozen || current?.frozen === true;
     const currentId = current?.id ?? null;
     const currentVideoUrl = current === null ? null : safeExternalUrl(current.videoUrl);
+    const currentRepositoryUrl = current === null ? null : safeExternalUrl(current.repositoryUrl);
+    const currentDemoUrl = current === null ? null : safeExternalUrl(current.demoUrl);
     const declareConflict = useDeclareConflict(organizationId, currentId);
     const flagAssignment = useFlagAssignment(organizationId, currentId);
     const hasUnscored = items.some((item) => isPending(item.status));
@@ -228,7 +232,11 @@ export function JudgingQueue({
                             <div className="flex flex-wrap items-start justify-between gap-2">
                                 <div className="flex flex-col gap-1">
                                     <CardTitle>{current.projectTitle}</CardTitle>
-                                    <CardDescription>Assignment {current.id}</CardDescription>
+                                    <CardDescription>
+                                        {current.teamName ?? "No team"} ·{" "}
+                                        {current.divisionName ?? "Edition-wide"} · Assignment{" "}
+                                        {current.id}
+                                    </CardDescription>
                                 </div>
                                 <Badge tone={statusTone(current.status)}>
                                     {statusLabel(current.status)}
@@ -239,6 +247,15 @@ export function JudgingQueue({
                             <KeyValue
                                 columns={2}
                                 items={[
+                                    { label: "Team", value: current.teamName ?? "No team" },
+                                    {
+                                        label: "Track",
+                                        value: current.divisionName ?? "Edition-wide",
+                                    },
+                                    {
+                                        label: "Submission",
+                                        value: humanizeToken(current.submissionStatus),
+                                    },
                                     { label: "Due", value: formatDateTime(current.dueAt) },
                                     {
                                         label: "Assigned",
@@ -263,6 +280,40 @@ export function JudgingQueue({
                                 </p>
                             )}
                             <div className="flex flex-col gap-3 border-t border-line pt-4">
+                                {current.descriptionMarkdown.trim().length === 0 ? null : (
+                                    <div className="flex flex-col gap-1">
+                                        <span className="text-sm font-medium text-ink">
+                                            Project description
+                                        </span>
+                                        <div className="prose-nethack">
+                                            <Markdown source={current.descriptionMarkdown} />
+                                        </div>
+                                    </div>
+                                )}
+                                {currentRepositoryUrl === null && currentDemoUrl === null ? null : (
+                                    <div className="flex flex-wrap gap-4">
+                                        {currentRepositoryUrl === null ? null : (
+                                            <a
+                                                href={currentRepositoryUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-sm text-primary underline-offset-4 hover:underline"
+                                            >
+                                                Open repository
+                                            </a>
+                                        )}
+                                        {currentDemoUrl === null ? null : (
+                                            <a
+                                                href={currentDemoUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-sm text-primary underline-offset-4 hover:underline"
+                                            >
+                                                Open demo
+                                            </a>
+                                        )}
+                                    </div>
+                                )}
                                 <div className="flex flex-col gap-1">
                                     <span className="text-sm font-medium text-ink">
                                         Demonstration video

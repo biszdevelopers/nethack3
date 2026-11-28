@@ -38,6 +38,7 @@ export const editionSchema = z.object({
     teamMaxSize: z.number().int().min(1).max(50),
     maxParticipants: z.number().int().min(1).max(100000).nullable(),
     rulesMarkdown: z.string().max(100_000),
+    resultsOpenAt: optionalDateTime,
 });
 export type EditionForm = z.infer<typeof editionSchema>;
 

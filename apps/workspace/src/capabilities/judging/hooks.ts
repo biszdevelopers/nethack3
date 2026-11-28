@@ -305,6 +305,23 @@ export function useJudgingHistory(organizationId: string | null, editionId: stri
     });
 }
 
+export function useTeamFeedback(
+    organizationId: string | null,
+    editionId: string | null,
+    teamId: string | null,
+) {
+    return useQuery({
+        queryKey: ["judging", organizationId ?? "none", "team-feedback", editionId, teamId],
+        queryFn: async () => {
+            if (organizationId === null || editionId === null || teamId === null) {
+                return null;
+            }
+            return api.judging.teamFeedback(organizationId, editionId, teamId);
+        },
+        enabled: organizationId !== null && editionId !== null && teamId !== null,
+    });
+}
+
 export function useEditionJudgingFlags(organizationId: string | null, editionId: string | null) {
     return useQuery({
         queryKey: [...flagsKeyPrefix(organizationId ?? "none"), editionId ?? "none"],

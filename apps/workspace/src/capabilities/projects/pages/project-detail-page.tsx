@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link, useParams } from "react-router";
 import {
+    Alert,
     Badge,
     Card,
     CardContent,
@@ -136,14 +137,21 @@ export function ProjectDetailPage(): ReactNode {
                     </Card>
 
                     {canEdit ? (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Edit project</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <ProjectEditForm project={detail} />
-                            </CardContent>
-                        </Card>
+                        detail.lockedAt === null ? (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Edit project</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <ProjectEditForm project={detail} />
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            <Alert tone="neutral" title="Project locked after submission">
+                                The first submitted version locked this project. Its repository,
+                                demo, video, and AI-use disclosure can no longer be edited here.
+                            </Alert>
+                        )
                     ) : null}
                 </div>
 

@@ -80,6 +80,21 @@ const AWARD_ID = "f7000000-0000-4000-8000-000000000061";
 const AWARD_NAME = "E2E Parity Award";
 const AWARDED_TEAM_ID = ENTRIES[1].teamId;
 
+const REVIEWER_IDS = [
+    FIXTURE.judgeId,
+    FIXTURE.applicantId,
+    "f2000000-0000-4000-8000-000000000041",
+] as const;
+const LOW_REVIEW_INDEX = 3;
+
+function fixtureUuid(value: number): string {
+    return `f7000000-0000-4000-8000-${String(value).padStart(12, "0")}`;
+}
+
+function reviewerCount(entryIndex: number): number {
+    return entryIndex === LOW_REVIEW_INDEX ? 1 : REVIEWER_IDS.length;
+}
+
 async function csrfToken(page: Page): Promise<string> {
     const response = await page.request.get(`${API_ORIGIN}/api/v1/auth/csrf`);
     expect(response.status()).toBe(200);
@@ -127,7 +142,7 @@ async function seedResultsFixture(): Promise<void> {
         },
     ];
 
-    for (const entry of ENTRIES) {
+    for (const [entryIndex, entry] of ENTRIES.entries()) {
         statements.push(
             {
                 text: `insert into teams
@@ -176,38 +191,53 @@ async function seedResultsFixture(): Promise<void> {
                     entry.teamId,
                 ],
             },
-            {
-                text: `insert into judge_assignments
-                           (id, organization_id, edition_id, rubric_id, submission_id, judge_user_id,
-                            status, assignment_note, due_at, assigned_by_user_id)
-                       values ($1, $2, $3, $4, $5, $6, 'assigned', 'Results parity assignment.',
-                               now() + interval '7 days', $7)
-                       on conflict do nothing`,
-                values: [
-                    entry.assignmentId,
-                    FIXTURE.organizationId,
-                    FIXTURE.editionId,
-                    FIXTURE.labRubricId,
-                    entry.submissionId,
-                    FIXTURE.judgeId,
-                    FIXTURE.organizerId,
-                ],
-            },
-            {
-                text: `insert into evaluations
-                           (id, organization_id, assignment_id, judge_user_id, status,
-                            overall_comment, weighted_score, submitted_at)
-                       values ($1, $2, $3, $4, 'submitted', 'Results parity evaluation.', $5, now())
-                       on conflict do nothing`,
-                values: [
-                    entry.evaluationId,
-                    FIXTURE.organizationId,
-                    entry.assignmentId,
-                    FIXTURE.judgeId,
-                    entry.weightedScore,
-                ],
-            },
         );
+
+        for (let reviewer = 0; reviewer < reviewerCount(entryIndex); reviewer += 1) {
+            const assignmentId =
+                reviewer === 0
+                    ? entry.assignmentId
+                    : fixtureUuid(1000 + entryIndex * 10 + reviewer);
+            const evaluationId =
+                reviewer === 0
+                    ? entry.evaluationId
+                    : fixtureUuid(2000 + entryIndex * 10 + reviewer);
+            statements.push(
+                {
+                    text: `insert into judge_assignments
+                               (id, organization_id, edition_id, rubric_id, submission_id,
+                                judge_user_id, status, assignment_note, due_at,
+                                assigned_by_user_id)
+                           values ($1, $2, $3, $4, $5, $6, 'assigned',
+                                   'Results parity assignment.', now() + interval '7 days', $7)
+                           on conflict do nothing`,
+                    values: [
+                        assignmentId,
+                        FIXTURE.organizationId,
+                        FIXTURE.editionId,
+                        FIXTURE.labRubricId,
+                        entry.submissionId,
+                        REVIEWER_IDS[reviewer],
+                        FIXTURE.organizerId,
+                    ],
+                },
+                {
+                    text: `insert into evaluations
+                               (id, organization_id, assignment_id, judge_user_id, status,
+                                overall_comment, weighted_score, submitted_at)
+                           values ($1, $2, $3, $4, 'submitted',
+                                   'Results parity evaluation.', $5, now())
+                           on conflict do nothing`,
+                    values: [
+                        evaluationId,
+                        FIXTURE.organizationId,
+                        assignmentId,
+                        REVIEWER_IDS[reviewer],
+                        entry.weightedScore,
+                    ],
+                },
+            );
+        }
     }
 
     statements.push({
@@ -240,8 +270,18 @@ async function cleanupResultsFixture(): Promise<void> {
     const teamIds = ENTRIES.map((entry) => entry.teamId);
     const projectIds = ENTRIES.map((entry) => entry.projectId);
     const submissionIds = ENTRIES.map((entry) => entry.submissionId);
-    const assignmentIds = ENTRIES.map((entry) => entry.assignmentId);
-    const evaluationIds = ENTRIES.map((entry) => entry.evaluationId);
+    const extraAssignmentIds = ENTRIES.flatMap((_entry, entryIndex) =>
+        Array.from({ length: reviewerCount(entryIndex) - 1 }, (_value, reviewerIndex) =>
+            fixtureUuid(1000 + entryIndex * 10 + reviewerIndex + 1),
+        ),
+    );
+    const extraEvaluationIds = ENTRIES.flatMap((_entry, entryIndex) =>
+        Array.from({ length: reviewerCount(entryIndex) - 1 }, (_value, reviewerIndex) =>
+            fixtureUuid(2000 + entryIndex * 10 + reviewerIndex + 1),
+        ),
+    );
+    const assignmentIds = [...ENTRIES.map((entry) => entry.assignmentId), ...extraAssignmentIds];
+    const evaluationIds = [...ENTRIES.map((entry) => entry.evaluationId), ...extraEvaluationIds];
     await ownerTenantBatch(FIXTURE.organizationId, [
         {
             text: "delete from team_awards where award_id = $1",
@@ -340,7 +380,8 @@ test.describe("public results parity", () => {
             const tracks = page.getByRole("region", { name: "Results by track" });
             await expect(tracks.getByText(/Rank #\d+/).first()).toBeVisible();
             const design = tracks.getByRole("region", { name: DESIGN_DIVISION_NAME });
-            await expect(design.getByText(/^Rank #\d+$/)).toHaveCount(4);
+            await expect(design.getByText(/^Rank #\d+$/)).toHaveCount(3);
+            await expect(design.getByText(/Not enough reviews/)).toBeVisible();
             await expect(tracks.getByText(/\d+\.\d{2} \/ 100/).first()).toBeVisible();
             await expect(page.getByText("Rankings are not public for this edition")).toBeHidden();
             await expect(

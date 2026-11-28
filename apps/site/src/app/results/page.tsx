@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRight, Award, Star, Trophy } from "lucide-react";
-import type { PublicResultEntry, PublicResults, PublicTeamAward } from "@nethack/contracts";
+import {
+    MINIMUM_PUBLIC_REVIEWS,
+    type PublicResultEntry,
+    type PublicResults,
+    type PublicTeamAward,
+} from "@nethack/contracts";
 import {
     Badge,
     Button,
@@ -29,11 +34,27 @@ function formatDate(value: string | null): string {
     return new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(value));
 }
 
+function formatDateTime(value: string): string {
+    return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(
+        new Date(value),
+    );
+}
+
+function hasEnoughReviews(entry: PublicResultEntry): boolean {
+    return entry.submittedCount >= MINIMUM_PUBLIC_REVIEWS;
+}
+
 function rankLabel(entry: PublicResultEntry): string {
+    if (!hasEnoughReviews(entry)) {
+        return `Not enough reviews (${String(entry.submittedCount)} of ${String(MINIMUM_PUBLIC_REVIEWS)})`;
+    }
     return entry.rank === null ? "Unranked" : `Rank #${String(entry.rank)}`;
 }
 
 function scoreLabel(entry: PublicResultEntry): string {
+    if (!hasEnoughReviews(entry)) {
+        return `Not enough reviews (${String(entry.submittedCount)} of ${String(MINIMUM_PUBLIC_REVIEWS)})`;
+    }
     const score = entry.displayScore ?? entry.averageScore;
     return score === null ? "Not scored" : `${score.toFixed(2)} / 100`;
 }
@@ -164,6 +185,18 @@ export default async function ResultsPage(): Promise<ReactNode> {
         peopleChoiceEntry === undefined || peopleChoiceEntry.projectSlug.length === 0
             ? null
             : `/projects/${peopleChoiceEntry.projectSlug}`;
+    const peopleChoiceProject =
+        results === null || results.peopleChoice === null
+            ? undefined
+            : previewProjectById.get(results.peopleChoice.projectId);
+    const certificateByTeamId = new Map<string, string>();
+    for (const entry of results?.judgingEntries ?? []) {
+        const href = certificateHref(entry, results?.showRanking ?? false);
+        if (href !== null && entry.teamId !== null && !certificateByTeamId.has(entry.teamId)) {
+            certificateByTeamId.set(entry.teamId, href);
+        }
+    }
+    const scheduledReleases = competitions.items.filter((item) => item.resultsOpenAt !== null);
 
     return (
         <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-10 px-4 py-10 sm:px-6 md:py-14 lg:px-8">
@@ -192,6 +225,13 @@ export default async function ResultsPage(): Promise<ReactNode> {
                                     ? "No competition has published results. Standings appear here only after organizers publish them."
                                     : `Standings for ${pendingEdition.name} appear here only after organizers publish them.`}
                             </p>
+                            {scheduledReleases.map((edition) => (
+                                <p key={edition.editionId} className="text-sm text-ink-muted">
+                                    Scheduled release: {formatDateTime(edition.resultsOpenAt ?? "")}
+                                    {" · "}
+                                    {edition.name}
+                                </p>
+                            ))}
                             <div className="flex flex-wrap gap-3">
                                 <Button asChild variant="outline" color="neutral">
                                     <Link href="/competitions">Browse competitions</Link>
@@ -249,6 +289,14 @@ export default async function ResultsPage(): Promise<ReactNode> {
                                     <p className="text-xs text-ink-subtle">
                                         {results.peopleChoice.roundName}
                                     </p>
+                                    {peopleChoiceProject === undefined ? null : (
+                                        <div className="pt-2">
+                                            <ResultsProjectPreview
+                                                project={peopleChoiceProject}
+                                                certificateUrl={null}
+                                            />
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         </Reveal>
@@ -499,7 +547,8 @@ export default async function ResultsPage(): Promise<ReactNode> {
                                                                 />
                                                             </div>
                                                             <div className="flex flex-wrap items-center gap-3">
-                                                                {results.showScores ? (
+                                                                {results.showScores &&
+                                                                hasEnoughReviews(entry) ? (
                                                                     <span className="text-sm tabular-nums text-ink">
                                                                         {scoreLabel(entry)}
                                                                     </span>
@@ -525,6 +574,58 @@ export default async function ResultsPage(): Promise<ReactNode> {
                                             </ul>
                                         )}
                                     </section>
+                                ))}
+                            </div>
+                        )}
+                    </section>
+
+                    <section className="flex flex-col gap-5" aria-labelledby="all-projects-heading">
+                        <div className="flex flex-col gap-1">
+                            <h2
+                                id="all-projects-heading"
+                                className="text-2xl font-bold tracking-tight"
+                            >
+                                All submitted projects
+                            </h2>
+                            <p className="text-sm text-ink-muted">
+                                Every public project in this edition, including projects that still
+                                have no published reviews.
+                            </p>
+                        </div>
+                        {previewProjects.length === 0 ? (
+                            <EmptyState
+                                title="No public projects"
+                                description="Published projects for this edition appear here."
+                            />
+                        ) : (
+                            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                                {previewProjects.map((project) => (
+                                    <Card key={project.id} variant="outline">
+                                        <CardContent className="flex flex-col gap-2 pt-5">
+                                            <Link
+                                                href={`/projects/${project.slug}`}
+                                                className="break-words font-semibold text-ink transition-colors hover:text-primary"
+                                            >
+                                                {project.title}
+                                            </Link>
+                                            <p className="text-sm text-ink-muted">
+                                                {project.teamName ?? "Independent project"}
+                                                {project.divisionName === null
+                                                    ? ""
+                                                    : ` · ${project.divisionName}`}
+                                            </p>
+                                            <ResultsProjectPreview
+                                                project={project}
+                                                certificateUrl={
+                                                    project.teamId === null
+                                                        ? null
+                                                        : (certificateByTeamId.get(
+                                                              project.teamId,
+                                                          ) ?? null)
+                                                }
+                                            />
+                                        </CardContent>
+                                    </Card>
                                 ))}
                             </div>
                         )}
