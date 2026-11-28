@@ -41,11 +41,12 @@ import { formatDateTime } from "../../shared/datetime.js";
 import { describeError } from "../../shared/errors.js";
 import { humanizeToken } from "../../shared/format.js";
 import { RequestError } from "../../shared/states.jsx";
-import { conflictSchema, type ConflictForm } from "../forms.js";
+import { conflictSchema, flagSchema, type ConflictForm, type FlagForm } from "../forms.js";
 import {
     useAssignment,
     useAssignmentHistory,
     useDeclareConflict,
+    useFlagAssignment,
     useSaveEvaluation,
     useSubmitEvaluation,
 } from "../hooks.js";
@@ -87,6 +88,7 @@ export function AssignmentDetailPage(): ReactNode {
     const saveEvaluation = useSaveEvaluation(organizationId, assignmentId ?? null);
     const submitEvaluation = useSubmitEvaluation(organizationId, assignmentId ?? null);
     const declareConflict = useDeclareConflict(organizationId, assignmentId ?? null);
+    const flagAssignment = useFlagAssignment(organizationId, assignmentId ?? null);
 
     const [edit, setEdit] = useState<{
         readonly key: string;
@@ -95,10 +97,15 @@ export function AssignmentDetailPage(): ReactNode {
     } | null>(null);
     const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
     const [conflictOpen, setConflictOpen] = useState(false);
+    const [flagOpen, setFlagOpen] = useState(false);
 
     const conflictForm = useForm<ConflictForm>({
         resolver: zodResolver(conflictSchema),
         defaultValues: { note: "" },
+    });
+    const flagForm = useForm<FlagForm>({
+        resolver: zodResolver(flagSchema),
+        defaultValues: { reason: "" },
     });
 
     if (session.isPending) {
@@ -216,10 +223,25 @@ export function AssignmentDetailPage(): ReactNode {
             await declareConflict.mutateAsync({ note: values.note });
             setConflictOpen(false);
             conflictForm.reset({ note: "" });
-            toast({ title: "Conflict declared", tone: "neutral" });
+            toast({ title: "Recusal recorded", tone: "success" });
         } catch (error) {
             toast({
-                title: "Could not declare the conflict",
+                title: "Could not record the recusal",
+                description: describeError(error),
+                tone: "critical",
+            });
+        }
+    });
+
+    const onFlag = flagForm.handleSubmit(async (values) => {
+        try {
+            await flagAssignment.mutateAsync({ reason: values.reason });
+            setFlagOpen(false);
+            flagForm.reset({ reason: "" });
+            toast({ title: "Flag reported to the organizers", tone: "success" });
+        } catch (error) {
+            toast({
+                title: "Could not report the flag",
                 description: describeError(error),
                 tone: "critical",
             });
@@ -443,10 +465,9 @@ export function AssignmentDetailPage(): ReactNode {
                     {canEvaluate && assignment.conflictNote === null ? (
                         <Card>
                             <CardHeader>
-                                <CardTitle>Conflict</CardTitle>
+                                <CardTitle>Recusal</CardTitle>
                                 <CardDescription>
-                                    Declare a conflict if you cannot evaluate this submission
-                                    fairly.
+                                    Recuse yourself if you cannot evaluate this submission fairly.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -455,11 +476,33 @@ export function AssignmentDetailPage(): ReactNode {
                                     variant="outline"
                                     onClick={() => setConflictOpen(true)}
                                 >
-                                    Declare conflict
+                                    Recuse from this project
                                 </Button>
                             </CardContent>
                         </Card>
                     ) : null}
+
+                    {assignment.status === "conflict_declared" ||
+                    assignment.status === "revoked" ? null : (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Report a concern</CardTitle>
+                                <CardDescription>
+                                    Flag this project so organizers can review a rules question or
+                                    missing information.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={() => setFlagOpen(true)}
+                                >
+                                    Flag for organizers
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    )}
                 </aside>
             </div>
 
@@ -476,14 +519,14 @@ export function AssignmentDetailPage(): ReactNode {
             <Dialog open={conflictOpen} onOpenChange={setConflictOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Declare a judging conflict</DialogTitle>
+                        <DialogTitle>Recuse from this project</DialogTitle>
                         <DialogDescription>
                             The organizer sees this note and can reassign the submission.
                         </DialogDescription>
                     </DialogHeader>
                     <Form form={conflictForm} onSubmit={onDeclareConflict}>
                         <div className="flex flex-col gap-4">
-                            <FormField name="note" label="Conflict note" required>
+                            <FormField name="note" label="Recusal note" required>
                                 {(field) => (
                                     <Textarea
                                         {...field}
@@ -501,7 +544,44 @@ export function AssignmentDetailPage(): ReactNode {
                                     Cancel
                                 </Button>
                                 <Button type="submit" loading={declareConflict.isPending}>
-                                    Declare conflict
+                                    Recuse from this project
+                                </Button>
+                            </DialogFooter>
+                        </div>
+                    </Form>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={flagOpen} onOpenChange={setFlagOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Flag this project for organizers</DialogTitle>
+                        <DialogDescription>
+                            Use this for a concern that needs organizer review, such as a rules
+                            question or missing information.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <Form form={flagForm} onSubmit={onFlag}>
+                        <div className="flex flex-col gap-4">
+                            <FormField name="reason" label="Reason" required>
+                                {(field) => (
+                                    <Textarea
+                                        {...field}
+                                        value={field.value}
+                                        placeholder="Describe what the organizers should review."
+                                    />
+                                )}
+                            </FormField>
+                            <DialogFooter>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setFlagOpen(false)}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button type="submit" loading={flagAssignment.isPending}>
+                                    Report flag
                                 </Button>
                             </DialogFooter>
                         </div>

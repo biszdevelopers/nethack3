@@ -4,11 +4,13 @@ import {
     publicCompetitionDetailSchema,
     publicCompetitionSchema,
     publicProjectSchema,
+    publicUserProfileSchema,
     type ListResponse,
     type PublicAnnouncement,
     type PublicCompetition,
     type PublicCompetitionDetail,
     type PublicProject,
+    type PublicUserProfile,
 } from "@nethack/contracts";
 import type { z } from "zod";
 
@@ -82,4 +84,11 @@ export async function getProject(slug: string): Promise<PublicProject> {
 
 export async function getAnnouncements(): Promise<ListResponse<PublicAnnouncement>> {
     return publicRequest("/api/v1/public/announcements", announcementListSchema);
+}
+
+export async function getPublicUserProfile(userId: string): Promise<PublicUserProfile> {
+    return publicRequest(
+        `/api/v1/public/users/${encodeURIComponent(userId)}`,
+        publicUserProfileSchema,
+    );
 }

@@ -3,36 +3,62 @@
 import { useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Button, Drawer, DrawerClose, DrawerContent, cn, useColorMode } from "@nethack/ui";
+import {
+    Button,
+    Drawer,
+    DrawerClose,
+    DrawerContent,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    cn,
+    useColorMode,
+} from "@nethack/ui";
 import { gsap, useIsoLayoutEffect } from "@nethack/ui/motion";
 import {
     House,
     Trophy,
+    Archive,
     FolderGit2,
+    Medal,
     Megaphone,
     Info,
     HelpCircle,
+    Mail,
+    GitPullRequest,
+    ChevronDown,
     Moon,
     Sun,
     Menu,
+    Ellipsis,
     UserRound,
     ArrowUpRight,
     X,
 } from "lucide-react";
 
-const NAVIGATION = [
+const PRIMARY_NAVIGATION = [
     { href: "/", label: "Home", icon: House },
     { href: "/competitions", label: "Competitions", icon: Trophy },
+    { href: "/past", label: "Seasons", icon: Archive },
     { href: "/projects", label: "Showcase", icon: FolderGit2 },
+    { href: "/results", label: "Results", icon: Medal },
     { href: "/announcements", label: "Announcements", icon: Megaphone },
+] as const;
+
+const MORE_NAVIGATION = [
     { href: "/about", label: "About", icon: Info },
     { href: "/faq", label: "FAQ", icon: HelpCircle },
+    { href: "/contact", label: "Contact", icon: Mail },
+    { href: "/contributing", label: "Contributing", icon: GitPullRequest },
 ] as const;
+
+const MOBILE_NAVIGATION = [...PRIMARY_NAVIGATION, ...MORE_NAVIGATION] as const;
 
 export function SiteHeader({ workspaceOrigin }: { readonly workspaceOrigin: string }): ReactNode {
     const pathname = usePathname();
     const headerRef = useRef<HTMLElement | null>(null);
-    const navRef = useRef<HTMLDivElement | null>(null);
+    const navRef = useRef<HTMLElement | null>(null);
     const [menuOpen, setMenuOpen] = useState(false);
     const { colorMode, toggleColorMode } = useColorMode();
 
@@ -68,8 +94,16 @@ export function SiteHeader({ workspaceOrigin }: { readonly workspaceOrigin: stri
         return () => context.revert();
     }, []);
 
-    const isActive = (href: string): boolean =>
-        href === "/" ? pathname === "/" : pathname.startsWith(href);
+    const isActive = (href: string): boolean => {
+        if (href === "/") {
+            return pathname === "/";
+        }
+        if (href === "/past") {
+            return pathname.startsWith("/past") || pathname.startsWith("/seasons");
+        }
+        return pathname.startsWith(href);
+    };
+    const secondaryActive = MORE_NAVIGATION.some((item) => isActive(item.href));
 
     return (
         <header ref={headerRef} className="sticky top-0 z-50 border-b border-line bg-app/80">
@@ -92,11 +126,12 @@ export function SiteHeader({ workspaceOrigin }: { readonly workspaceOrigin: stri
                     />
                 </Link>
 
-                <div
+                <nav
                     ref={navRef}
-                    className="hidden flex-1 items-center justify-center gap-1 lg:flex"
+                    aria-label="Primary"
+                    className="hidden flex-1 items-center justify-center gap-1 xl:flex"
                 >
-                    {NAVIGATION.map((item) => {
+                    {PRIMARY_NAVIGATION.map((item) => {
                         const Icon = item.icon;
                         const active = isActive(item.href);
                         return (
@@ -124,9 +159,55 @@ export function SiteHeader({ workspaceOrigin }: { readonly workspaceOrigin: stri
                             </Link>
                         );
                     })}
-                </div>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <button
+                                type="button"
+                                className={cn(
+                                    "group inline-flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/25",
+                                    secondaryActive
+                                        ? "bg-raised text-primary"
+                                        : "text-ink-muted hover:bg-raised/60 hover:text-ink",
+                                )}
+                            >
+                                <Ellipsis
+                                    className={cn(
+                                        "size-4 transition-colors",
+                                        secondaryActive
+                                            ? "text-primary"
+                                            : "text-ink-subtle group-hover:text-ink-muted",
+                                    )}
+                                    aria-hidden="true"
+                                />
+                                More
+                                <ChevronDown className="size-3 opacity-70" aria-hidden="true" />
+                            </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="center">
+                            {MORE_NAVIGATION.map((item) => {
+                                const Icon = item.icon;
+                                const active = isActive(item.href);
+                                return (
+                                    <DropdownMenuItem key={item.href} asChild>
+                                        <Link
+                                            href={item.href}
+                                            aria-current={active ? "page" : undefined}
+                                            className={cn(
+                                                "flex w-full items-center gap-2",
+                                                active ? "text-primary" : undefined,
+                                            )}
+                                        >
+                                            <Icon className="size-4" aria-hidden="true" />
+                                            {item.label}
+                                        </Link>
+                                    </DropdownMenuItem>
+                                );
+                            })}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </nav>
 
-                <div className="ml-auto flex items-center gap-1.5 lg:ml-0 lg:flex-1 lg:justify-end">
+                <div className="ml-auto flex items-center gap-1.5 xl:ml-0 xl:flex-1 xl:justify-end">
                     <Button
                         variant="ghost"
                         size="icon"
@@ -152,7 +233,7 @@ export function SiteHeader({ workspaceOrigin }: { readonly workspaceOrigin: stri
                     <Button
                         variant="ghost"
                         size="icon"
-                        className="lg:hidden"
+                        className="xl:hidden"
                         aria-label="Open navigation"
                         onClick={() => setMenuOpen(true)}
                     >
@@ -164,12 +245,12 @@ export function SiteHeader({ workspaceOrigin }: { readonly workspaceOrigin: stri
             <Drawer open={menuOpen} onOpenChange={setMenuOpen}>
                 <DrawerContent
                     title="nethack"
-                    description="Competitions, projects, and announcements."
+                    description="Competitions, seasons, projects, and announcements."
                     side="right"
                     className="bg-app"
                 >
                     <nav aria-label="Mobile" className="flex flex-col gap-1">
-                        {NAVIGATION.map((item) => {
+                        {MOBILE_NAVIGATION.map((item) => {
                             const Icon = item.icon;
                             const active = isActive(item.href);
                             return (

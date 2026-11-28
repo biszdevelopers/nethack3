@@ -19,3 +19,8 @@ export const conflictSchema = z.object({
     note: z.string().trim().min(5, "Describe the conflict in at least five characters.").max(2000),
 });
 export type ConflictForm = z.infer<typeof conflictSchema>;
+
+export const flagSchema = z.object({
+    reason: z.string().trim().min(5, "Describe the concern in at least five characters.").max(2000),
+});
+export type FlagForm = z.infer<typeof flagSchema>;

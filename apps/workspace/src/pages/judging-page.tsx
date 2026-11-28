@@ -18,6 +18,7 @@ import {
     Input,
     LoadingBlock,
     PageHeader,
+    Progress,
     Select,
     Table,
     TableBody,
@@ -25,6 +26,10 @@ import {
     TableHead,
     TableHeader,
     TableRow,
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
     Textarea,
     useToast,
 } from "@nethack/ui";
@@ -35,14 +40,21 @@ import { describeError } from "../capabilities/shared/errors.js";
 import { humanizeToken } from "../capabilities/shared/format.js";
 import { RequestError } from "../capabilities/shared/states.jsx";
 import { assignmentSchema, type AssignmentForm } from "../capabilities/judging/forms.js";
+import { JudgingCoveragePanel } from "../capabilities/judging/components/judging-coverage-panel.js";
+import { JudgingQueue } from "../capabilities/judging/components/judging-queue.js";
 import { JudgingResultsPanel } from "../capabilities/judging/components/judging-results-panel.js";
 import { RubricBuilder } from "../capabilities/judging/components/rubric-builder.js";
-import { useOrganizerEditions } from "../capabilities/competitions/hooks.js";
+import { buildJudgeEditionOptions } from "../capabilities/judging/edition-options.js";
+import {
+    useOrganizerEditions,
+    usePublicEditionOptions,
+} from "../capabilities/competitions/hooks.js";
 import {
     useCreateAssignment,
     useEditionAssignments,
     useEditionRubrics,
     useEditionSubmissions,
+    useJudgingHistory,
     useMyAssignments,
     useRevokeAssignment,
 } from "../capabilities/judging/hooks.js";
@@ -103,12 +115,10 @@ export function JudgingPage(): ReactNode {
     const { toast } = useToast();
 
     const statusParam = readStatus(searchParams.get("status"));
-    const myAssignments = useMyAssignments(
-        organizationId,
-        statusParam === "all" ? undefined : statusParam,
-    );
+    const myAssignments = useMyAssignments(organizationId);
 
     const organizerEditions = useOrganizerEditions(organizationId, isOrganizer);
+    const publicEditions = usePublicEditionOptions(membership?.organizationSlug ?? null);
     const editionId = searchParams.get("edition");
     const rubrics = useEditionRubrics(organizationId, isOrganizer ? editionId : null);
     const assignments = useEditionAssignments(organizationId, isOrganizer ? editionId : null);
@@ -132,6 +142,14 @@ export function JudgingPage(): ReactNode {
         },
     });
 
+    const allMyItems = myAssignments.data?.items ?? [];
+    const judgeEditionOptions = buildJudgeEditionOptions(allMyItems, [
+        ...publicEditions.editions,
+        ...organizerEditions.editions,
+    ]);
+    const historyEditionId = editionId ?? judgeEditionOptions[0]?.id ?? null;
+    const myHistory = useJudgingHistory(organizationId, historyEditionId);
+
     if (session.isPending) {
         return <LoadingBlock rows={4} label="Loading judging" />;
     }
@@ -153,12 +171,34 @@ export function JudgingPage(): ReactNode {
         );
     }
 
-    const myItems = myAssignments.data?.items ?? [];
     const editionAssignments = assignments.data?.items ?? [];
     const rubricItems = rubrics.data?.items ?? [];
     const submissionItems = submissions.data?.items ?? [];
     const selectedEdition =
         organizerEditions.editions.find((edition) => edition.id === editionId) ?? null;
+    const myItems =
+        editionId === null
+            ? allMyItems
+            : allMyItems.filter((assignment) => assignment.editionId === editionId);
+    const visibleMyItems =
+        statusParam === "all"
+            ? myItems
+            : myItems.filter((assignment) => assignment.status === statusParam);
+    const trackedMyItems = myItems.filter((assignment) => assignment.status !== "revoked");
+    const submittedCount = trackedMyItems.filter(
+        (assignment) => assignment.status === "submitted",
+    ).length;
+    const pendingCount = trackedMyItems.filter(
+        (assignment) => assignment.status === "assigned" || assignment.status === "in_progress",
+    ).length;
+    const conflictCount = trackedMyItems.filter(
+        (assignment) => assignment.status === "conflict_declared",
+    ).length;
+    const editionFilterOptions = [
+        { value: "all", label: "All editions" },
+        ...judgeEditionOptions.map((edition) => ({ value: edition.id, label: edition.name })),
+    ];
+    const historyItems = myHistory.data?.items ?? [];
 
     const setEdition = (next: string): void => {
         const params = new URLSearchParams(searchParams);
@@ -171,6 +211,25 @@ export function JudgingPage(): ReactNode {
             dueAt: "",
             note: "",
         });
+    };
+
+    const setEditionFilter = (next: string): void => {
+        const params = new URLSearchParams(searchParams);
+        if (next === "all") {
+            params.delete("edition");
+        } else {
+            params.set("edition", next);
+        }
+        setSearchParams(params, { replace: true });
+        if (next !== "all") {
+            assignmentForm.reset({
+                submissionId: "",
+                rubricId: "",
+                judgeEmail: "",
+                dueAt: "",
+                note: "",
+            });
+        }
     };
 
     const setStatus = (next: string): void => {
@@ -229,89 +288,332 @@ export function JudgingPage(): ReactNode {
                 description="Review assigned submissions, score each rubric criterion, and submit feedback."
             />
 
-            <section className="flex flex-col gap-4" aria-labelledby="my-assignments-heading">
-                <div className="flex flex-wrap items-end justify-between gap-4">
-                    <div className="flex flex-col gap-1">
-                        <h2
-                            id="my-assignments-heading"
-                            className="text-lg font-bold tracking-tight"
-                        >
-                            My assignments
-                        </h2>
-                        <p className="text-sm text-ink-muted">
-                            Assignments where you are the assigned judge.
-                        </p>
-                    </div>
-                    <div className="w-48">
-                        <Select
-                            label="Filter by status"
-                            options={STATUS_OPTIONS}
-                            value={statusParam}
-                            onValueChange={setStatus}
-                        />
-                    </div>
-                </div>
+            <Tabs defaultValue="assignments">
+                <TabsList aria-label="Judging sections">
+                    <TabsTrigger value="assignments">My assignments</TabsTrigger>
+                    <TabsTrigger value="queue">Continue judging</TabsTrigger>
+                    <TabsTrigger value="history">History</TabsTrigger>
+                    {isOrganizer ? <TabsTrigger value="coverage">Coverage</TabsTrigger> : null}
+                </TabsList>
 
-                {myAssignments.isPending ? (
-                    <LoadingBlock rows={4} label="Loading assignments" />
-                ) : myAssignments.isError ? (
-                    <RequestError
-                        error={myAssignments.error}
-                        onRetry={() => void myAssignments.refetch()}
-                    />
-                ) : myItems.length === 0 ? (
-                    <EmptyState
-                        title="No judging assignments"
-                        description="Assignments appear after an organizer creates a rubric and assigns you to a submission."
-                    />
-                ) : (
-                    <Card>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Project</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Due</TableHead>
-                                    <TableHead>Assigned</TableHead>
-                                    <TableHead className="text-right">Open</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {myItems.map((assignment) => (
-                                    <TableRow key={assignment.id}>
-                                        <TableCell>
-                                            <span className="font-medium">
-                                                {assignment.projectTitle}
-                                            </span>
-                                            <span className="block text-xs text-ink-subtle">
-                                                {assignment.id}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge tone={statusTone(assignment.status)}>
-                                                {statusLabel(assignment.status)}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-ink-muted">
-                                            {formatDateTime(assignment.dueAt)}
-                                        </TableCell>
-                                        <TableCell className="text-ink-muted">
-                                            {formatDateTime(assignment.assignedAt)}
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <Button variant="outline" size="sm" asChild>
-                                                <Link to={`/judging/assignments/${assignment.id}`}>
-                                                    Open assignment
-                                                </Link>
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </Card>
-                )}
-            </section>
+                <TabsContent value="assignments">
+                    <section
+                        className="flex flex-col gap-4"
+                        aria-labelledby="my-assignments-heading"
+                    >
+                        <div className="flex flex-wrap items-end justify-between gap-4">
+                            <div className="flex flex-col gap-1">
+                                <h2
+                                    id="my-assignments-heading"
+                                    className="text-lg font-bold tracking-tight"
+                                >
+                                    My assignments
+                                </h2>
+                                <p className="text-sm text-ink-muted">
+                                    Assignments where you are the assigned judge.
+                                </p>
+                            </div>
+                            <div className="flex flex-wrap gap-3">
+                                <div className="w-52">
+                                    <Select
+                                        label="Filter by edition"
+                                        options={editionFilterOptions}
+                                        value={editionId ?? "all"}
+                                        onValueChange={setEditionFilter}
+                                    />
+                                </div>
+                                <div className="w-48">
+                                    <Select
+                                        label="Filter by status"
+                                        options={STATUS_OPTIONS}
+                                        value={statusParam}
+                                        onValueChange={setStatus}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {myAssignments.isPending ? (
+                            <LoadingBlock rows={4} label="Loading assignments" />
+                        ) : myAssignments.isError ? (
+                            <RequestError
+                                error={myAssignments.error}
+                                onRetry={() => void myAssignments.refetch()}
+                            />
+                        ) : myItems.length === 0 ? (
+                            <EmptyState
+                                title="No judging assignments"
+                                description="Assignments appear after an organizer creates a rubric and assigns you to a submission."
+                            />
+                        ) : (
+                            <>
+                                <Card>
+                                    <CardContent className="flex flex-col gap-3 pt-6">
+                                        <Progress
+                                            label="Evaluations submitted"
+                                            value={submittedCount}
+                                            max={trackedMyItems.length}
+                                            valueText={`${String(submittedCount)} of ${String(trackedMyItems.length)} submitted`}
+                                        />
+                                        <p className="text-sm text-ink-muted">
+                                            {String(pendingCount)} pending ·{" "}
+                                            {String(submittedCount)} submitted ·{" "}
+                                            {String(conflictCount)} recused
+                                        </p>
+                                    </CardContent>
+                                </Card>
+                                {visibleMyItems.length === 0 ? (
+                                    <EmptyState
+                                        title="No assignments match this filter"
+                                        description="Change the edition or status filter to see more assignments."
+                                    />
+                                ) : (
+                                    <Card>
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Project</TableHead>
+                                                    <TableHead>Edition</TableHead>
+                                                    <TableHead>Status</TableHead>
+                                                    <TableHead>Due</TableHead>
+                                                    <TableHead>Assigned</TableHead>
+                                                    <TableHead className="text-right">
+                                                        Open
+                                                    </TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {visibleMyItems.map((assignment) => (
+                                                    <TableRow key={assignment.id}>
+                                                        <TableCell>
+                                                            <span className="font-medium">
+                                                                {assignment.projectTitle}
+                                                            </span>
+                                                            <span className="block text-xs text-ink-subtle">
+                                                                {assignment.id}
+                                                            </span>
+                                                        </TableCell>
+                                                        <TableCell className="text-ink-muted">
+                                                            {judgeEditionOptions.find(
+                                                                (edition) =>
+                                                                    edition.id ===
+                                                                    assignment.editionId,
+                                                            )?.name ?? "—"}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge
+                                                                tone={statusTone(assignment.status)}
+                                                            >
+                                                                {statusLabel(assignment.status)}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-ink-muted">
+                                                            {formatDateTime(assignment.dueAt)}
+                                                        </TableCell>
+                                                        <TableCell className="text-ink-muted">
+                                                            {formatDateTime(assignment.assignedAt)}
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                asChild
+                                                            >
+                                                                <Link
+                                                                    to={`/judging/assignments/${assignment.id}`}
+                                                                >
+                                                                    Open assignment
+                                                                </Link>
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </Card>
+                                )}
+                            </>
+                        )}
+                    </section>
+                </TabsContent>
+
+                <TabsContent value="queue">
+                    <section
+                        className="flex flex-col gap-4"
+                        aria-labelledby="judging-queue-heading"
+                    >
+                        <div className="flex flex-col gap-1">
+                            <h2
+                                id="judging-queue-heading"
+                                className="text-lg font-bold tracking-tight"
+                            >
+                                Continue judging
+                            </h2>
+                            <p className="text-sm text-ink-muted">
+                                Work through one project at a time. Open a project to score it, or
+                                recuse yourself if you cannot evaluate it fairly.
+                            </p>
+                        </div>
+                        <JudgingQueue
+                            organizationId={organizationId}
+                            items={myItems}
+                            isPending={myAssignments.isPending}
+                            error={myAssignments.isError ? myAssignments.error : null}
+                            onRetry={() => void myAssignments.refetch()}
+                        />
+                    </section>
+                </TabsContent>
+
+                <TabsContent value="history">
+                    <section
+                        className="flex flex-col gap-4"
+                        aria-labelledby="judging-history-heading"
+                    >
+                        <div className="flex flex-wrap items-end justify-between gap-4">
+                            <div className="flex flex-col gap-1">
+                                <h2
+                                    id="judging-history-heading"
+                                    className="text-lg font-bold tracking-tight"
+                                >
+                                    History
+                                </h2>
+                                <p className="text-sm text-ink-muted">
+                                    Submitted evaluations for the selected edition. This stays
+                                    available when judging is closed.
+                                </p>
+                            </div>
+                            {historyEditionId === null ? null : (
+                                <Button variant="outline" asChild>
+                                    <Link to={`/judging/history?edition=${historyEditionId}`}>
+                                        Open evaluation history
+                                    </Link>
+                                </Button>
+                            )}
+                        </div>
+
+                        {judgeEditionOptions.length > 0 ? (
+                            <div className="max-w-md">
+                                <Select
+                                    label="Edition"
+                                    options={judgeEditionOptions.map((edition) => ({
+                                        value: edition.id,
+                                        label: edition.name,
+                                    }))}
+                                    value={historyEditionId ?? ""}
+                                    onValueChange={setEditionFilter}
+                                />
+                            </div>
+                        ) : null}
+
+                        {historyEditionId === null ? (
+                            <EmptyState
+                                title="No submitted evaluations"
+                                description="Submitted evaluations appear here after you finish scoring an assignment."
+                            />
+                        ) : myHistory.isPending ? (
+                            <LoadingBlock rows={3} label="Loading submitted evaluations" />
+                        ) : myHistory.isError ? (
+                            <RequestError
+                                error={myHistory.error}
+                                onRetry={() => void myHistory.refetch()}
+                            />
+                        ) : historyItems.length === 0 ? (
+                            <EmptyState
+                                title="No submitted evaluations"
+                                description="Submitted evaluations for this edition appear here after you finish scoring."
+                            />
+                        ) : (
+                            <Card>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Project</TableHead>
+                                            <TableHead>Team</TableHead>
+                                            <TableHead>Score</TableHead>
+                                            <TableHead>Submitted</TableHead>
+                                            <TableHead className="text-right">Open</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {historyItems.map((item) => (
+                                            <TableRow key={item.assignmentId}>
+                                                <TableCell className="font-medium">
+                                                    {item.projectTitle}
+                                                </TableCell>
+                                                <TableCell>{item.teamName ?? "No team"}</TableCell>
+                                                <TableCell className="tabular-nums">
+                                                    {item.weightedScore === null
+                                                        ? "Not scored"
+                                                        : `${item.weightedScore.toFixed(2)} / 100`}
+                                                </TableCell>
+                                                <TableCell className="text-ink-muted">
+                                                    {formatDateTime(item.submittedAt)}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <Button variant="outline" size="sm" asChild>
+                                                        <Link
+                                                            to={`/judging/assignments/${item.assignmentId}`}
+                                                        >
+                                                            Open assignment
+                                                        </Link>
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </Card>
+                        )}
+                    </section>
+                </TabsContent>
+
+                {isOrganizer ? (
+                    <TabsContent value="coverage">
+                        <section
+                            className="flex flex-col gap-4"
+                            aria-labelledby="judging-coverage-heading"
+                        >
+                            <div className="flex flex-col gap-1">
+                                <h2
+                                    id="judging-coverage-heading"
+                                    className="text-lg font-bold tracking-tight"
+                                >
+                                    Coverage
+                                </h2>
+                                <p className="text-sm text-ink-muted">
+                                    Per-judge progress, calibration, and open flags for this
+                                    edition.
+                                </p>
+                            </div>
+                            {organizerEditions.query.isPending ? (
+                                <LoadingBlock rows={2} label="Loading editions" />
+                            ) : organizerEditions.query.isError ? (
+                                <RequestError
+                                    error={organizerEditions.query.error}
+                                    onRetry={() => void organizerEditions.query.refetch()}
+                                />
+                            ) : organizerEditions.editions.length === 0 ? (
+                                <EmptyState
+                                    title="No competition editions"
+                                    description="Create a competition edition before reviewing judge coverage."
+                                />
+                            ) : (
+                                <div className="max-w-md">
+                                    <EditionSelect
+                                        editions={organizerEditions.editions}
+                                        value={editionId ?? ""}
+                                        onValueChange={setEdition}
+                                    />
+                                </div>
+                            )}
+                            <JudgingCoveragePanel
+                                organizationId={organizationId}
+                                editionId={editionId}
+                            />
+                        </section>
+                    </TabsContent>
+                ) : null}
+            </Tabs>
 
             {isOrganizer && editionId !== null ? (
                 <JudgingResultsPanel organizationId={organizationId} editionId={editionId} />

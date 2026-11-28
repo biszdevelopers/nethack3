@@ -78,6 +78,12 @@ export default async function PastCompetitionsPage(): Promise<ReactNode> {
                                     >
                                         Projects
                                     </Link>
+                                    <Link
+                                        href={`/seasons/${competition.slug}`}
+                                        className="text-ink-muted transition-colors hover:text-primary"
+                                    >
+                                        Season archive
+                                    </Link>
                                 </div>
                             </CardContent>
                         </Card>

@@ -2,7 +2,16 @@ import { useState, type ReactNode } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams } from "react-router";
-import type { Ballot, OrganizationRole, VoteResult, VotingRound } from "@nethack/contracts";
+import {
+    BALLOT_MAX_STARS_PER_SUBMISSION,
+    BALLOT_TOTAL_STARS,
+    type Ballot,
+    type BallotScore,
+    type OrganizationRole,
+    type VoteResult,
+    type VotableSubmission,
+    type VotingRound,
+} from "@nethack/contracts";
 import {
     AlertDialog,
     Badge,
@@ -12,7 +21,6 @@ import {
     CardDescription,
     CardHeader,
     CardTitle,
-    Checkbox,
     CheckboxGroup,
     EmptyState,
     Form,
@@ -110,7 +118,7 @@ export function VotingPage(): ReactNode {
             name: "",
             description: "",
             eligibleRoles: ["participant"],
-            maxSelections: 1,
+            maxSelections: 10,
             opensAt: "",
             closesAt: "",
         },
@@ -151,7 +159,7 @@ export function VotingPage(): ReactNode {
             name: "",
             description: "",
             eligibleRoles: ["participant"],
-            maxSelections: 1,
+            maxSelections: 10,
             opensAt: "",
             closesAt: "",
         });
@@ -174,7 +182,7 @@ export function VotingPage(): ReactNode {
                 name: "",
                 description: "",
                 eligibleRoles: ["participant"],
-                maxSelections: 1,
+                maxSelections: 10,
                 opensAt: "",
                 closesAt: "",
             });
@@ -320,8 +328,9 @@ export function VotingPage(): ReactNode {
                                 <CardHeader>
                                     <CardTitle>Create a voting round</CardTitle>
                                     <CardDescription>
-                                        Eligible roles and the selection limit are fixed when the
-                                        round is created.
+                                        Eligible roles and how many projects may be scored are fixed
+                                        when the round is created. Every ballot must distribute 10
+                                        stars with at most 5 per project.
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent>
@@ -342,12 +351,12 @@ export function VotingPage(): ReactNode {
                                                     name="maxSelections"
                                                     render={({ field, fieldState }) => (
                                                         <NumberInput
-                                                            label="Maximum selections"
-                                                            min={1}
+                                                            label="Maximum scored projects"
+                                                            min={2}
                                                             max={50}
                                                             value={field.value}
                                                             onValueChange={(value) =>
-                                                                field.onChange(value ?? 1)
+                                                                field.onChange(value ?? 10)
                                                             }
                                                             {...(fieldState.error?.message ===
                                                             undefined
@@ -455,7 +464,7 @@ export function VotingPage(): ReactNode {
                                                     <TableHead>Round</TableHead>
                                                     <TableHead>Status</TableHead>
                                                     <TableHead>Eligible roles</TableHead>
-                                                    <TableHead>Selections</TableHead>
+                                                    <TableHead>Scored projects</TableHead>
                                                     <TableHead>Window</TableHead>
                                                     <TableHead className="text-right">
                                                         Actions
@@ -628,20 +637,37 @@ function ResultTable({ result }: { readonly result: VoteResult }): ReactNode {
         <Table>
             <TableHeader>
                 <TableRow>
+                    <TableHead>Rank</TableHead>
                     <TableHead>Project</TableHead>
                     <TableHead>Team</TableHead>
-                    <TableHead className="text-right">Votes</TableHead>
+                    <TableHead className="text-right">Ballots</TableHead>
+                    <TableHead className="text-right">Total stars</TableHead>
+                    <TableHead className="text-right">Average stars</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
                 {result.entries.map((entry) => (
                     <TableRow key={entry.submissionId}>
-                        <TableCell>{entry.projectTitle}</TableCell>
+                        <TableCell className="tabular-nums">{String(entry.rank)}</TableCell>
+                        <TableCell>
+                            <span className="flex flex-wrap items-center gap-2">
+                                {entry.projectTitle}
+                                {entry.rank === 1 ? (
+                                    <Badge tone="primary">{"People's choice"}</Badge>
+                                ) : null}
+                            </span>
+                        </TableCell>
                         <TableCell className="text-ink-muted">
                             {entry.teamName ?? "No team"}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                             {String(entry.votes)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                            {String(entry.totalStars)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                            {entry.averageStars.toFixed(2)}
                         </TableCell>
                     </TableRow>
                 ))}
@@ -663,31 +689,15 @@ function BallotCard({
     const ballot = useBallot(organizationId, round.id, true);
     const submissions = useVotableSubmissions(organizationId, editionId);
     const castBallot = useCastBallot(organizationId, editionId);
-    const [selected, setSelected] = useState<readonly string[]>([]);
 
-    const submitted = ballot.data !== null && ballot.data !== undefined;
+    const submittedBallot = ballot.data ?? null;
+    const submitted = submittedBallot !== null;
     const submissionItems = submissions.data?.items ?? [];
-    const atLimit = selected.length >= round.maxSelections;
 
-    const toggle = (submissionId: string, checked: boolean): void => {
-        setSelected((current) => {
-            if (!checked) {
-                return current.filter((id) => id !== submissionId);
-            }
-            if (current.includes(submissionId) || current.length >= round.maxSelections) {
-                return current;
-            }
-            return [...current, submissionId];
-        });
-    };
-
-    const onCast = async (): Promise<void> => {
+    const onCast = async (scores: readonly BallotScore[]): Promise<void> => {
         try {
-            await castBallot.mutateAsync({
-                roundId: round.id,
-                body: { submissionIds: [...selected] },
-            });
-            toast({ title: "Ballot submitted", tone: "success" });
+            await castBallot.mutateAsync({ roundId: round.id, body: { scores: [...scores] } });
+            toast({ title: submitted ? "Ballot updated" : "Ballot submitted", tone: "success" });
         } catch (error) {
             toast({
                 title: "Could not submit the ballot",
@@ -715,102 +725,231 @@ function BallotCard({
                 </div>
             </CardHeader>
             <CardContent>
-                <div className="flex flex-col gap-4">
-                    <dl className="grid grid-cols-2 gap-3 text-xs text-ink-muted">
-                        <div className="flex flex-col gap-0.5">
-                            <dt className="text-ink-subtle">Selections allowed</dt>
-                            <dd className="tabular-nums text-ink">{String(round.maxSelections)}</dd>
-                        </div>
-                        <div className="flex flex-col gap-0.5">
-                            <dt className="text-ink-subtle">Closes</dt>
-                            <dd className="text-ink">{formatDateTime(round.closesAt)}</dd>
-                        </div>
-                    </dl>
-
-                    {ballot.isPending ? (
-                        <LoadingBlock rows={2} label="Loading ballot" />
-                    ) : ballot.isError ? (
-                        <RequestError error={ballot.error} onRetry={() => void ballot.refetch()} />
-                    ) : ballot.data !== null && ballot.data !== undefined ? (
-                        <BallotSummary ballot={ballot.data} />
-                    ) : submissions.isPending ? (
-                        <LoadingBlock rows={3} label="Loading submissions" />
-                    ) : submissions.isError ? (
-                        <RequestError
-                            error={submissions.error}
-                            onRetry={() => void submissions.refetch()}
-                        />
-                    ) : submissionItems.length === 0 ? (
-                        <EmptyState
-                            title="No submissions"
-                            description="A ballot can be cast after submissions exist in this edition."
-                        />
-                    ) : (
-                        <fieldset className="flex flex-col gap-2">
-                            <legend className="text-sm font-medium text-ink">
-                                Select up to {String(round.maxSelections)}
-                            </legend>
-                            {submissionItems.map((submission) => {
-                                const checked = selected.includes(submission.id);
-                                return (
-                                    <Checkbox
-                                        key={submission.id}
-                                        checked={checked}
-                                        onCheckedChange={(value) =>
-                                            toggle(submission.id, value === true)
-                                        }
-                                        disabled={!checked && atLimit}
-                                        label={
-                                            submission.teamName === null
-                                                ? submission.projectTitle
-                                                : `${submission.projectTitle} · ${submission.teamName}`
-                                        }
-                                    />
-                                );
-                            })}
-                        </fieldset>
-                    )}
-
-                    {submitted ? null : submissionItems.length > 0 ? (
-                        <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3">
-                            <Button
-                                type="button"
-                                loading={castBallot.isPending}
-                                disabled={selected.length === 0}
-                                onClick={() => void onCast()}
-                            >
-                                Cast ballot
-                            </Button>
-                            <span className="text-xs text-ink-muted">
-                                {String(selected.length)} of {String(round.maxSelections)} selected
-                            </span>
-                        </div>
-                    ) : null}
-                </div>
+                {ballot.isPending ? (
+                    <LoadingBlock rows={2} label="Loading ballot" />
+                ) : ballot.isError ? (
+                    <RequestError error={ballot.error} onRetry={() => void ballot.refetch()} />
+                ) : submissions.isPending ? (
+                    <LoadingBlock rows={3} label="Loading submissions" />
+                ) : submissions.isError ? (
+                    <RequestError
+                        error={submissions.error}
+                        onRetry={() => void submissions.refetch()}
+                    />
+                ) : submissionItems.length === 0 ? (
+                    <EmptyState
+                        title="No submissions"
+                        description="A ballot can be cast after submissions exist in this edition."
+                    />
+                ) : (
+                    <StarEditor
+                        key={submittedBallot?.submittedAt ?? "new"}
+                        round={round}
+                        submissions={submissionItems}
+                        initialScores={scoresFromBallot(ballot.data)}
+                        submittedAt={submittedBallot?.submittedAt ?? null}
+                        isSubmitting={castBallot.isPending}
+                        onCast={onCast}
+                    />
+                )}
             </CardContent>
         </Card>
     );
 }
 
-function BallotSummary({ ballot }: { readonly ballot: Ballot }): ReactNode {
-    if (ballot.submissionIds.length === 0) {
-        return (
-            <EmptyState
-                title="Empty ballot"
-                description="This ballot does not contain any selections."
-            />
-        );
-    }
+function StarEditor({
+    round,
+    submissions,
+    initialScores,
+    submittedAt,
+    isSubmitting,
+    onCast,
+}: {
+    readonly round: VotingRound;
+    readonly submissions: readonly VotableSubmission[];
+    readonly initialScores: Record<string, number>;
+    readonly submittedAt: string | null;
+    readonly isSubmitting: boolean;
+    readonly onCast: (scores: readonly BallotScore[]) => Promise<void>;
+}): ReactNode {
+    const [scores, setScores] = useState<Record<string, number>>(() => {
+        const visible: Record<string, number> = {};
+        for (const submission of submissions) {
+            const stars = initialScores[submission.id];
+            if (stars !== undefined) {
+                visible[submission.id] = stars;
+            }
+        }
+        return visible;
+    });
+
+    const totalStars = Object.values(scores).reduce((sum, stars) => sum + stars, 0);
+    const remainingStars = BALLOT_TOTAL_STARS - totalStars;
+    const scoredCount = Object.values(scores).filter((stars) => stars > 0).length;
+    const atScoredLimit = scoredCount >= round.maxSelections;
+    const capBlocksFullBallot =
+        round.maxSelections * BALLOT_MAX_STARS_PER_SUBMISSION < BALLOT_TOTAL_STARS;
+    const canSubmit = totalStars === BALLOT_TOTAL_STARS && !capBlocksFullBallot && !isSubmitting;
+
+    const changeStars = (submissionId: string, delta: number): void => {
+        setScores((current) => {
+            const stars = current[submissionId] ?? 0;
+            const next = stars + delta;
+            if (next < 0 || next > BALLOT_MAX_STARS_PER_SUBMISSION) {
+                return current;
+            }
+            const currentTotal = Object.values(current).reduce((sum, value) => sum + value, 0);
+            if (delta > 0 && currentTotal >= BALLOT_TOTAL_STARS) {
+                return current;
+            }
+            const currentScored = Object.values(current).filter((value) => value > 0).length;
+            if (delta > 0 && stars === 0 && currentScored >= round.maxSelections) {
+                return current;
+            }
+            return { ...current, [submissionId]: next };
+        });
+    };
+
+    const submit = async (): Promise<void> => {
+        const payload = submissions
+            .map((submission) => ({
+                submissionId: submission.id,
+                stars: scores[submission.id] ?? 0,
+            }))
+            .filter((score) => score.stars > 0);
+        await onCast(payload);
+    };
+
     return (
-        <div className="flex flex-col gap-2">
-            <p className="text-sm text-ink">Submitted {formatDateTime(ballot.submittedAt)}</p>
-            <ul className="flex flex-col gap-1">
-                {ballot.submissionIds.map((submissionId) => (
-                    <li key={submissionId} className="text-xs text-ink-muted">
-                        {submissionId}
-                    </li>
-                ))}
-            </ul>
+        <div className="flex flex-col gap-4">
+            <dl className="grid grid-cols-2 gap-3 text-xs text-ink-muted sm:grid-cols-4">
+                <div className="flex flex-col gap-0.5">
+                    <dt className="text-ink-subtle">Stars to distribute</dt>
+                    <dd className="tabular-nums text-ink">{String(BALLOT_TOTAL_STARS)}</dd>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                    <dt className="text-ink-subtle">Remaining</dt>
+                    <dd className="tabular-nums text-ink">{String(remainingStars)}</dd>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                    <dt className="text-ink-subtle">Max stars per project</dt>
+                    <dd className="tabular-nums text-ink">
+                        {String(BALLOT_MAX_STARS_PER_SUBMISSION)}
+                    </dd>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                    <dt className="text-ink-subtle">Projects you may score</dt>
+                    <dd className="tabular-nums text-ink">{String(round.maxSelections)}</dd>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                    <dt className="text-ink-subtle">Closes</dt>
+                    <dd className="text-ink">{formatDateTime(round.closesAt)}</dd>
+                </div>
+            </dl>
+
+            {capBlocksFullBallot ? (
+                <p className="text-sm text-ink-muted">
+                    This round allows scoring {String(round.maxSelections)}{" "}
+                    {round.maxSelections === 1 ? "project" : "projects"}, which cannot reach{" "}
+                    {String(BALLOT_TOTAL_STARS)} stars. Ask an organizer to raise the limit.
+                </p>
+            ) : null}
+
+            {submittedAt === null ? null : (
+                <p className="text-sm text-ink">
+                    You submitted a ballot {formatDateTime(submittedAt)}. You can update it until
+                    the round closes.
+                </p>
+            )}
+
+            <fieldset className="flex flex-col gap-3">
+                <legend className="text-sm font-medium text-ink">
+                    Assign stars to each project
+                </legend>
+                <ul className="flex flex-col gap-3">
+                    {submissions.map((submission) => {
+                        const stars = scores[submission.id] ?? 0;
+                        const canAdd =
+                            !isSubmitting &&
+                            !capBlocksFullBallot &&
+                            stars < BALLOT_MAX_STARS_PER_SUBMISSION &&
+                            remainingStars > 0 &&
+                            (stars > 0 || !atScoredLimit);
+                        return (
+                            <li
+                                key={submission.id}
+                                className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3 first:border-t-0 first:pt-0"
+                            >
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-sm text-ink">
+                                        {submission.projectTitle}
+                                    </span>
+                                    <span className="text-xs text-ink-muted">
+                                        {submission.teamName ?? "No team"}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        aria-label={`Remove a star from ${submission.projectTitle}`}
+                                        disabled={isSubmitting || stars === 0}
+                                        onClick={() => changeStars(submission.id, -1)}
+                                    >
+                                        -
+                                    </Button>
+                                    <span className="min-w-20 text-center text-sm tabular-nums text-ink">
+                                        {String(stars)} of {String(BALLOT_MAX_STARS_PER_SUBMISSION)}
+                                    </span>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        aria-label={`Add a star to ${submission.projectTitle}`}
+                                        disabled={!canAdd}
+                                        onClick={() => changeStars(submission.id, 1)}
+                                    >
+                                        +
+                                    </Button>
+                                </div>
+                            </li>
+                        );
+                    })}
+                </ul>
+            </fieldset>
+
+            <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3">
+                <Button
+                    type="button"
+                    loading={isSubmitting}
+                    disabled={!canSubmit}
+                    onClick={() => void submit()}
+                >
+                    {submittedAt === null ? "Cast ballot" : "Update ballot"}
+                </Button>
+                <span className="text-xs text-ink-muted">
+                    {String(totalStars)} of {String(BALLOT_TOTAL_STARS)} stars assigned across{" "}
+                    {String(scoredCount)} of {String(round.maxSelections)} projects
+                </span>
+            </div>
+            {remainingStars > 0 ? (
+                <p className="text-xs text-ink-muted">
+                    Assign {String(remainingStars)} more {remainingStars === 1 ? "star" : "stars"}{" "}
+                    to submit this ballot.
+                </p>
+            ) : null}
         </div>
     );
+}
+
+function scoresFromBallot(ballot: Ballot | null | undefined): Record<string, number> {
+    if (ballot === null || ballot === undefined) {
+        return {};
+    }
+    const scores: Record<string, number> = {};
+    for (const score of ballot.scores) {
+        scores[score.submissionId] = score.stars;
+    }
+    return scores;
 }

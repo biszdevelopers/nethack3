@@ -33,7 +33,7 @@ import {
     StaggerReveal,
     Tilt,
 } from "@nethack/ui/motion";
-import { getCompetitions, getProjects } from "../lib/public-api";
+import { getCompetition, getCompetitions, getProjects } from "../lib/public-api";
 
 const FEATURES = [
     {
@@ -79,6 +79,46 @@ function statusLabel(status: string): string {
     return status.replaceAll("_", " ");
 }
 
+const EVENT_STATUS_PRIORITY = [
+    "registration_open",
+    "active",
+    "judging",
+    "voting",
+    "registration_closed",
+    "published",
+] as const;
+
+function eventPhaseLabel(status: string): string {
+    switch (status) {
+        case "registration_open":
+            return "Registration is open";
+        case "registration_closed":
+            return "Registration is closed";
+        case "active":
+            return "Submissions are open";
+        case "judging":
+            return "Judging is in progress";
+        case "voting":
+            return "Peer voting is open";
+        case "completed":
+            return "This event is complete";
+        case "archived":
+            return "This event is archived";
+        default:
+            return "A competition is published";
+    }
+}
+
+function currentEvent<T extends { readonly status: string }>(items: readonly T[]): T | undefined {
+    for (const status of EVENT_STATUS_PRIORITY) {
+        const found = items.find((item) => item.status === status);
+        if (found !== undefined) {
+            return found;
+        }
+    }
+    return undefined;
+}
+
 export default async function HomePage(): Promise<ReactNode> {
     const workspaceOrigin = process.env.WORKSPACE_ORIGIN ?? "http://localhost:5173";
     let competitions: Awaited<ReturnType<typeof getCompetitions>> = {
@@ -93,10 +133,26 @@ export default async function HomePage(): Promise<ReactNode> {
         unavailable = true;
     }
 
-    const openCompetition = competitions.items.find(
-        (competition) =>
-            competition.status === "registration_open" || competition.status === "published",
-    );
+    const openCompetition = currentEvent(competitions.items);
+    let nextMilestone: { title: string; occursAt: string } | null = null;
+    if (openCompetition !== undefined) {
+        try {
+            const detail = await getCompetition(openCompetition.slug);
+            nextMilestone =
+                detail.milestones
+                    .filter(
+                        (milestone) =>
+                            new Date(milestone.occursAt).getTime() >= Date.now() &&
+                            milestone.kind !== "other",
+                    )
+                    .toSorted(
+                        (left, right) =>
+                            new Date(left.occursAt).getTime() - new Date(right.occursAt).getTime(),
+                    )[0] ?? null;
+        } catch {
+            nextMilestone = null;
+        }
+    }
 
     return (
         <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-20 overflow-x-clip px-4 py-10 sm:px-6 md:py-16 lg:px-8">
@@ -161,9 +217,7 @@ export default async function HomePage(): Promise<ReactNode> {
                             />
                             <span className="flex flex-col gap-0.5">
                                 <span className="text-sm font-medium text-primary">
-                                    {openCompetition.status === "registration_open"
-                                        ? "Registration is open"
-                                        : "A competition is published"}
+                                    {eventPhaseLabel(openCompetition.status)}
                                 </span>
                                 <span className="text-sm text-ink-muted">
                                     {openCompetition.name} · {openCompetition.organizationName} ·{" "}
@@ -172,6 +226,12 @@ export default async function HomePage(): Promise<ReactNode> {
                                             openCompetition.startsAt,
                                     )}
                                 </span>
+                                {nextMilestone === null ? null : (
+                                    <span className="text-xs text-ink-subtle">
+                                        Next: {nextMilestone.title} ·{" "}
+                                        {formatDate(nextMilestone.occursAt)}
+                                    </span>
+                                )}
                             </span>
                             <ArrowUpRight
                                 className="ml-auto mt-0.5 size-4 text-primary transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"

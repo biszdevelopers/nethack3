@@ -3,12 +3,19 @@ import type {
     ConflictDeclarationRequest,
     CreateRubricRequest,
     CreateAssignmentRequest,
+    CreateJudgeFlagRequest,
     JudgeAssignmentStatus,
     SaveEvaluationRequest,
 } from "@nethack/contracts";
 import { api } from "../../application/api.js";
 import { queryKeys } from "../shared/query-keys.js";
 import { listEditionSubmissions } from "./edition-submissions.js";
+
+const flagsKeyPrefix = (organizationId: string) => ["judging", organizationId, "flags"] as const;
+const coverageKeyPrefix = (organizationId: string) =>
+    ["judging", organizationId, "coverage"] as const;
+const historyKeyPrefix = (organizationId: string) =>
+    ["judging", organizationId, "history"] as const;
 
 export function useMyAssignments(organizationId: string | null, status?: JudgeAssignmentStatus) {
     return useQuery({
@@ -212,6 +219,9 @@ export function useSubmitEvaluation(organizationId: string | null, assignmentId:
                           queryClient.invalidateQueries({
                               queryKey: queryKeys.judgingAssignments(organizationId),
                           }),
+                          queryClient.invalidateQueries({
+                              queryKey: historyKeyPrefix(organizationId),
+                          }),
                       ]),
             ]);
         },
@@ -242,6 +252,87 @@ export function useDeclareConflict(organizationId: string | null, assignmentId: 
                               queryKey: queryKeys.judgingAssignments(organizationId),
                           }),
                       ]),
+            ]);
+        },
+    });
+}
+
+export function useJudgingHistory(organizationId: string | null, editionId: string | null) {
+    return useQuery({
+        queryKey: [...historyKeyPrefix(organizationId ?? "none"), editionId ?? "none"],
+        queryFn: async () => {
+            if (organizationId === null || editionId === null) {
+                return { items: [], nextCursor: null };
+            }
+            return api.judging.judgingHistory(organizationId, editionId);
+        },
+        enabled: organizationId !== null && editionId !== null,
+    });
+}
+
+export function useEditionJudgingFlags(organizationId: string | null, editionId: string | null) {
+    return useQuery({
+        queryKey: [...flagsKeyPrefix(organizationId ?? "none"), editionId ?? "none"],
+        queryFn: async () => {
+            if (organizationId === null || editionId === null) {
+                return { items: [], nextCursor: null };
+            }
+            return api.judging.flags(organizationId, editionId);
+        },
+        enabled: organizationId !== null && editionId !== null,
+    });
+}
+
+export function useJudgingCoverage(organizationId: string | null, editionId: string | null) {
+    return useQuery({
+        queryKey: [...coverageKeyPrefix(organizationId ?? "none"), editionId ?? "none"],
+        queryFn: async () => {
+            if (organizationId === null || editionId === null) {
+                return null;
+            }
+            return api.judging.coverage(organizationId, editionId);
+        },
+        enabled: organizationId !== null && editionId !== null,
+    });
+}
+
+export function useFlagAssignment(organizationId: string | null, assignmentId: string | null) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (input: CreateJudgeFlagRequest) => {
+            if (organizationId === null || assignmentId === null) {
+                throw new Error("Select an assignment first.");
+            }
+            return api.judging.flagAssignment(organizationId, assignmentId, input);
+        },
+        onSuccess: async () => {
+            if (organizationId === null) {
+                return;
+            }
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: flagsKeyPrefix(organizationId) }),
+                queryClient.invalidateQueries({ queryKey: coverageKeyPrefix(organizationId) }),
+            ]);
+        },
+    });
+}
+
+export function useResolveJudgingFlag(organizationId: string | null) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (flagId: string) => {
+            if (organizationId === null) {
+                throw new Error("Select an organization first.");
+            }
+            return api.judging.resolveFlag(organizationId, flagId);
+        },
+        onSuccess: async () => {
+            if (organizationId === null) {
+                return;
+            }
+            await Promise.all([
+                queryClient.invalidateQueries({ queryKey: flagsKeyPrefix(organizationId) }),
+                queryClient.invalidateQueries({ queryKey: coverageKeyPrefix(organizationId) }),
             ]);
         },
     });

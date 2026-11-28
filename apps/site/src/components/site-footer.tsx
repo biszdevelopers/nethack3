@@ -9,7 +9,7 @@ export function SiteFooter(): ReactNode {
     const workspaceOrigin = process.env.WORKSPACE_ORIGIN ?? "http://localhost:5173";
     return (
         <footer className="border-t border-line bg-panel/40">
-            <Reveal className="mx-auto grid w-full max-w-[1280px] gap-8 px-4 py-10 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr] lg:px-8">
+            <Reveal className="mx-auto grid w-full max-w-[1280px] gap-8 px-4 py-10 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr_1fr] lg:px-8">
                 <div className="flex flex-col gap-3">
                     <Link
                         href="/"
@@ -51,7 +51,13 @@ export function SiteFooter(): ReactNode {
                         href="/past"
                         className="text-ink-muted transition-colors hover:text-primary"
                     >
-                        Past competitions
+                        Seasons archive
+                    </Link>
+                    <Link
+                        href="/results"
+                        className="text-ink-muted transition-colors hover:text-primary"
+                    >
+                        Results
                     </Link>
                     <Link
                         href="/about"
@@ -64,6 +70,22 @@ export function SiteFooter(): ReactNode {
                         className="text-ink-muted transition-colors hover:text-primary"
                     >
                         FAQ
+                    </Link>
+                </nav>
+
+                <nav aria-label="Support" className="flex flex-col gap-2 text-sm">
+                    <p className="text-xs text-ink-subtle">Support</p>
+                    <Link
+                        href="/contact"
+                        className="text-ink-muted transition-colors hover:text-primary"
+                    >
+                        Contact
+                    </Link>
+                    <Link
+                        href="/contributing"
+                        className="text-ink-muted transition-colors hover:text-primary"
+                    >
+                        Contributing
                     </Link>
                 </nav>
 

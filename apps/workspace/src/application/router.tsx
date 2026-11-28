@@ -107,6 +107,14 @@ export const router = createBrowserRouter([
                         },
                     },
                     {
+                        path: "judging/history",
+                        lazy: async () => {
+                            const { JudgingHistoryPage } =
+                                await import("../pages/judging-history-page.js");
+                            return { Component: JudgingHistoryPage };
+                        },
+                    },
+                    {
                         path: "voting",
                         lazy: async () => {
                             const { VotingPage } = await import("../pages/voting-page.js");
@@ -141,6 +149,58 @@ export const router = createBrowserRouter([
                         lazy: async () => {
                             const { AdminPage } = await import("../pages/admin-page.js");
                             return { Component: AdminPage };
+                        },
+                    },
+                    {
+                        path: "admin/users",
+                        lazy: async () => {
+                            const { AdminUsersPage } = await import("../pages/admin-users-page.js");
+                            return { Component: AdminUsersPage };
+                        },
+                    },
+                    {
+                        path: "admin/teams",
+                        lazy: async () => {
+                            const { AdminTeamsPage } = await import("../pages/admin-teams-page.js");
+                            return { Component: AdminTeamsPage };
+                        },
+                    },
+                    {
+                        path: "admin/standings",
+                        lazy: async () => {
+                            const { AdminStandingsPage } =
+                                await import("../pages/admin-standings-page.js");
+                            return { Component: AdminStandingsPage };
+                        },
+                    },
+                    {
+                        path: "results",
+                        lazy: async () => {
+                            const { ParticipantResultsPage } =
+                                await import("../pages/participant-results-page.js");
+                            return { Component: ParticipantResultsPage };
+                        },
+                    },
+                    {
+                        path: "awards",
+                        lazy: async () => {
+                            const { AwardsPage } = await import("../pages/awards-page.js");
+                            return { Component: AwardsPage };
+                        },
+                    },
+                    {
+                        path: "profile",
+                        lazy: async () => {
+                            const { ProfilePage } = await import("../pages/profile-page.js");
+                            return { Component: ProfilePage };
+                        },
+                    },
+                    {
+                        path: "presentation",
+                        lazy: async () => {
+                            const { PresentationPage } =
+                                await import("../pages/presentation-page.js");
+                            return { Component: PresentationPage };
                         },
                     },
                     ...(import.meta.env.DEV

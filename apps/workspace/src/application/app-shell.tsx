@@ -27,8 +27,10 @@ import {
     useIsoLayoutEffect,
 } from "@nethack/ui";
 import {
+    Award,
     Bell,
     Building2,
+    ChartNoAxesColumn,
     ChevronDown,
     FolderGit2,
     Gavel,
@@ -36,6 +38,7 @@ import {
     LogOut,
     Menu as MenuIcon,
     Moon,
+    Presentation,
     Send,
     Settings,
     Shield,
@@ -66,6 +69,7 @@ const PRIMARY_NAVIGATION: readonly NavigationItem[] = [
     { label: "Teams", to: "/teams", icon: <Users className="size-4" /> },
     { label: "Projects", to: "/projects", icon: <FolderGit2 className="size-4" /> },
     { label: "Submissions", to: "/submissions", icon: <Send className="size-4" /> },
+    { label: "Results", to: "/results", icon: <Award className="size-4" /> },
 ];
 
 const REVIEW_NAVIGATION: readonly NavigationItem[] = [
@@ -90,10 +94,18 @@ const ORGANIZATION_NAVIGATION: readonly NavigationItem[] = [
         roles: ["owner", "organizer"],
         icon: <Building2 className="size-4" />,
     },
+    {
+        label: "Administration",
+        to: "/admin",
+        roles: ["owner", "organizer"],
+        icon: <ChartNoAxesColumn className="size-4" />,
+    },
 ];
 
 const ACCOUNT_NAVIGATION: readonly NavigationItem[] = [
     { label: "Notifications", to: "/notifications", icon: <Bell className="size-4" /> },
+    { label: "Profile", to: "/profile", icon: <UserRound className="size-4" /> },
+    { label: "Presentation", to: "/presentation", icon: <Presentation className="size-4" /> },
     { label: "Settings", to: "/settings", icon: <Settings className="size-4" /> },
 ];
 

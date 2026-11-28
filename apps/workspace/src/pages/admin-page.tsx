@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { Link } from "react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { AuditLog, GlobalAdministrator } from "@nethack/contracts";
@@ -34,7 +35,7 @@ import {
     Textarea,
     useToast,
 } from "@nethack/ui";
-import { useSession } from "../application/session.js";
+import { useSession, useActiveMembership } from "../application/session.js";
 import { formatDateTime } from "../capabilities/shared/datetime.js";
 import { describeError } from "../capabilities/shared/errors.js";
 import { RequestError } from "../capabilities/shared/states.jsx";
@@ -70,6 +71,8 @@ function AdminContent({
     readonly globalAdministrator: boolean;
 }): ReactNode {
     const { toast } = useToast();
+    const { membership } = useActiveMembership();
+    const canManageOrganization = membership?.role === "owner" || membership?.role === "organizer";
     const administrators = useGlobalAdministrators(globalAdministrator);
     const grantAdministrator = useGrantAdministrator();
     const revokeAdministrator = useRevokeAdministrator();
@@ -120,23 +123,20 @@ function AdminContent({
             <div className="flex flex-col gap-6">
                 <PageHeader
                     title="Administration"
-                    description="Global administrators and cross-organization audit history."
+                    description="Organization administration and platform-wide controls."
                 />
-                <Alert tone="warning" title="Global administrator access required">
-                    This area is limited to global administrators. Organization-level administration
-                    is available on the organization page for owners and organizers.
+                {canManageOrganization ? (
+                    <AdministrationHub />
+                ) : (
+                    <Alert tone="warning" title="Administration access required">
+                        Organization administration requires an owner or organizer role. Platform
+                        administration requires a global administrator grant.
+                    </Alert>
+                )}
+                <Alert tone="neutral" title="Platform controls">
+                    Global administrator grants and cross-organization audit history are limited to
+                    global administrators.
                 </Alert>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>What this area controls</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-ink-muted">
-                            <li>Granting and revoking global administrator access.</li>
-                            <li>Reading audit history across organizations.</li>
-                        </ul>
-                    </CardContent>
-                </Card>
             </div>
         );
     }
@@ -197,9 +197,11 @@ function AdminContent({
         <div className="flex flex-col gap-6">
             <PageHeader
                 title="Administration"
-                description="Global administrators and cross-organization audit history."
+                description="Global administrators, organization operations, and cross-organization audit history."
                 actions={<Badge tone="outline">Global administrator</Badge>}
             />
+
+            {canManageOrganization ? <AdministrationHub /> : null}
 
             <section className="flex flex-col gap-4" aria-labelledby="administrators-heading">
                 <div className="flex flex-col gap-1">
@@ -545,5 +547,57 @@ function AdminContent({
                 </Card>
             ) : null}
         </div>
+    );
+}
+
+const ADMINISTRATION_LINKS = [
+    {
+        to: "/admin/users",
+        title: "Users",
+        description: "Member roles, judge flags, and global administrator grants.",
+    },
+    {
+        to: "/admin/teams",
+        title: "Teams",
+        description: "Team status, membership, deletion, and submission reopening.",
+    },
+    {
+        to: "/admin/standings",
+        title: "Standings",
+        description: "Preflight counts and the standings CSV export.",
+    },
+    {
+        to: "/awards",
+        title: "Awards",
+        description: "Award catalog, team assignments, and results publication.",
+    },
+] as const;
+
+function AdministrationHub(): ReactNode {
+    return (
+        <section className="flex flex-col gap-3" aria-labelledby="administration-hub-heading">
+            <div className="flex flex-col gap-1">
+                <h2 id="administration-hub-heading" className="text-lg font-bold tracking-tight">
+                    Organization operations
+                </h2>
+                <p className="text-sm text-ink-muted">
+                    Organizer tools for the active organization.
+                </p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+                {ADMINISTRATION_LINKS.map((link) => (
+                    <Link
+                        key={link.to}
+                        to={link.to}
+                        className="rounded-lg border border-line bg-panel p-4 transition-colors hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-primary/25"
+                    >
+                        <span className="block text-sm font-semibold text-ink">{link.title}</span>
+                        <span className="mt-1 block text-xs text-ink-muted">
+                            {link.description}
+                        </span>
+                    </Link>
+                ))}
+            </div>
+        </section>
     );
 }

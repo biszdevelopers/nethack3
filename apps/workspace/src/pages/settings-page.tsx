@@ -15,7 +15,7 @@ import {
     useColorMode,
     useLocale,
 } from "@nethack/ui";
-import { Sun, Moon, UserRound } from "lucide-react";
+import { Sun, Moon, UserRound, ExternalLink } from "lucide-react";
 import { useSession } from "../application/session.js";
 import { api } from "../application/api.js";
 import { useQueryClient } from "@tanstack/react-query";
@@ -43,6 +43,9 @@ export function SettingsPage(): ReactNode {
     if (user === null) {
         return null;
     }
+
+    const siteOrigin = import.meta.env.VITE_SITE_ORIGIN ?? "http://localhost:3000";
+    const publicProfileUrl = new URL(`/users/${user.id}`, siteOrigin).toString();
 
     const saveProfile = async (): Promise<void> => {
         setStatus("saving");
@@ -109,6 +112,24 @@ export function SettingsPage(): ReactNode {
                                     {user.email ?? "No email on file"}
                                 </span>
                             </div>
+                        </div>
+                        <div className="flex flex-col gap-1 rounded-md border border-line bg-app/60 p-3">
+                            <span className="text-xs text-ink-subtle">Public profile</span>
+                            <a
+                                href={publicProfileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-start gap-1.5 break-all text-xs text-primary transition-colors hover:text-primary-hover"
+                            >
+                                {publicProfileUrl}
+                                <ExternalLink
+                                    className="mt-0.5 size-3 shrink-0"
+                                    aria-hidden="true"
+                                />
+                            </a>
+                            <span className="text-xs text-ink-muted">
+                                Publishes your display name and avatar. Your email stays private.
+                            </span>
                         </div>
                         <div className="flex flex-col gap-1.5">
                             <label htmlFor="display-name" className="text-sm font-medium">
